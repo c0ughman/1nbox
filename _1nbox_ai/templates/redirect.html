@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Current URL Display</title>
+</head>
+<body>
+
+<h1>HERE!</h1>
+
+<script>
+    // Get the current URL
+    var currentUrl = window.location.href;
+
+    var stringUrl = String(currentUrl);
+    const url = new URL(stringUrl);
+
+    // Get the fragment part of the URL
+    const fragment = url.hash.substring(1);
+
+    // Parse the fragment to get URLSearchParams
+    const params = new URLSearchParams(fragment);
+
+    // Extract the desired parameters
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token");
+    const provider_token = params.get("provider_token");
+
+    // The backend URL for the POST request
+    const backendURL = "https://6944-190-141-90-15.ngrok-free.app/process_tokens/";
+
+    // Create the data payload for the POST request
+    const data = {
+    access_token: access_token,
+    refresh_token: refresh_token,
+    provider_token: provider_token
+    };
+
+    // Perform the POST request using the fetch API
+    fetch(backendURL, {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(responseData => {
+        // Handle the response from the backend
+        console.log("Backend response:", responseData);
+
+        // Redirect the user to another page
+        //window.location.href = 'https://editor.weweb.io/672ec896-eac1-4097-a0c2-92b8f242caa5/55c9beba-0795-49a4-9265-375cc09f9be5';
+
+    })
+    .catch(error => {
+        // Handle errors during the fetch operation
+        console.error("Error during POST request:", error);
+    });
+</script>
+
+</body>
+</html>
