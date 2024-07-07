@@ -1,1 +1,1 @@
-web: gunicorn 1nbox.wsgi
+web: gunicorn _1nbox_ai.wsgi
