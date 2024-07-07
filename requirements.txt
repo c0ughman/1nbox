@@ -34,7 +34,7 @@ openai==1.11.1
 packaging==23.2
 pluggy==1.4.0
 postgrest==0.15.0
-postgrest-py==0.4.0
+#postgrest-py==0.4.0
 protobuf==4.25.2
 py==1.11.0
 pyasn1==0.5.1
