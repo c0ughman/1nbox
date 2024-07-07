@@ -32,7 +32,7 @@ SECRET_KEY = 'django-insecure-9y#asx20a^uqj@r!k4v#1op2as7u+ssl#=w1wf3(gfp*f7%_h+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['e24f-92-59-222-139.ngrok-free.app', '127.0.0.1']
+ALLOWED_HOSTS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com/', '127.0.0.1']
 
 
 # Application definition
@@ -140,7 +140,7 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CSRF_TRUSTED_ORIGINS = ['https://e24f-92-59-222-139.ngrok-free.app',
+CSRF_TRUSTED_ORIGINS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com/',
                         'https://www.1nbox-ai.com',
                         'https://api.stripe.com/v1/webhook_endpoints',
                         'https://a.stripecdn.com',
