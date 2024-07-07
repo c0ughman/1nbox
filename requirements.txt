@@ -12,7 +12,7 @@ pytz
 python-dotenv
 djangorestframework
 django-cors-headers
-
-
+gunicorn
+django-heroku
 
 
