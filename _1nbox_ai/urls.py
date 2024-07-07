@@ -28,5 +28,9 @@ urlpatterns = [
     path('new_keywords/', views.new_keywords),
     path('redirect/', views.oauth_redirect, name='redirect'),
     path('process_tokens/', views.process_tokens, name='process_tokens'),
-    path('workflow/', views.workflow, name='workflow')
+    path('workflow/', views.workflow, name='workflow'),
+    path('stripe_webhook/', views.stripe_webhook, name='stripe_webhook'),
+    path('create_checkout_session/', views.create_checkout_session, name='create_checkout_session'),
+    path('create_checkout_session_pro/', views.create_checkout_session_pro, name='create_checkout_session_pro')
+
 ]

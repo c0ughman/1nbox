@@ -264,6 +264,7 @@ def create_prompt(user):
             "what messages I have received in a one-sentence summary for each email. Don't miss any of the emails."
             "I want each email summary to follow the following format: "
             "*sender name:* [the main idea or important piece of information of the email] "
+            "I also want there to be a line break after each summary"
         )
         # THIS NEEDS TO BE FIXED SOMETIME
     elif style == "importance":
