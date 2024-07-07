@@ -11,7 +11,7 @@ stripe
 pytz
 python-dotenv
 djangorestframework
-
+django-cors-headers
 
 
 
