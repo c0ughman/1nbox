@@ -59,6 +59,7 @@ soupsieve==2.5
 sqlparse==0.4.4
 storage3==0.7.0
 StrEnum==0.4.15
+stripe==10.1.0
 supabase==2.3.4
 supabase-py==0.0.2
 supafunc==0.3.3
