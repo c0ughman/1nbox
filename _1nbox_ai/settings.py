@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
-import django-heroku
+import django_heroku
 from pathlib import Path
 import os
 
@@ -175,3 +175,5 @@ CSRF_TRUSTED_ORIGINS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com/',
                         'https://uploads.stripe.com',
                         'https://editor.weweb.io'
                         ]
+
+django_heroku.settings(locals())
