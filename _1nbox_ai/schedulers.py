@@ -12,21 +12,21 @@ def checkTime(user):
     print(currentTime)
     print(user.t[:5])
 
-    if (user.frequency != 'custom'):
-        if (user.t[:5] == currentTime):
-            if (user.frequency == "daily" or str(datetime.today().weekday()) in user.weekday): 
-                return True
-            else:
-                return False
-        else:
-            return False
-    else:
+    if (user.frequency == 'custom' and user.plan == "pro")
         if ((user.t[:5] if user.t is not None else '') == currentTime or
             (user.t2[:5] if user.t2 is not None else '') == currentTime or
             (user.t3[:5] if user.t3 is not None else '') == currentTime or
             (user.t4[:5] if user.t4 is not None else '') == currentTime or
             (user.t5[:5] if user.t5 is not None else '') == currentTime):
             if (str(datetime.today().weekday()) in user.weekday or user.weekday == "[]"): 
+                return True
+            else:
+                return False
+        else:
+            return False
+    else:
+        if (user.t[:5] == currentTime):
+            if (user.frequency == "daily" or str(datetime.today().weekday()) in user.weekday): 
                 return True
             else:
                 return False
@@ -45,8 +45,9 @@ def timeLoop():
     while(True):
         print("ran")   #!!!
         for user in User.objects.all():
-            isTime = checkTime(user)
-            if (isTime):
-                execute(user)
+            if user.plan == "pro" or  user.plan == "basic":
+                isTime = checkTime(user)
+                if (isTime):
+                    execute(user)
         time.sleep(60)
 
