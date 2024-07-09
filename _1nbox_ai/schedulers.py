@@ -7,33 +7,21 @@ import pytz
 
 
 def checkTime(user):
-    madrid_timezone = pytz.timezone('Europe/Madrid') # FIX TIME ZONES
-    currentTime = str(datetime.now(madrid_timezone).time())[:5]
-    print(currentTime)
-    print(user.t[:5])
+    madrid_timezone = pytz.timezone('Europe/Madrid')
+    currentTime = datetime.now(madrid_timezone).time().replace(second=0, microsecond=0)
+    current_weekday = str(datetime.today().weekday())
 
-    if (user.frequency == 'custom' and user.plan == "pro")
-        if ((user.t[:5] if user.t is not None else '') == currentTime or
-            (user.t2[:5] if user.t2 is not None else '') == currentTime or
-            (user.t3[:5] if user.t3 is not None else '') == currentTime or
-            (user.t4[:5] if user.t4 is not None else '') == currentTime or
-            (user.t5[:5] if user.t5 is not None else '') == currentTime):
-            if (str(datetime.today().weekday()) in user.weekday or user.weekday == "[]"): 
-                return True
-            else:
-                return False
-        else:
-            return False
-    else:
-        if (user.t[:5] == currentTime):
-            if (user.frequency == "daily" or str(datetime.today().weekday()) in user.weekday): 
-                return True
-            else:
-                return False
-        else:
-            return False
+    if user.plan == "pro" and user.frequency == 'custom':
+        scheduled_times = [user.t, user.t2, user.t3, user.t4, user.t5]
+        for t in scheduled_times:
+            if t and t[:5] == str(currentTime)[:5]:
+                return current_weekday in user.weekday or user.weekday == "[]"
+    elif user.t:
+        if str(user.t)[:5] == str(currentTime)[:5]:
+            return user.frequency == "daily" or current_weekday in user.weekday
+
+    return False
         
-
 def execute(user):
     print(f"running task for {user.email}")
     try:
@@ -42,12 +30,10 @@ def execute(user):
         print(f"Had a problem running task: {e}")
 
 def timeLoop():
-    while(True):
-        print("ran")   #!!!
-        for user in User.objects.all():
-            if user.plan == "pro" or  user.plan == "basic":
-                isTime = checkTime(user)
-                if (isTime):
-                    execute(user)
+    while True:
+        print("ran")
+        for user in User.objects.filter(plan__in=["pro", "basic"]):
+            if checkTime(user):
+                execute(user)
         time.sleep(60)
 
