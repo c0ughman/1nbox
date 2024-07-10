@@ -44,18 +44,21 @@ def get_gmail_messages(user):
         refresh_access_token(creds)
 
     # Choosing the frequency to see how many days to get emails from
-    days = '1d'
-    if frequency == 'daily':
-        days = '1d'
-    elif frequency == 'weekly':
-        days = '7d'
-    else:
-        print("frequency not daily or weekly")
-    
+    last_run = user.last_run
+    if (last_run is None or last_run - int(time.time()) > 864000): # 10 days
+        print("last_run not usable, fixing...")
+        if user.frequency == "daily" or user.frequency == "custom":
+            last_run = int(time.time()) - 86400 # one day
+        elif user.frequency == "weekly":
+            last_run = int(time.time()) - 604800 # one week
+        else:
+            last_run = int(time.time()) - 86400 # one day
+            print("last_run variable is not usable and the frequency is not daily, weekly or custom, was set to one day")
+                
     service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
 
     # Get messages using the Gmail API                          UNTESTED↓↓↓
-    response = service.users().messages().list(userId='me', q=f'newer_than:{days} in:inbox is:unread -category:(promotions OR social)').execute()
+    response = service.users().messages().list(userId='me', q=f'after:{last_run} in:inbox is:unread -category:(promotions OR social)').execute()
     #print(response)
     messages = response.get('messages', [])
 
@@ -450,6 +453,7 @@ def main(user):
 
     # Send via Whatsapp
     send_message_whatsapp(user, summary, number_of_emails)
+    user.last_run = int(time.time())
 
 
     print(f"({user.t} - {user.frequency})")
