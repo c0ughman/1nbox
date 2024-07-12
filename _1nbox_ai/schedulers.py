@@ -11,8 +11,9 @@ def checkTime(user):
     currentTime = datetime.now(madrid_timezone).time().replace(second=0, microsecond=0)
     current_weekday = str(datetime.today().weekday())
 
-    print(str(currentTime)[:5])
-    print(user.t[:5])
+    print(user.email)
+    print("     " + str(currentTime)[:5])
+    print("     " + user.t[:5])
 
     if user.plan == "pro" and user.frequency == 'custom':
         scheduled_times = [user.t, user.t2, user.t3, user.t4, user.t5]
