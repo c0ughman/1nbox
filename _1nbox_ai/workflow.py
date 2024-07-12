@@ -456,8 +456,8 @@ def main(user):
     # Send via Whatsapp
     send_message_whatsapp(user, summary, number_of_emails)
     user.last_run = int(datetime.now().timestamp())
-
-
+    user.save()
+    
     print(f"({user.t} - {user.frequency})")
     print(user.email + f" -- ({user.supabase_user_id})")
     print("Summary: ")  
