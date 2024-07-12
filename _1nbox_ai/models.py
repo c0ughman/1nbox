@@ -4,7 +4,7 @@ class User(models.Model):
     email = models.CharField(max_length=255, blank=True, null=True)
     phone_number = models.CharField(max_length=255, blank=True, null=True)
     supabase_user_id = models.CharField(max_length=255, null=False, blank=False)
-    last_run = models.IntegerField(blank=True, null=True)
+    last_run = models.BigIntegerField(blank=True, null=True)
     plan = models.CharField(max_length=255, null=False, default="no plan", blank=False)
     negative_keywords = models.TextField(blank=True, null=True)
     positive_keywords = models.TextField(blank=True, null=True)
