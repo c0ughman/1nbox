@@ -6,7 +6,6 @@ from supabase import create_client
 import base64
 from datetime import datetime
 from datetime import timedelta
-import time
 import re
 from openai import OpenAI
 from bs4 import BeautifulSoup
@@ -46,14 +45,16 @@ def get_gmail_messages(user):
 
     # Choosing the frequency to see how many days to get emails from
     last_run = user.last_run
-    if (last_run is None or last_run - int(time.time()) > 864000): # 10 days
+    current_time = int(datetime.now().timestamp())
+    
+    if last_run is None or (current_time - last_run) > 864000:  # 10 days
         print("last_run not usable, fixing...")
-        if user.frequency == "daily" or user.frequency == "custom":
-            last_run = int(time.time()) - 86400 # one day
+        if user.frequency in ["daily", "custom"]:
+            last_run = current_time - 86400  # one day
         elif user.frequency == "weekly":
-            last_run = int(time.time()) - 604800 # one week
+            last_run = current_time - 604800  # one week
         else:
-            last_run = int(time.time()) - 86400 # one day
+            last_run = current_time - 86400  # one day
             print("last_run variable is not usable and the frequency is not daily, weekly or custom, was set to one day")
                 
     service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
