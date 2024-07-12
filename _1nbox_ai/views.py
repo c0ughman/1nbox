@@ -70,15 +70,11 @@ def new_settings(request):
                 user.t5 = t5
                 user.save()
                 print("exists new_settings")
-                new_scheduler(user)
             else:
                 # Create a new user
                 new_user = User.objects.create(supabase_user_id=user_id, phone_number=phone_number, style=style, frequency=frequency, t=t)
-                # Create a new scheduler
                 print("does not exist new_settings")
-                new_scheduler(new_user)
-
-
+                
             return JsonResponse({'good': "Everything's good"}, status=200)
 
         except Exception as e:
@@ -117,17 +113,6 @@ def new_keywords(request):
 
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
-
-def new_scheduler(user):
-    scheduled_task = ScheduledTask.objects.filter(user=user).first()
-    if scheduled_task:
-        scheduled_task.t = user.t
-        scheduled_task.frequency = user.frequency
-        scheduled_task.save()
-        print("exists new_scheduler")
-    else:
-        ScheduledTask.objects.create(user=user, t=user.t, frequency=user.frequency)
-        print("does not exist new_scheduler")
 
 @csrf_exempt
 def process_tokens(request):
