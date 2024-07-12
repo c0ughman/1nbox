@@ -8,6 +8,7 @@ from _1nbox_ai.workflow import main
 from django.views.decorators.http import require_POST
 import jwt
 import os
+import sys
 from django.http import JsonResponse
 from django.conf import settings
 import stripe
@@ -81,6 +82,8 @@ def new_settings(request):
 
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+            print(str(e))
+            sys.stdout.flush()
 
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
