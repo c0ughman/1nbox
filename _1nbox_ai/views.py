@@ -24,21 +24,26 @@ supabase_key = os.environ.get('SUPABASE_KEY')
 def new_settings(request):
     if request.method == 'POST':
         try:
+            print(1)
             request_data = json.loads(request.body.decode('utf-8'))
             print(request_data)
             user_id = request_data.get('record', {}).get('user_id')
             print(user_id)
+            print(2)
             phone_number = request_data.get('record', {}).get('phone_number')
             frequency = request_data.get('record', {}).get('frequency')
             weekday = request_data.get('record', {}).get('weekday')
+            print(3)
             t = request_data.get('record', {}).get('time')
             t2 = request_data.get('record', {}).get('time2')
             t3 = request_data.get('record', {}).get('time3')
             t4 = request_data.get('record', {}).get('time4')
             t5 = request_data.get('record', {}).get('time5')
             style = request_data.get('record', {}).get('style')
+            print(4)
             # Try to get the user with the given ID
             user = User.objects.filter(supabase_user_id=user_id).first()
+            print(5)
             if user:
                 # Update the fields
                 user.phone_number = phone_number
@@ -57,7 +62,8 @@ def new_settings(request):
                     'friday': 4,
                     'saturday': 5,
                     'sunday': 6
-                }
+                    }
+                print(6)
                 # Convert the list of weekday names to their corresponding numbers
                 numbers_list = [weekdays_mapping[day.lower()] for day in weekdays_list]
 
@@ -70,6 +76,7 @@ def new_settings(request):
                 user.save()
                 print("exists new_settings")
                 new_scheduler(user)
+                print(7)
             else:
                 # Create a new user
                 new_user = User.objects.create(supabase_user_id=user_id, phone_number=phone_number, style=style, frequency=frequency, t=t)
