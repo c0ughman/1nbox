@@ -14,5 +14,5 @@ djangorestframework
 django-cors-headers
 gunicorn
 django-heroku
-
+dj_database_url
 
