@@ -9,6 +9,7 @@ class User(models.Model):
     positive_keywords = models.TextField(blank=True, null=True)
     style = models.CharField(max_length=255, blank=True, null=True)
     frequency = models.CharField(max_length=255)
+    last_run = models.IntegerField(blank=True, null=True)
     weekday = models.CharField(max_length=255, blank=True, null=True)
     t = models.CharField(max_length=255, blank=True, null=True)
     t2 = models.CharField(max_length=255, blank=True, null=True)
