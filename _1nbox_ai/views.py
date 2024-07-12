@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 import json
 from django.views.decorators.csrf import csrf_exempt
-from _1nbox_ai.models import User, ScheduledTask
+from _1nbox_ai.models import User
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from _1nbox_ai.workflow import main
