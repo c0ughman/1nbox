@@ -46,8 +46,8 @@ def new_settings(request):
                 user.frequency = frequency
 
                 # MAKE WEEKDAY USABLE
-                weekdays_list = weekday
-
+                weekdays_list = weekday.split(',') if weekday else ['Friday']
+                
                 # Define the mapping of weekdays to numbers
                 weekdays_mapping = {
                     'monday': 0,
@@ -57,28 +57,20 @@ def new_settings(request):
                     'friday': 4,
                     'saturday': 5,
                     'sunday': 6
-                    }
-                print(6)
+                }
+                                
                 # Convert the list of weekday names to their corresponding numbers
-                numbers_list = [weekdays_mapping[day.lower()] for day in weekdays_list]
-                print(1)
+                numbers_list = [weekdays_mapping.get(day.strip().lower(), 4) for day in weekdays_list if day.strip()]
 
                 user.weekday = str(numbers_list)
-                print(2)
                 user.t = t
-                print(3)
                 user.t2 = t2
-                print(4)
                 user.t3 = t3
                 user.t4 = t4
                 user.t5 = t5
-                print(5)
                 user.save()
-                print(6)
                 print("exists new_settings")
-                print(7)
                 new_scheduler(user)
-                print("!!!")
             else:
                 # Create a new user
                 new_user = User.objects.create(supabase_user_id=user_id, phone_number=phone_number, style=style, frequency=frequency, t=t)
