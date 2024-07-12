@@ -33,6 +33,7 @@ def timeLoop():
     while True:
         print("ran")
         for user in User.objects.filter(plan__in=["pro", "basic"]):
+            print(user.t)
             if checkTime(user):
                 execute(user)
         time.sleep(60)
