@@ -23,12 +23,3 @@ class User(models.Model):
 
     def __str__(self):
         return f"{self.email}"
-
-
-class ScheduledTask(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    t = models.CharField(max_length=255)
-    frequency = models.CharField(max_length=255)
-
-    def __str__(self):
-        return f"{self.t} - {self.user.email}"
