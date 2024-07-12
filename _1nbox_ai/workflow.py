@@ -6,6 +6,7 @@ from supabase import create_client
 import base64
 from datetime import datetime
 from datetime import timedelta
+import time
 import re
 from openai import OpenAI
 from bs4 import BeautifulSoup
