@@ -37,6 +37,8 @@ def new_settings(request):
             t4 = request_data.get('record', {}).get('time4')
             t5 = request_data.get('record', {}).get('time5')
             style = request_data.get('record', {}).get('style')
+            time_zone = request_data.get('record', {}).get('time_zone')
+            language = request_data.get('record', {}).get('language')
             # Try to get the user with the given ID
             user = User.objects.filter(supabase_user_id=user_id).first()
             if user:
@@ -44,6 +46,8 @@ def new_settings(request):
                 user.phone_number = phone_number
                 user.style = style
                 user.frequency = frequency
+                user.language = language
+                user.time_zone = time_zone
 
                 # MAKE WEEKDAY USABLE
                 weekdays_list = weekday.split(',') if weekday else ['Friday']
