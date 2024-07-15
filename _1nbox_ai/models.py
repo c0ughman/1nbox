@@ -24,3 +24,10 @@ class User(models.Model):
 
     def __str__(self):
         return f"{self.email}"
+
+class ScheduledTask(models.Model):
+    email = models.CharField(max_length=255, blank=True, null=True)
+    phone_number = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.email}"
