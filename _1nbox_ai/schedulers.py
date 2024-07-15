@@ -7,8 +7,8 @@ import pytz
 
 
 def checkTime(user):
-    madrid_timezone = pytz.timezone('Europe/Madrid')
-    currentTime = datetime.now(madrid_timezone).time().replace(second=0, microsecond=0)
+    user_timezone = pytz.timezone(user.time_zone)
+    currentTime = datetime.now(user_timezone).time().replace(second=0, microsecond=0)
     current_weekday = str(datetime.today().weekday())
 
     print(user.email)
