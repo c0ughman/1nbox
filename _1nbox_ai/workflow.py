@@ -254,6 +254,8 @@ def create_prompt(user):
     style = user.style
     positive = user.positive_keywords
     negative = user.negative_keywords
+    language = user.language
+
 
     style_text = (
         "You are an Inbox Summarizer. I will give you some messages from my email inbox, and I want you to tell me "
@@ -281,7 +283,10 @@ def create_prompt(user):
             "giving me a snapshot of the other emails i received  in a small and direct paragraph."
         )
     
-    return f'{style_text} It is obligatory to delete anything containing or pertaining to these words: {negative}. It is obligatory to include anything containing or pertaining to these words: {positive}'
+    return f'{style_text} 
+    It is obligatory to delete anything containing or pertaining to these words: {negative}.
+    It is obligatory to include anything containing or pertaining to these words: {positive}.
+    I want the response to strictly be in the {language} language. All other languages are prohibited.'
 
 # Function to send request to OpenAI API
 def get_openai_response(user, messages):
