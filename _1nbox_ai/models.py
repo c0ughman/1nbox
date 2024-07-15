@@ -17,17 +17,11 @@ class User(models.Model):
     t3 = models.CharField(max_length=255, blank=True, null=True)
     t4 = models.CharField(max_length=255, blank=True, null=True)
     t5 = models.CharField(max_length=255, blank=True, null=True)
+    last_run = models.IntegerField(blank=True, null=True)
     access_token = models.TextField(blank=True, null=True)
     provider_token = models.CharField(max_length=255, blank=True, null=True)
     refresh_token = models.CharField(max_length=255, blank=True, null=True)
     provider_refresh_token = models.CharField(max_length=255, blank=True, null=True)
-
-    def __str__(self):
-        return f"{self.email}"
-
-class ScheduledTask(models.Model):
-    email = models.CharField(max_length=255, blank=True, null=True)
-    phone_number = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
         return f"{self.email}"
