@@ -8,9 +8,7 @@ import pytz
 
 def checkTime(user):
     user_timezone = pytz.timezone(user.time_zone)
-    print(user_timezone)
     currentTime = datetime.now(user_timezone).time().replace(second=0, microsecond=0)
-    print(str(currentTime)[:5])
     current_weekday = str(datetime.today().weekday())
 
     print(user.email)
