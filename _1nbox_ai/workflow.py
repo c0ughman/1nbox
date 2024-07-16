@@ -502,8 +502,19 @@ def main(user):
     messages, number_of_emails = get_gmail_messages(user)
     if (number_of_emails == 0):
         print("No emails, sending no email message")
-        
+        send_no_emails_message(user)
 
+        timeframe = "today"
+        if user.frequency == "weekly":
+            timeframe = "the week"
+        elif user.frequency == "daily":
+            timeframe = "today"
+        else: 
+            print("OJO!!! - frequency not daily or weekly")
+        
+        add_summary_to_supabase(user, f"No new emails for {timeframe}!")
+        return
+        
     messages = remove_whitespace(messages)
     messages = remove_repeated_text(messages)
 
