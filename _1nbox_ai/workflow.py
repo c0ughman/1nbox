@@ -403,7 +403,6 @@ def send_message_whatsapp(user, message, number_of_emails):
     access_key = os.environ.get('WHATSAPP_KEY')
 
     # phone number related variables
-    # CHANGE to user.number or something similar when ready
     phone_number = user.phone_number
 
     # project variables
@@ -439,11 +438,71 @@ def send_message_whatsapp(user, message, number_of_emails):
     print("OJO!!!!! ") 
     print(response)
 
+def send_no_emails_message(user):
+    
+    # general API variables
+    access_key = os.environ.get('WHATSAPP_KEY')
+
+    # phone number related variables
+    phone_number = user.phone_number
+
+    # time frame variable
+    timeframe = "today"
+    if user.frequency == "weekly":
+        timeframe = "the week"
+    elif user.frequency == "daily":
+        timeframe = "today"
+    else: 
+        print("OJO!!! - frequency not daily or weekly")
+
+    # project variables
+    project_id = "e05fefe8-7123-43ca-bd99-2ab6a6c81626"
+    version = "b9466584-d8fc-40ad-91ba-03e01899951c"
+    locale = "en"
+
+    # actually sending request
+    url = os.environ.get('WHATSAPP_URL')
+
+    headers = {
+        'Authorization': f'AccessKey {access_key}',
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "receiver": {
+            "contacts": [
+                {
+                    "identifierValue": phone_number,
+                    "identifierKey": "phonenumber"
+                }
+            ]
+        },
+        "template": {
+            "projectId": project_id,
+            "version": version,
+            "locale": locale,
+            "variables": {
+                "timeframe": timeframe,
+            }
+        }
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+
+    print("OJO!!!!! ") 
+    print(response.status_code)
+    print(response.json())
+    
+    return response.status_code, response.json()
+
 # Main function to execute the workflow
 def main(user):
     
     # Get messages from Gmail API
     messages, number_of_emails = get_gmail_messages(user)
+    if (number_of_emails == 0):
+        print("No emails, sending no email message")
+        
 
     messages = remove_whitespace(messages)
     messages = remove_repeated_text(messages)
