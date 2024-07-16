@@ -1,2 +1,2 @@
 web: gunicorn _1nbox_ai.wsgi
-worker: python manage.py runscript runscheduler
+worker: python manage.py runscript schedulers
