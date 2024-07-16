@@ -5,12 +5,6 @@ import requests
 from _1nbox_ai import workflow
 import pytz
 
-from django.utils import timezone
-from django.db import connection
-from django.core.exceptions import ObjectDoesNotExist
-from django.db.utils import OperationalError
-import logging
-
 
 def checkTime(user):
     user_timezone = pytz.timezone(user.time_zone)
@@ -39,28 +33,10 @@ def execute(user):
     except Exception as e:
         print(f"Had a problem running task: {e}")
 
-logger = logging.getLogger(__name__)
-
 def timeLoop():
     while True:
-        try:
-            logger.info("Running time loop")
-            for user in User.objects.filter(plan__in=["pro", "basic"]):
-                try:
-                    if checkTime(user):
-                        execute(user)
-                except ObjectDoesNotExist:
-                    logger.error(f"User {user.id} no longer exists")
-                except Exception as e:
-                    logger.error(f"Error processing user {user.id}: {str(e)}")
-            
-            # Close the database connection to prevent timeouts
-            connection.close()
-            
-            time.sleep(60)
-        except OperationalError:
-            logger.error("Database connection lost. Reconnecting...")
-            time.sleep(10)
-        except Exception as e:
-            logger.error(f"Unexpected error in time loop: {str(e)}")
-            time.sleep(60)
+        print("ran")
+        for user in User.objects.filter(plan__in=["pro", "basic"]):
+            if checkTime(user):
+                execute(user)
+        time.sleep(60)
