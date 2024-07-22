@@ -31,6 +31,7 @@ def new_settings(request):
             phone_number = request_data.get('record', {}).get('phone_number')
             frequency = request_data.get('record', {}).get('frequency')
             weekday = request_data.get('record', {}).get('weekday')
+            plan = request_data.get('record', {}).get('plan')
             t = request_data.get('record', {}).get('time')
             t2 = request_data.get('record', {}).get('time2')
             t3 = request_data.get('record', {}).get('time3')
@@ -48,6 +49,7 @@ def new_settings(request):
                 user.frequency = frequency
                 user.language = language
                 user.time_zone = time_zone
+                user.plan = plan
 
                 # MAKE WEEKDAY USABLE
                 weekdays_list = weekday.split(',') if weekday else ['Friday']
