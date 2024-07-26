@@ -12,15 +12,30 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         days_back = options['days']
 
+        def get_publication_date(entry):
+            if 'published_parsed' in entry:
+                return datetime(*entry.published_parsed[:6], tzinfo=pytz.utc)
+            elif 'updated_parsed' in entry:
+                return datetime(*entry.updated_parsed[:6], tzinfo=pytz.utc)
+            elif 'published' in entry:
+                return datetime.strptime(entry.published, '%a, %d %b %Y %H:%M:%S %Z')
+            elif 'updated' in entry:
+                return datetime.strptime(entry.updated, '%a, %d %b %Y %H:%M:%S %Z')
+            elif 'dc:date' in entry:
+                return datetime.strptime(entry['dc:date'], '%Y-%m-%dT%H:%M:%SZ')
+            else:
+                print("Found no publication date... will be skipped")
+                return None
+
         def get_articles_from_rss(rss_url, days_back=1):
             feed = feedparser.parse(rss_url)
             articles = []
             cutoff_date = datetime.now(pytz.utc) - timedelta(days=days_back)
             
             for entry in feed.entries:
-                pub_date = datetime(*entry.published_parsed[:6], tzinfo=pytz.utc)
+                pub_date = get_publication_date(entry)
                 
-                if pub_date >= cutoff_date:
+                if pub_date and pub_date >= cutoff_date:
                     articles.append({
                         'title': entry.title,
                         'link': entry.link,
@@ -28,6 +43,8 @@ class Command(BaseCommand):
                         'summary': entry.summary if 'summary' in entry else '',
                         'content': entry.content[0].value if 'content' in entry else entry.summary
                     })
+                elif not pub_date:
+                    self.stdout.write(f"Warning: Missing date for entry '{entry.title}'")
             
             return articles
 
