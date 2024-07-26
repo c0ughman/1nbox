@@ -16,3 +16,4 @@ gunicorn
 django-heroku
 dj_database_url
 honcho
+feedparser
