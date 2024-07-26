@@ -41,14 +41,14 @@ class Command(BaseCommand):
                         'link': entry.link,
                         'published': pub_date,
                         'summary': entry.summary if 'summary' in entry else '',
-                        'content': entry.content[0].value if 'content' in entry else entry.summary
+                        'content': entry.content[0].value if 'content' in entry else entry.summary if 'summary' in entry else ''
                     })
                 else:
                     deleted_articles.append({
                         'title': entry.title,
                         'link': entry.link,
                         'summary': entry.summary if 'summary' in entry else '',
-                        'content': entry.content[0].value if 'content' in entry else entry.summary
+                        'content': entry.content[0].value if 'content' in entry else entry.summary if 'summary' in entry else ''
                     })
             
             return articles, deleted_articles
