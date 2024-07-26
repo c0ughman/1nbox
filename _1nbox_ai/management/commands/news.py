@@ -86,6 +86,7 @@ class Command(BaseCommand):
         deleted_articles_per_site = {}
         all_article_list = []
         deleted_article_list = []
+        avg_word_count_per_site = {}
 
         for url, articles in all_articles.items():
             num_articles = len(articles)
@@ -95,6 +96,9 @@ class Command(BaseCommand):
             deleted_articles_per_site[url] = num_deleted_articles
             all_article_list.extend(articles)
             deleted_article_list.extend(all_deleted_articles[url])
+
+            total_words = sum(len(article['content'].split()) for article in articles)
+            avg_word_count_per_site[url] = total_words / num_articles if num_articles > 0 else 0
 
         # Find smallest and largest articles
         if all_article_list:
@@ -116,16 +120,20 @@ class Command(BaseCommand):
         for url, count in articles_per_site.items():
             self.stdout.write(f"{url}: {count} (Deleted: {deleted_articles_per_site[url]})")
 
+        self.stdout.write("\nAverage word count per article for each site:")
+        for url, avg_word_count in avg_word_count_per_site.items():
+            self.stdout.write(f"{url}: {avg_word_count:.2f} words")
+
         if all_article_list:
             self.stdout.write(f"\nSmallest article: '{smallest_article['title']}' ({len(smallest_article['content'])} characters)")
             self.stdout.write(f"Largest article: '{largest_article['title']}' ({len(largest_article['content'])} characters)")
 
-            self.stdout.write("\n10 sample article titles:")
+            self.stdout.write("\n10 sample articles:")
             for article in all_article_list[:10]:
-                self.stdout.write(f"- {article['title']}")
+                self.stdout.write(f"- Title: {article['title']}\n  Link: {article['link']}\n  Published: {article['published']}\n  Summary: {article['summary']}\n  Content: {article['content']}\n")
         else:
             self.stdout.write("\nNo articles found in the specified timeframe.")
 
         self.stdout.write("\n5 sample articles deleted due to missing publication date:")
         for article in deleted_article_list[:5]:
-            self.stdout.write(f"- {article['title']}")
+            self.stdout.write(f"- Title: {article['title']}\n  Link: {article['link']}\n  Summary: {article['summary']}\n  Content: {article['content']}\n")
