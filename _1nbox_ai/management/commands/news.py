@@ -24,7 +24,6 @@ class Command(BaseCommand):
             elif 'dc:date' in entry:
                 return datetime.strptime(entry['dc:date'], '%Y-%m-%dT%H:%M:%SZ')
             else:
-                print("Found no publication date... will be skipped")
                 return None
 
         def get_articles_from_rss(rss_url, days_back=1):
@@ -44,13 +43,14 @@ class Command(BaseCommand):
                         'content': entry.content[0].value if 'content' in entry else entry.summary
                     })
                 elif not pub_date:
-                    self.stdout.write(f"Warning: Missing date for entry '{entry.title}'")
+                    self.stdout.write(f"Missing date for entry '{entry.title}'")
             
             return articles
 
         def get_articles_from_multiple_sources(rss_urls, days_back=1):
             all_articles = {}
             for url in rss_urls:
+                print(url)
                 articles = get_articles_from_rss(url, days_back)
                 all_articles[url] = articles
             return all_articles
