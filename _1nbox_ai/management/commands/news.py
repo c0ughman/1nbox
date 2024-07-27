@@ -1,65 +1,56 @@
-import feedparser
-from datetime import datetime, timedelta
-import pytz
-from django.core.management.base import BaseCommand
-from collections import Counter
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from collections import defaultdict
 import numpy as np
-from gensim import corpora
-from gensim.models import LdaModel
-from gensim.parsing.preprocessing import STOPWORDS
-import gensim
 
 def preprocess(text):
+    # Basic preprocessing
+    return ' '.join([word.lower() for word in text.split() if word.isalnum()])
+
+def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, num_clusters=20):
+    # Preprocess the articles
+    preprocessed_articles = [preprocess(article['content']) for article in articles]
+    
+    # Create TF-IDF vectorizer
+    vectorizer = TfidfVectorizer(max_features=max_features, min_df=min_df, max_df=max_df)
+    tfidf_matrix = vectorizer.fit_transform(preprocessed_articles)
+    
+    # Get feature names (words)
+    feature_names = vectorizer.get_feature_names_out()
+    
+    # Perform K-means clustering
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+    cluster_labels = kmeans.fit_predict(tfidf_matrix)
+    
+    # Group articles by cluster
+    clustered_articles = defaultdict(list)
+    for article, label in zip(articles, cluster_labels):
+        clustered_articles[label].append(article)
+    
+    # Get top words for each cluster
+    cluster_top_words = {}
+    for cluster_id, cluster_articles in clustered_articles.items():
+        cluster_tfidf = tfidf_matrix[cluster_labels == cluster_id]
+        top_word_indices = cluster_tfidf.sum(0).argsort()[0, -10:].tolist()[0]
+        cluster_top_words[cluster_id] = [feature_names[i] for i in top_word_indices]
+    
+    # Prepare the result
     result = []
-    for token in gensim.utils.simple_preprocess(text):
-        if token not in STOPWORDS and len(token) > 3:
-            result.append(token)
-    return result
-
-def cluster_articles(articles):
-    contents = [article['content'] for article in articles]
-    processed_docs = [preprocess(doc) for doc in contents]
-    
-    dictionary = corpora.Dictionary(processed_docs)
-    corpus = [dictionary.doc2bow(doc) for doc in processed_docs]
-
-    # Use coherence score to find optimal number of topics
-    coherence_scores = []
-    max_topics = min(20, len(articles))  # Limit max topics
-    for num_topics in range(2, max_topics + 1):
-        lda_model = LdaModel(corpus=corpus, id2word=dictionary, num_topics=num_topics, random_state=42)
-        coherence_model = gensim.models.CoherenceModel(model=lda_model, texts=processed_docs, dictionary=dictionary, coherence='c_v')
-        coherence_scores.append(coherence_model.get_coherence())
-    
-    optimal_num_topics = coherence_scores.index(max(coherence_scores)) + 2
-
-    lda_model = LdaModel(corpus=corpus, id2word=dictionary, num_topics=optimal_num_topics, random_state=42)
-    
-    article_topics = [max(lda_model[dictionary.doc2bow(doc)], key=lambda x: x[1])[0] for doc in processed_docs]
-
-    clustered_articles = []
-    for i in range(optimal_num_topics):
-        cluster_articles = [article for article, topic in zip(articles, article_topics) if topic == i]
-        cluster_words = " ".join([article['content'] for article in cluster_articles])
-        word_counts = Counter(cluster_words.split())
-        
-        # Find top words for this topic
-        top_words = [word for word, _ in lda_model.show_topic(i, topn=10)]
-
+    for cluster_id, cluster_articles in clustered_articles.items():
         total_word_count = sum(len(article['content'].split()) for article in cluster_articles)
         total_char_count = sum(len(article['content']) for article in cluster_articles)
         openai_tokens = total_char_count // 4  # Approximate conversion
-
-        clustered_articles.append({
-            'cluster_id': i+1,
-            'top_words': top_words,
+        
+        result.append({
+            'cluster_id': cluster_id + 1,
+            'top_words': cluster_top_words[cluster_id],
             'articles': cluster_articles,
             'total_word_count': total_word_count,
             'total_char_count': total_char_count,
             'openai_tokens': openai_tokens
         })
-
-    return clustered_articles
+    
+    return result
 
 def calculate_dataset_stats(all_articles):
     total_articles = sum(len(articles) for articles in all_articles.values())
@@ -165,7 +156,7 @@ class Command(BaseCommand):
         articles = [article for site_articles in all_articles.values() for article in site_articles]
         
         clustered_articles = cluster_articles(articles)
-
+        
         for cluster in clustered_articles:
             print(f"Cluster {cluster['cluster_id']}:")
             print(f"Top words: {', '.join(cluster['top_words'])}")
