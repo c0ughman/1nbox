@@ -4,26 +4,64 @@ import pytz
 from django.core.management.base import BaseCommand
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
-from collections import defaultdict
+from collections import defaultdict, Counter
 import numpy as np
+import re
+import spacy
+
+# Load spaCy model
+nlp = spacy.load("en_core_web_sm")
 
 def preprocess(text):
     # Basic preprocessing
-    return ' '.join([word.lower() for word in text.split() if word.isalnum()])
+    return ' '.join([word.lower() for word in re.findall(r'\w+', text)])
 
-def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, initial_num_clusters=10, min_cluster_percentage=0.10):
-    # Preprocess the articles
-    preprocessed_articles = [preprocess(article['content']) for article in articles]
+def extract_key_topics(articles, top_n=50):
+    # Combine all article content
+    all_text = ' '.join([article['content'] for article in articles])
     
-    # Create TF-IDF vectorizer
-    vectorizer = TfidfVectorizer(max_features=max_features, min_df=min_df, max_df=max_df)
-    tfidf_matrix = vectorizer.fit_transform(preprocessed_articles)
+    # Process the text with spaCy
+    doc = nlp(all_text)
     
-    # Get feature names (words)
-    feature_names = vectorizer.get_feature_names_out()
+    # Extract named entities and nouns
+    entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ['PERSON', 'ORG', 'GPE', 'EVENT']]
+    nouns = [token.text.lower() for token in doc if token.pos_ == 'NOUN']
     
-    # Perform K-means clustering with a higher initial number of clusters
-    kmeans = KMeans(n_clusters=initial_num_clusters, random_state=42)
+    # Combine and count occurrences
+    key_words = Counter(entities + nouns)
+    
+    # Filter out common words and single-character words
+    common_words = set(['said', 'year', 'day', 'time', 'people', 'way', 'man', 'woman'])
+    key_topics = [word for word, count in key_words.most_common(top_n) 
+                  if word not in common_words and len(word) > 1]
+    
+    return key_topics
+
+def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5):
+    # Extract key topics
+    key_topics = extract_key_topics(articles)
+    
+    # Create TF-IDF vectorizer with key topics as features
+    vectorizer = TfidfVectorizer(vocabulary=key_topics, max_df=max_df, min_df=min_df)
+    tfidf_matrix = vectorizer.fit_transform([article['content'] for article in articles])
+    
+    # Determine optimal number of clusters using elbow method
+    max_clusters = min(20, len(articles) // 10)  # Adjust as needed
+    inertias = []
+    for k in range(2, max_clusters + 1):
+        kmeans = KMeans(n_clusters=k, random_state=42)
+        kmeans.fit(tfidf_matrix)
+        inertias.append(kmeans.inertia_)
+    
+    # Find elbow point
+    optimal_clusters = 2
+    for i in range(1, len(inertias) - 1):
+        if (inertias[i-1] - inertias[i]) / (inertias[i] - inertias[i+1]) < 0.5:
+            optimal_clusters = i + 2
+            break
+    
+    # Perform final clustering
+    kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
     cluster_labels = kmeans.fit_predict(tfidf_matrix)
     
     # Group articles by cluster
@@ -31,50 +69,26 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, initi
     for article, label in zip(articles, cluster_labels):
         clustered_articles[label].append(article)
     
-    # Get top words for each cluster
-    cluster_top_words = {}
-    for cluster_id, cluster_articles in clustered_articles.items():
-        cluster_tfidf = tfidf_matrix[cluster_labels == cluster_id]
-        top_word_indices = cluster_tfidf.sum(0).argsort()[0, -10:].tolist()[0]
-        cluster_top_words[cluster_id] = [feature_names[i] for i in top_word_indices]
-    
     # Prepare the result
     result = []
-    total_articles = len(articles)
-    min_cluster_size = total_articles * min_cluster_percentage
-    misc_cluster = {
-        'cluster_id': 'miscellaneous',
-        'top_words': [],
-        'articles': [],
-        'total_word_count': 0,
-        'total_char_count': 0,
-        'openai_tokens': 0
-    }
-    
+    feature_names = vectorizer.get_feature_names_out()
     for cluster_id, cluster_articles in clustered_articles.items():
+        cluster_tfidf = tfidf_matrix[cluster_labels == cluster_id]
+        top_word_indices = cluster_tfidf.sum(0).argsort()[0, -5:].tolist()[0]
+        top_words = [feature_names[i] for i in top_word_indices]
+        
         total_word_count = sum(len(article['content'].split()) for article in cluster_articles)
         total_char_count = sum(len(article['content']) for article in cluster_articles)
         openai_tokens = total_char_count // 4  # Approximate conversion
         
-        cluster_info = {
+        result.append({
             'cluster_id': cluster_id + 1,
-            'top_words': cluster_top_words[cluster_id],
+            'top_words': top_words,
             'articles': cluster_articles,
             'total_word_count': total_word_count,
             'total_char_count': total_char_count,
             'openai_tokens': openai_tokens
-        }
-        
-        if len(cluster_articles) >= min_cluster_size:
-            result.append(cluster_info)
-        else:
-            misc_cluster['articles'].extend(cluster_articles)
-            misc_cluster['total_word_count'] += total_word_count
-            misc_cluster['total_char_count'] += total_char_count
-            misc_cluster['openai_tokens'] += openai_tokens
-    
-    if misc_cluster['articles']:
-        result.append(misc_cluster)
+        })
     
     return result
 
@@ -182,7 +196,7 @@ class Command(BaseCommand):
         articles = [article for site_articles in all_articles.values() for article in site_articles]
         
         clustered_articles = cluster_articles(articles)
-        
+
         for cluster in clustered_articles:
             print(f"Cluster {cluster['cluster_id']}:")
             print(f"Top words: {', '.join(cluster['top_words'])}")
