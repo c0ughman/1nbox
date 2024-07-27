@@ -16,7 +16,7 @@ def cluster_articles(articles, num_clusters=6):
     kmeans = KMeans(n_clusters=num_clusters, random_state=42)
     kmeans.fit(X)
 
-    feature_names = vectorizer.get_feature_names()
+    feature_names = vectorizer.get_feature_names_out()
     clustered_articles = []
     for i in range(num_clusters):
         cluster_articles = [article for article, label in zip(articles, kmeans.labels_) if label == i]
