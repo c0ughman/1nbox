@@ -2,36 +2,49 @@ import feedparser
 from datetime import datetime, timedelta
 import pytz
 from django.core.management.base import BaseCommand
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
 from collections import Counter
 import numpy as np
+from gensim import corpora
+from gensim.models import LdaModel
+from gensim.parsing.preprocessing import STOPWORDS
+import gensim
 
-def cluster_articles(articles, num_clusters=6):
+def preprocess(text):
+    result = []
+    for token in gensim.utils.simple_preprocess(text):
+        if token not in STOPWORDS and len(token) > 3:
+            result.append(token)
+    return result
+
+def cluster_articles(articles):
     contents = [article['content'] for article in articles]
+    processed_docs = [preprocess(doc) for doc in contents]
     
-    vectorizer = TfidfVectorizer(stop_words='english', max_features=1000, ngram_range=(1, 2))
-    X = vectorizer.fit_transform(contents)
+    dictionary = corpora.Dictionary(processed_docs)
+    corpus = [dictionary.doc2bow(doc) for doc in processed_docs]
 
-    num_clusters = min(num_clusters, len(contents))
-    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-    kmeans.fit(X)
+    # Use coherence score to find optimal number of topics
+    coherence_scores = []
+    max_topics = min(20, len(articles))  # Limit max topics
+    for num_topics in range(2, max_topics + 1):
+        lda_model = LdaModel(corpus=corpus, id2word=dictionary, num_topics=num_topics, random_state=42)
+        coherence_model = gensim.models.CoherenceModel(model=lda_model, texts=processed_docs, dictionary=dictionary, coherence='c_v')
+        coherence_scores.append(coherence_model.get_coherence())
+    
+    optimal_num_topics = coherence_scores.index(max(coherence_scores)) + 2
 
-    feature_names = vectorizer.get_feature_names_out()
+    lda_model = LdaModel(corpus=corpus, id2word=dictionary, num_topics=optimal_num_topics, random_state=42)
+    
+    article_topics = [max(lda_model[dictionary.doc2bow(doc)], key=lambda x: x[1])[0] for doc in processed_docs]
+
     clustered_articles = []
-    for i in range(num_clusters):
-        cluster_articles = [article for article, label in zip(articles, kmeans.labels_) if label == i]
+    for i in range(optimal_num_topics):
+        cluster_articles = [article for article, topic in zip(articles, article_topics) if topic == i]
         cluster_words = " ".join([article['content'] for article in cluster_articles])
         word_counts = Counter(cluster_words.split())
         
-        # Find unique words for this cluster
-        unique_words = set(word_counts.keys())
-        for j in range(num_clusters):
-            if j != i:
-                other_cluster_words = " ".join([article['content'] for article, label in zip(articles, kmeans.labels_) if label == j])
-                unique_words -= set(other_cluster_words.split())
-        
-        top_words = [word for word in unique_words if word in feature_names][:10]
+        # Find top words for this topic
+        top_words = [word for word, _ in lda_model.show_topic(i, topn=10)]
 
         total_word_count = sum(len(article['content'].split()) for article in cluster_articles)
         total_char_count = sum(len(article['content']) for article in cluster_articles)
@@ -117,7 +130,6 @@ class Command(BaseCommand):
             'https://www.aljazeera.com/xml/rss/all.xml',
             'https://news.google.com/rss',
             'https://www.npr.org/rss/rss.php?id=1001',
-            # 10 more RSS feeds
             'https://www.washingtonpost.com/rss',
             'https://www.wsj.com/xml/rss/3_7085.xml',
             'https://feeds.a.dj.com/rss/RSSWorldNews.xml',
@@ -152,11 +164,11 @@ class Command(BaseCommand):
         # Clustering
         articles = [article for site_articles in all_articles.values() for article in site_articles]
         
-        clustered_articles = cluster_articles(articles, num_clusters=6)
+        clustered_articles = cluster_articles(articles)
 
         for cluster in clustered_articles:
             print(f"Cluster {cluster['cluster_id']}:")
-            print(f"Top unique words: {', '.join(cluster['top_words'])}")
+            print(f"Top words: {', '.join(cluster['top_words'])}")
             print(f"Number of articles: {len(cluster['articles'])}")
             print(f"Total word count: {cluster['total_word_count']}")
             print(f"Total character count: {cluster['total_char_count']}")
