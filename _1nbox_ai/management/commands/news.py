@@ -11,7 +11,7 @@ def preprocess(text):
     # Basic preprocessing
     return ' '.join([word.lower() for word in text.split() if word.isalnum()])
 
-def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, num_clusters=5):
+def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, num_clusters=5, min_cluster_percentage=0.10):
     # Preprocess the articles
     preprocessed_articles = [preprocess(article['content']) for article in articles]
     
@@ -40,36 +40,41 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, num_c
     
     # Prepare the result
     result = []
+    total_articles = len(articles)
+    min_cluster_size = total_articles * min_cluster_percentage
+    misc_cluster = {
+        'cluster_id': 'miscellaneous',
+        'top_words': [],
+        'articles': [],
+        'total_word_count': 0,
+        'total_char_count': 0,
+        'openai_tokens': 0
+    }
+    
     for cluster_id, cluster_articles in clustered_articles.items():
         total_word_count = sum(len(article['content'].split()) for article in cluster_articles)
         total_char_count = sum(len(article['content']) for article in cluster_articles)
         openai_tokens = total_char_count // 4  # Approximate conversion
         
-        result.append({
+        cluster_info = {
             'cluster_id': cluster_id + 1,
             'top_words': cluster_top_words[cluster_id],
             'articles': cluster_articles,
             'total_word_count': total_word_count,
             'total_char_count': total_char_count,
             'openai_tokens': openai_tokens
-        })
-    
-    # Identify and handle miscellaneous articles
-    if len(result) > 6:
-        misc_cluster = {
-            'cluster_id': 'miscellaneous',
-            'top_words': [],
-            'articles': [],
-            'total_word_count': 0,
-            'total_char_count': 0,
-            'openai_tokens': 0
         }
-        for extra_cluster in result[6:]:
-            misc_cluster['articles'].extend(extra_cluster['articles'])
-            misc_cluster['total_word_count'] += extra_cluster['total_word_count']
-            misc_cluster['total_char_count'] += extra_cluster['total_char_count']
-            misc_cluster['openai_tokens'] += extra_cluster['openai_tokens']
-        result = result[:6] + [misc_cluster]
+        
+        if len(cluster_articles) >= min_cluster_size:
+            result.append(cluster_info)
+        else:
+            misc_cluster['articles'].extend(cluster_articles)
+            misc_cluster['total_word_count'] += total_word_count
+            misc_cluster['total_char_count'] += total_char_count
+            misc_cluster['openai_tokens'] += openai_tokens
+    
+    if misc_cluster['articles']:
+        result.append(misc_cluster)
     
     return result
 
@@ -186,7 +191,5 @@ class Command(BaseCommand):
             print(f"Total character count: {cluster['total_char_count']}")
             print(f"Approximate OpenAI tokens: {cluster['openai_tokens']}")
             print("Example articles:")
-            for article in cluster['articles'][:6]:  # Displaying 6 example articles
-                print(f"- {article['title']}")
-            print()
+            for article in cluster['articles'][:6]: 
 
