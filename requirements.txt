@@ -19,5 +19,4 @@ honcho
 feedparser
 scikit-learn
 numpy
-scipy
-matplotlib
+gensim
