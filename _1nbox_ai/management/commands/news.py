@@ -11,7 +11,7 @@ def preprocess(text):
     # Basic preprocessing
     return ' '.join([word.lower() for word in text.split() if word.isalnum()])
 
-def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, num_clusters=20):
+def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, num_clusters=5):
     # Preprocess the articles
     preprocessed_articles = [preprocess(article['content']) for article in articles]
     
@@ -53,6 +53,23 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, num_c
             'total_char_count': total_char_count,
             'openai_tokens': openai_tokens
         })
+    
+    # Identify and handle miscellaneous articles
+    if len(result) > 6:
+        misc_cluster = {
+            'cluster_id': 'miscellaneous',
+            'top_words': [],
+            'articles': [],
+            'total_word_count': 0,
+            'total_char_count': 0,
+            'openai_tokens': 0
+        }
+        for extra_cluster in result[6:]:
+            misc_cluster['articles'].extend(extra_cluster['articles'])
+            misc_cluster['total_word_count'] += extra_cluster['total_word_count']
+            misc_cluster['total_char_count'] += extra_cluster['total_char_count']
+            misc_cluster['openai_tokens'] += extra_cluster['openai_tokens']
+        result = result[:6] + [misc_cluster]
     
     return result
 
@@ -172,3 +189,4 @@ class Command(BaseCommand):
             for article in cluster['articles'][:6]:  # Displaying 6 example articles
                 print(f"- {article['title']}")
             print()
+
