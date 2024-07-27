@@ -2,6 +2,9 @@ import feedparser
 from datetime import datetime, timedelta
 import pytz
 from django.core.management.base import BaseCommand
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from collections import Counter
 
 def cluster_articles(articles, num_clusters=6):
     contents = [article['content'] for article in articles]
