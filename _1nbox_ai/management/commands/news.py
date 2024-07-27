@@ -3,6 +3,32 @@ from datetime import datetime, timedelta
 import pytz
 from django.core.management.base import BaseCommand
 
+def cluster_articles(articles, num_clusters=6):
+    contents = [article['content'] for article in articles]
+    
+    vectorizer = TfidfVectorizer(stop_words='english', max_features=1000)
+    X = vectorizer.fit_transform(contents)
+
+    num_clusters = min(num_clusters, len(contents))
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+    kmeans.fit(X)
+
+    feature_names = vectorizer.get_feature_names()
+    clustered_articles = []
+    for i in range(num_clusters):
+        cluster_articles = [article for article, label in zip(articles, kmeans.labels_) if label == i]
+        cluster_words = " ".join([article['content'] for article in cluster_articles])
+        word_counts = Counter(cluster_words.split())
+        top_words = [word for word, _ in word_counts.most_common(10) if word in feature_names]
+
+        clustered_articles.append({
+            'cluster_id': i+1,
+            'top_words': top_words,
+            'articles': cluster_articles
+        })
+
+    return clustered_articles
+
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds and display statistics'
 
@@ -65,75 +91,37 @@ class Command(BaseCommand):
 
         # List of 10 RSS feed URLs focused on politics
         rss_urls = [
-            'http://rss.cnn.com/rss/cnn_allpolitics.rss',
-            'https://feeds.nbcnews.com/nbcnews/public/politics',
-            'http://feeds.foxnews.com/foxnews/politics',
-            'http://feeds.washingtonpost.com/rss/politics',
-            'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml',
-            'https://www.politico.com/rss/politics.xml',
-            'https://thehill.com/homenews/feed/',
-            'https://www.npr.org/rss/rss.php?id=1014',
-            'http://feeds.bbci.co.uk/news/politics/rss.xml',
-            'https://rssfeeds.usatoday.com/UsatodaycomWashington-TopStories'
+            "https://feeds.npr.org/1014/rss.xml",
+            "https://www.theatlantic.com/feed/channel/politics/",
+            "https://www.politico.com/rss/politics.xml",
+            "https://fivethirtyeight.com/politics/feed/",
+            "https://thehill.com/homenews/feed/",
+            "https://www.vox.com/rss/policy-and-politics/index.xml",
+            "https://www.motherjones.com/politics/feed/",
+            "https://reason.com/latest/feed/",
+            "https://newrepublic.com/rss.xml",
+            "https://washingtonmonthly.com/feed/"
         ]
+
 
         # Fetch articles
         all_articles, all_deleted_articles = get_articles_from_multiple_sources(rss_urls, days_back)
 
-        # Process and print statistics
-        total_articles = 0
-        articles_per_site = {}
-        deleted_articles_per_site = {}
-        all_article_list = []
-        deleted_article_list = []
-        avg_word_count_per_site = {}
+        #Clustering
+        articles = [article for site_articles in all_articles.values() for article in site_articles]
+        
+        clustered_articles = cluster_articles(articles)
 
-        for url, articles in all_articles.items():
-            num_articles = len(articles)
-            num_deleted_articles = len(all_deleted_articles[url])
-            total_articles += num_articles
-            articles_per_site[url] = num_articles
-            deleted_articles_per_site[url] = num_deleted_articles
-            all_article_list.extend(articles)
-            deleted_article_list.extend(all_deleted_articles[url])
+        for cluster in clustered_articles:
+            print(f"Cluster {cluster['cluster_id']}:")
+            print(f"Top words: {', '.join(cluster['top_words'])}")
+            print(f"Number of articles: {len(cluster['articles'])}")
+            print("Example articles:")
+            for article in cluster['articles'][:3]:
+                print(f"- {article['title']}")
+            print()
 
-            total_words = sum(len(article['content'].split()) for article in articles)
-            avg_word_count_per_site[url] = total_words / num_articles if num_articles > 0 else 0
 
-        # Find smallest and largest articles
-        if all_article_list:
-            smallest_article = min(all_article_list, key=lambda x: len(x['content']))
-            largest_article = max(all_article_list, key=lambda x: len(x['content']))
 
-        # Calculate total characters, words, and OpenAI tokens
-        total_characters = sum(len(article['content']) for article in all_article_list)
-        total_words = sum(len(article['content'].split()) for article in all_article_list)
-        total_tokens = sum(len(article['content'].split()) // 4 for article in all_article_list)  # Rough estimate
 
-        # Print statistics
-        self.stdout.write(f"Total number of articles: {total_articles}")
-        self.stdout.write(f"Total characters: {total_characters}")
-        self.stdout.write(f"Total words: {total_words}")
-        self.stdout.write(f"Total OpenAI tokens (approx): {total_tokens}")
 
-        self.stdout.write("\nNumber of articles per site:")
-        for url, count in articles_per_site.items():
-            self.stdout.write(f"{url}: {count} (Deleted: {deleted_articles_per_site[url]})")
-
-        self.stdout.write("\nAverage word count per article for each site:")
-        for url, avg_word_count in avg_word_count_per_site.items():
-            self.stdout.write(f"{url}: {avg_word_count:.2f} words")
-
-        if all_article_list:
-            self.stdout.write(f"\nSmallest article: '{smallest_article['title']}' ({len(smallest_article['content'])} characters)")
-            self.stdout.write(f"Largest article: '{largest_article['title']}' ({len(largest_article['content'])} characters)")
-
-            self.stdout.write("\n10 sample articles:")
-            for article in all_article_list[:10]:
-                self.stdout.write(f"- Title: {article['title']}\n  Link: {article['link']}\n  Published: {article['published']}\n  Summary: {article['summary']}\n  Content: {article['content']}\n")
-        else:
-            self.stdout.write("\nNo articles found in the specified timeframe.")
-
-        self.stdout.write("\n5 sample articles deleted due to missing publication date:")
-        for article in deleted_article_list[:5]:
-            self.stdout.write(f"- Title: {article['title']}\n  Link: {article['link']}\n  Summary: {article['summary']}\n  Content: {article['content']}\n")
