@@ -191,5 +191,6 @@ class Command(BaseCommand):
             print(f"Total character count: {cluster['total_char_count']}")
             print(f"Approximate OpenAI tokens: {cluster['openai_tokens']}")
             print("Example articles:")
-            for article in cluster['articles'][:6]: 
-
+            for article in cluster['articles'][:6]:  # Displaying 6 example articles
+                print(f"- {article['title']}")
+            print()
