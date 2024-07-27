@@ -4,14 +4,14 @@ import pytz
 from django.core.management.base import BaseCommand
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
-from collections import defaultdict, Counter
+from collections import defaultdict
 import numpy as np
 
 def preprocess(text):
     # Basic preprocessing
     return ' '.join([word.lower() for word in text.split() if word.isalnum()])
 
-def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, num_clusters=5, min_cluster_percentage=0.10):
+def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, initial_num_clusters=10, min_cluster_percentage=0.10):
     # Preprocess the articles
     preprocessed_articles = [preprocess(article['content']) for article in articles]
     
@@ -22,8 +22,8 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.1, num_c
     # Get feature names (words)
     feature_names = vectorizer.get_feature_names_out()
     
-    # Perform K-means clustering
-    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+    # Perform K-means clustering with a higher initial number of clusters
+    kmeans = KMeans(n_clusters=initial_num_clusters, random_state=42)
     cluster_labels = kmeans.fit_predict(tfidf_matrix)
     
     # Group articles by cluster
