@@ -1,6 +1,10 @@
+import feedparser
+from datetime import datetime, timedelta
+import pytz
+from django.core.management.base import BaseCommand
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
-from collections import defaultdict
+from collections import defaultdict, Counter
 import numpy as np
 
 def preprocess(text):
