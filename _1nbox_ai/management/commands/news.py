@@ -83,32 +83,43 @@ def simple_clustering(articles, min_word_freq=3, max_word_freq=0.3, similarity_t
                 'common_words': article_valid_words
             })
     
-    # Merge small clusters
-    while len(clusters) > max_clusters or any(len(c['articles']) < min_cluster_size for c in clusters):
-        clusters.sort(key=lambda x: len(x['articles']))
-        if len(clusters) <= 1:
-            break
-        
-        cluster1 = clusters.pop(0)
-        best_match = max(clusters, key=lambda x: calculate_similarity(cluster1['common_words'], x['common_words']))
-        
-        best_match['articles'].extend(cluster1['articles'])
-        best_match['common_words'].intersection_update(cluster1['common_words'])
-    
-    # Ensure minimum common words
+    # Miscellaneous cluster
+    misc_cluster = {'articles': [], 'common_words': set()}
+
+    # Filter clusters based on minimum size and enforce common words constraint
+    final_clusters = []
     for cluster in clusters:
+        if len(cluster['articles']) >= min_cluster_size:
+            # Ensure all articles contain the common words
+            common_words = set(cluster['common_words'])
+            filtered_articles = [article for article in cluster['articles'] if common_words.issubset(article_words[article['title']])]
+            if len(filtered_articles) >= min_cluster_size:
+                final_clusters.append({
+                    'articles': filtered_articles,
+                    'common_words': common_words
+                })
+            else:
+                misc_cluster['articles'].extend(cluster['articles'])
+        else:
+            misc_cluster['articles'].extend(cluster['articles'])
+    
+    # Ensure minimum common words and calculate cluster strength
+    for cluster in final_clusters:
         if len(cluster['common_words']) < min_common_words:
             most_common = Counter(word for article in cluster['articles'] for word in article_words[article['title']] if word in valid_words).most_common(min_common_words)
             cluster['common_words'] = set(word for word, _ in most_common)
-    
-    # Calculate cluster strength
-    for cluster in clusters:
         cluster['avg_strength'] = calculate_avg_strength(cluster, article_words)
     
     # Sort clusters by size and strength
-    clusters.sort(key=lambda x: (len(x['articles']), x['avg_strength']), reverse=True)
-    
-    return clusters
+    final_clusters.sort(key=lambda x: (len(x['articles']), x['avg_strength']), reverse=True)
+
+    # Add the miscellaneous cluster at the end if it contains any articles
+    if misc_cluster['articles']:
+        misc_cluster['avg_strength'] = 0  # Miscellaneous cluster doesn't need a calculated strength
+        final_clusters.append(misc_cluster)
+
+    return final_clusters
+
 
 
 def calculate_avg_strength(cluster, article_words):
