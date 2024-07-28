@@ -15,7 +15,7 @@ def extract_capitalized_words(text):
             words.extend([word for word in sentence_words[1:] if word.istitle()])
     return words
 
-def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, num_clusters=5):
+def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, min_cluster_size=0.05):
     # Extract capitalized words from all articles
     all_words = []
     for article in articles:
@@ -29,8 +29,8 @@ def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, num_clusters
     valid_words = set([word for word, count in word_counts.items() 
                        if min_word_freq <= count <= total_articles * max_word_freq])
     
-    # Create clusters
-    clusters = defaultdict(list)
+    # Create initial clusters based on common words
+    initial_clusters = defaultdict(list)
     miscellaneous = []
     
     for article in articles:
@@ -38,29 +38,36 @@ def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, num_clusters
         if not article_words:
             miscellaneous.append(article)
         else:
-            best_cluster = None
-            max_overlap = 0
-            for cluster_id, cluster_articles in clusters.items():
-                cluster_words = set.union(*[set(extract_capitalized_words(a['content'])) & valid_words 
-                                            for a in cluster_articles])
-                overlap = len(article_words & cluster_words)
-                if overlap > max_overlap:
-                    max_overlap = overlap
-                    best_cluster = cluster_id
-            
-            if best_cluster is not None and len(clusters) >= num_clusters:
-                clusters[best_cluster].append(article)
-            elif len(clusters) < num_clusters:
-                new_cluster_id = len(clusters) + 1
-                clusters[new_cluster_id].append(article)
+            key_word = max(article_words, key=lambda w: word_counts[w])
+            initial_clusters[key_word].append(article)
+    
+    # Merge similar clusters and remove small clusters
+    final_clusters = {}
+    cluster_id = 1
+    
+    for key_word, cluster_articles in initial_clusters.items():
+        if len(cluster_articles) >= total_articles * min_cluster_size:
+            cluster_words = set.intersection(*[set(extract_capitalized_words(a['content'])) & valid_words 
+                                               for a in cluster_articles])
+            if cluster_words:
+                final_clusters[cluster_id] = {
+                    'articles': cluster_articles,
+                    'common_words': list(cluster_words)
+                }
+                cluster_id += 1
             else:
-                miscellaneous.append(article)
+                miscellaneous.extend(cluster_articles)
+        else:
+            miscellaneous.extend(cluster_articles)
     
     # Add miscellaneous cluster
     if miscellaneous:
-        clusters['miscellaneous'] = miscellaneous
+        final_clusters['miscellaneous'] = {
+            'articles': miscellaneous,
+            'common_words': ['Various topics']
+        }
     
-    return clusters
+    return final_clusters
 
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds and display statistics'
@@ -140,10 +147,11 @@ class Command(BaseCommand):
         clustered_articles = simple_clustering(articles)
 
         # Print clustering results
-        for cluster_id, cluster_articles in clustered_articles.items():
+        for cluster_id, cluster_info in clustered_articles.items():
             print(f"Cluster {cluster_id}:")
-            print(f"Number of articles: {len(cluster_articles)}")
+            print(f"Number of articles: {len(cluster_info['articles'])}")
+            print(f"Common words: {', '.join(cluster_info['common_words'])}")
             print("Example articles:")
-            for article in cluster_articles[:5]:  # Displaying 5 example articles
+            for article in cluster_info['articles'][:5]:  # Displaying 5 example articles
                 print(f"- {article['title']}")
             print()
