@@ -112,8 +112,9 @@ def calculate_avg_strength(cluster, article_words):
     strengths = []
     for article in cluster['articles']:
         article_words_set = article_words[article['title']]
-        strength = len(cluster['common_words'].intersection(article_words_set)) / len(article_words_set)
-        strengths.append(strength)
+        if article_words_set:  # Only proceed if article_words_set is not empty
+            strength = len(cluster['common_words'].intersection(article_words_set)) / len(article_words_set)
+            strengths.append(strength)
     return sum(strengths) / len(strengths) if strengths else 0
 
 class Command(BaseCommand):
