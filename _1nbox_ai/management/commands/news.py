@@ -7,7 +7,6 @@ import re
 from itertools import combinations
 
 def extract_capitalized_words(text):
-    # Extract capitalized words, excluding those at the start of sentences
     sentences = re.split(r'[.!?]+', text)
     words = []
     for sentence in sentences:
@@ -21,8 +20,40 @@ def calculate_similarity(set1, set2):
     union = set1.union(set2)
     return len(intersection) / len(union) if union else 0
 
-def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, similarity_threshold=0.3):
-    # Extract capitalized words from all articles
+def merge_clusters(clusters):
+    while len(clusters) > 10:
+        max_similarity = 0
+        merge_pair = None
+        for i, j in combinations(range(len(clusters)), 2):
+            similarity = calculate_similarity(clusters[i]['common_words'], clusters[j]['common_words'])
+            if similarity > max_similarity:
+                max_similarity = similarity
+                merge_pair = (i, j)
+        
+        if merge_pair is None:
+            break
+        
+        i, j = merge_pair
+        new_cluster = {
+            'articles': clusters[i]['articles'] + clusters[j]['articles'],
+            'common_words': clusters[i]['common_words'].intersection(clusters[j]['common_words'])
+        }
+        new_cluster['avg_strength'] = calculate_avg_strength(new_cluster)
+        
+        clusters = [cluster for k, cluster in enumerate(clusters) if k not in merge_pair]
+        clusters.append(new_cluster)
+    
+    return clusters
+
+def calculate_avg_strength(cluster):
+    strengths = []
+    for article in cluster['articles']:
+        article_words_set = set(extract_capitalized_words(article['content']))
+        strength = len(cluster['common_words'].intersection(article_words_set)) / len(article_words_set)
+        strengths.append(strength)
+    return sum(strengths) / len(strengths) if strengths else 0
+
+def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, similarity_threshold=0.3, min_cluster_size=5, min_common_words=5):
     all_words = []
     article_words = {}
     for article in articles:
@@ -30,21 +61,18 @@ def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, similarity_t
         all_words.extend(words)
         article_words[article['title']] = words
     
-    # Count word frequencies
     word_counts = Counter(all_words)
     total_articles = len(articles)
     
-    # Filter words based on frequency
     valid_words = set([word for word, count in word_counts.items() 
                        if min_word_freq <= count <= total_articles * max_word_freq])
     
-    # Create initial clusters
     clusters = []
     miscellaneous = []
     
     for article in articles:
         article_valid_words = article_words[article['title']].intersection(valid_words)
-        if not article_valid_words:
+        if len(article_valid_words) < min_common_words:
             miscellaneous.append(article)
         else:
             added_to_cluster = False
@@ -62,14 +90,18 @@ def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, similarity_t
                     'common_words': article_valid_words
                 })
     
+    # Remove small clusters and clusters with few common words
+    for cluster in clusters[:]:
+        if len(cluster['articles']) < min_cluster_size or len(cluster['common_words']) < min_common_words:
+            miscellaneous.extend(cluster['articles'])
+            clusters.remove(cluster)
+    
     # Calculate cluster strength
     for cluster in clusters:
-        strengths = []
-        for article in cluster['articles']:
-            article_words_set = article_words[article['title']]
-            strength = len(cluster['common_words'].intersection(article_words_set)) / len(article_words_set)
-            strengths.append(strength)
-        cluster['avg_strength'] = sum(strengths) / len(strengths) if strengths else 0
+        cluster['avg_strength'] = calculate_avg_strength(cluster)
+    
+    # Merge clusters until we have 10 or fewer
+    clusters = merge_clusters(clusters)
     
     # Sort clusters by size and strength
     clusters.sort(key=lambda x: (len(x['articles']), x['avg_strength']), reverse=True)
