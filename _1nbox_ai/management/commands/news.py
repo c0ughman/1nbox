@@ -45,15 +45,7 @@ def merge_clusters(clusters):
     
     return clusters
 
-def calculate_avg_strength(cluster):
-    strengths = []
-    for article in cluster['articles']:
-        article_words_set = set(extract_capitalized_words(article['content']))
-        strength = len(cluster['common_words'].intersection(article_words_set)) / len(article_words_set)
-        strengths.append(strength)
-    return sum(strengths) / len(strengths) if strengths else 0
-
-def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, similarity_threshold=0.3, min_cluster_size=5, min_common_words=5):
+def simple_clustering(articles, min_word_freq=3, max_word_freq=0.3, similarity_threshold=0.15, min_cluster_size=5, min_common_words=3, max_clusters=10):
     all_words = []
     article_words = {}
     for article in articles:
@@ -67,63 +59,83 @@ def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, similarity_t
     valid_words = set([word for word, count in word_counts.items() 
                        if min_word_freq <= count <= total_articles * max_word_freq])
     
+    # Initial clustering
     clusters = []
-    miscellaneous = []
-    
     for article in articles:
         article_valid_words = article_words[article['title']].intersection(valid_words)
-        if len(article_valid_words) < min_common_words:
-            miscellaneous.append(article)
+        best_cluster = None
+        best_similarity = 0
+        
+        for cluster in clusters:
+            similarity = calculate_similarity(article_valid_words, cluster['common_words'])
+            if similarity > best_similarity:
+                best_similarity = similarity
+                best_cluster = cluster
+        
+        if best_similarity >= similarity_threshold:
+            best_cluster['articles'].append(article)
+            best_cluster['common_words'].intersection_update(article_valid_words)
         else:
-            added_to_cluster = False
-            for cluster in clusters:
-                similarity = calculate_similarity(article_valid_words, cluster['common_words'])
-                if similarity >= similarity_threshold:
-                    cluster['articles'].append(article)
-                    cluster['common_words'].intersection_update(article_valid_words)
-                    added_to_cluster = True
-                    break
-            
-            if not added_to_cluster:
-                clusters.append({
-                    'articles': [article],
-                    'common_words': article_valid_words
-                })
+            clusters.append({
+                'articles': [article],
+                'common_words': article_valid_words
+            })
     
-    # Remove small clusters and clusters with few common words
-    for cluster in clusters[:]:
-        if len(cluster['articles']) < min_cluster_size or len(cluster['common_words']) < min_common_words:
-            miscellaneous.extend(cluster['articles'])
-            clusters.remove(cluster)
+    # Merge small clusters
+    while len(clusters) > max_clusters or any(len(c['articles']) < min_cluster_size for c in clusters):
+        clusters.sort(key=lambda x: len(x['articles']))
+        if len(clusters) <= 1:
+            break
+        
+        cluster1 = clusters.pop(0)
+        best_match = max(clusters, key=lambda x: calculate_similarity(cluster1['common_words'], x['common_words']))
+        
+        best_match['articles'].extend(cluster1['articles'])
+        best_match['common_words'].intersection_update(cluster1['common_words'])
+    
+    # Ensure minimum common words
+    for cluster in clusters:
+        if len(cluster['common_words']) < min_common_words:
+            most_common = Counter(word for article in cluster['articles'] for word in article_words[article['title']] if word in valid_words).most_common(min_common_words)
+            cluster['common_words'] = set(word for word, _ in most_common)
     
     # Calculate cluster strength
     for cluster in clusters:
-        cluster['avg_strength'] = calculate_avg_strength(cluster)
-    
-    # Merge clusters until we have 10 or fewer
-    clusters = merge_clusters(clusters)
+        cluster['avg_strength'] = calculate_avg_strength(cluster, article_words)
     
     # Sort clusters by size and strength
     clusters.sort(key=lambda x: (len(x['articles']), x['avg_strength']), reverse=True)
     
-    # Add miscellaneous cluster
-    if miscellaneous:
-        clusters.append({
-            'articles': miscellaneous,
-            'common_words': set(['Various topics']),
-            'avg_strength': 0
-        })
-    
     return clusters
+
+def calculate_avg_strength(cluster, article_words):
+    strengths = []
+    for article in cluster['articles']:
+        article_words_set = article_words[article['title']]
+        strength = len(cluster['common_words'].intersection(article_words_set)) / len(article_words_set)
+        strengths.append(strength)
+    return sum(strengths) / len(strengths) if strengths else 0
 
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds and display statistics'
 
     def add_arguments(self, parser):
         parser.add_argument('--days', type=int, default=1, help='Number of days to look back')
+        parser.add_argument('--min_word_freq', type=int, default=3, help='Minimum word frequency')
+        parser.add_argument('--max_word_freq', type=float, default=0.3, help='Maximum word frequency as a fraction of total articles')
+        parser.add_argument('--similarity_threshold', type=float, default=0.15, help='Similarity threshold for clustering')
+        parser.add_argument('--min_cluster_size', type=int, default=5, help='Minimum cluster size')
+        parser.add_argument('--min_common_words', type=int, default=3, help='Minimum number of common words in a cluster')
+        parser.add_argument('--max_clusters', type=int, default=10, help='Maximum number of clusters')
 
     def handle(self, *args, **options):
         days_back = options['days']
+        min_word_freq = options['min_word_freq']
+        max_word_freq = options['max_word_freq']
+        similarity_threshold = options['similarity_threshold']
+        min_cluster_size = options['min_cluster_size']
+        min_common_words = options['min_common_words']
+        max_clusters = options['max_clusters']
 
         def get_publication_date(entry):
             if 'published_parsed' in entry:
@@ -159,7 +171,6 @@ class Command(BaseCommand):
 
             return articles
 
-        # List of RSS feed URLs (same as before)
         rss_urls = [
             'https://rss.cnn.com/rss/edition.rss',
             'https://feeds.bbci.co.uk/news/rss.xml',
@@ -187,19 +198,18 @@ class Command(BaseCommand):
         for url in rss_urls:
             all_articles[url] = get_articles_from_rss(url, days_back)
 
-        # Flatten the list of articles
         articles = [article for site_articles in all_articles.values() for article in site_articles]
 
-        # Perform simple clustering
-        clustered_articles = simple_clustering(articles)
+        clustered_articles = simple_clustering(articles, min_word_freq=min_word_freq, max_word_freq=max_word_freq, similarity_threshold=similarity_threshold, min_cluster_size=min_cluster_size, min_common_words=min_common_words, max_clusters=max_clusters)
 
-        # Print clustering results
         for i, cluster in enumerate(clustered_articles, 1):
             print(f"Cluster {i}:")
             print(f"Number of articles: {len(cluster['articles'])}")
             print(f"Common words: {', '.join(cluster['common_words'])}")
             print(f"Average cluster strength: {cluster['avg_strength']:.2%}")
             print("Example articles:")
-            for article in cluster['articles'][:5]:  # Displaying 5 example articles
+            for article in cluster['articles'][:5]:
                 print(f"- {article['title']}")
             print()
+
+
