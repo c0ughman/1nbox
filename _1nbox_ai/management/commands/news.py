@@ -72,9 +72,11 @@ def simple_clustering(articles, min_word_freq=3, max_word_freq=0.3, similarity_t
                 best_similarity = similarity
                 best_cluster = cluster
         
-        if best_similarity >= similarity_threshold:
-            best_cluster['articles'].append(article)
-            best_cluster['common_words'].intersection_update(article_valid_words)
+        if best_similarity >= similarity_threshold and best_cluster is not None:
+            # Check if the article contains all the common words of the best cluster
+            if best_cluster['common_words'].issubset(article_valid_words):
+                best_cluster['articles'].append(article)
+                best_cluster['common_words'].intersection_update(article_valid_words)
         else:
             clusters.append({
                 'articles': [article],
@@ -107,6 +109,7 @@ def simple_clustering(articles, min_word_freq=3, max_word_freq=0.3, similarity_t
     clusters.sort(key=lambda x: (len(x['articles']), x['avg_strength']), reverse=True)
     
     return clusters
+
 
 def calculate_avg_strength(cluster, article_words):
     strengths = []
