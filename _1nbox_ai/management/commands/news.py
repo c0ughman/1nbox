@@ -4,6 +4,7 @@ import pytz
 from django.core.management.base import BaseCommand
 from collections import defaultdict, Counter
 import re
+from itertools import combinations
 
 def extract_capitalized_words(text):
     # Extract capitalized words, excluding those at the start of sentences
@@ -15,11 +16,19 @@ def extract_capitalized_words(text):
             words.extend([word for word in sentence_words[1:] if word.istitle()])
     return words
 
-def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, min_cluster_size=0.05):
+def calculate_similarity(set1, set2):
+    intersection = set1.intersection(set2)
+    union = set1.union(set2)
+    return len(intersection) / len(union) if union else 0
+
+def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, similarity_threshold=0.3):
     # Extract capitalized words from all articles
     all_words = []
+    article_words = {}
     for article in articles:
-        all_words.extend(extract_capitalized_words(article['content']))
+        words = set(extract_capitalized_words(article['content']))
+        all_words.extend(words)
+        article_words[article['title']] = words
     
     # Count word frequencies
     word_counts = Counter(all_words)
@@ -29,45 +38,51 @@ def simple_clustering(articles, min_word_freq=5, max_word_freq=0.3, min_cluster_
     valid_words = set([word for word, count in word_counts.items() 
                        if min_word_freq <= count <= total_articles * max_word_freq])
     
-    # Create initial clusters based on common words
-    initial_clusters = defaultdict(list)
+    # Create initial clusters
+    clusters = []
     miscellaneous = []
     
     for article in articles:
-        article_words = set(extract_capitalized_words(article['content'])) & valid_words
-        if not article_words:
+        article_valid_words = article_words[article['title']].intersection(valid_words)
+        if not article_valid_words:
             miscellaneous.append(article)
         else:
-            key_word = max(article_words, key=lambda w: word_counts[w])
-            initial_clusters[key_word].append(article)
+            added_to_cluster = False
+            for cluster in clusters:
+                similarity = calculate_similarity(article_valid_words, cluster['common_words'])
+                if similarity >= similarity_threshold:
+                    cluster['articles'].append(article)
+                    cluster['common_words'].intersection_update(article_valid_words)
+                    added_to_cluster = True
+                    break
+            
+            if not added_to_cluster:
+                clusters.append({
+                    'articles': [article],
+                    'common_words': article_valid_words
+                })
     
-    # Merge similar clusters and remove small clusters
-    final_clusters = {}
-    cluster_id = 1
+    # Calculate cluster strength
+    for cluster in clusters:
+        strengths = []
+        for article in cluster['articles']:
+            article_words_set = article_words[article['title']]
+            strength = len(cluster['common_words'].intersection(article_words_set)) / len(article_words_set)
+            strengths.append(strength)
+        cluster['avg_strength'] = sum(strengths) / len(strengths) if strengths else 0
     
-    for key_word, cluster_articles in initial_clusters.items():
-        if len(cluster_articles) >= total_articles * min_cluster_size:
-            cluster_words = set.intersection(*[set(extract_capitalized_words(a['content'])) & valid_words 
-                                               for a in cluster_articles])
-            if cluster_words:
-                final_clusters[cluster_id] = {
-                    'articles': cluster_articles,
-                    'common_words': list(cluster_words)
-                }
-                cluster_id += 1
-            else:
-                miscellaneous.extend(cluster_articles)
-        else:
-            miscellaneous.extend(cluster_articles)
+    # Sort clusters by size and strength
+    clusters.sort(key=lambda x: (len(x['articles']), x['avg_strength']), reverse=True)
     
     # Add miscellaneous cluster
     if miscellaneous:
-        final_clusters['miscellaneous'] = {
+        clusters.append({
             'articles': miscellaneous,
-            'common_words': ['Various topics']
-        }
+            'common_words': set(['Various topics']),
+            'avg_strength': 0
+        })
     
-    return final_clusters
+    return clusters
 
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds and display statistics'
@@ -147,11 +162,12 @@ class Command(BaseCommand):
         clustered_articles = simple_clustering(articles)
 
         # Print clustering results
-        for cluster_id, cluster_info in clustered_articles.items():
-            print(f"Cluster {cluster_id}:")
-            print(f"Number of articles: {len(cluster_info['articles'])}")
-            print(f"Common words: {', '.join(cluster_info['common_words'])}")
+        for i, cluster in enumerate(clustered_articles, 1):
+            print(f"Cluster {i}:")
+            print(f"Number of articles: {len(cluster['articles'])}")
+            print(f"Common words: {', '.join(cluster['common_words'])}")
+            print(f"Average cluster strength: {cluster['avg_strength']:.2%}")
             print("Example articles:")
-            for article in cluster_info['articles'][:5]:  # Displaying 5 example articles
+            for article in cluster['articles'][:5]:  # Displaying 5 example articles
                 print(f"- {article['title']}")
             print()
