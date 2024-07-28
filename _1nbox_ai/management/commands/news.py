@@ -5,7 +5,6 @@ from django.core.management.base import BaseCommand
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 from collections import defaultdict, Counter
-import numpy as np
 import re
 import spacy
 
