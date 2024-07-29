@@ -7,7 +7,7 @@ from collections import defaultdict, Counter
 import re
 from itertools import combinations
 import math
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
@@ -34,7 +34,7 @@ def vectorize_article(article, word_tfidf, all_words):
     vector = [word_tfidf.get(word, 0) if word in article_words else 0 for word in all_words]
     return vector
 
-def cluster_articles(articles, n_clusters=10):
+def cluster_articles(articles, min_common_words=3, min_cluster_size=5, max_distance=0.7):
     # Preprocessing
     all_words = []
     word_counts = Counter()
@@ -50,50 +50,32 @@ def cluster_articles(articles, n_clusters=10):
     # Article Vectorization
     article_vectors = [vectorize_article(article, word_tfidf, all_words) for article in articles]
 
-    # Initial Clustering
-    kmeans = MiniBatchKMeans(n_clusters=n_clusters, random_state=42)
-    initial_clusters = kmeans.fit_predict(article_vectors)
-
-    # Refined Clustering
-    final_clusters = [[] for _ in range(n_clusters)]
-    for i, cluster in enumerate(initial_clusters):
-        final_clusters[cluster].append(i)
+    # Clustering
+    clustering = AgglomerativeClustering(n_clusters=None, distance_threshold=max_distance, linkage='complete')
+    clusters = clustering.fit_predict(article_vectors)
 
     # Post-processing
-    merged_clusters = merge_similar_clusters(final_clusters, article_vectors)
-    
+    cluster_dict = defaultdict(list)
+    for i, cluster in enumerate(clusters):
+        cluster_dict[cluster].append(i)
+
     # Prepare results
     clustered_articles = []
-    for cluster in merged_clusters:
-        cluster_articles = [articles[i] for i in cluster]
-        common_words = set.intersection(*[set(extract_capitalized_words(article['content'])) for article in cluster_articles])
-        clustered_articles.append({
-            'articles': cluster_articles,
-            'common_words': common_words,
-            'avg_strength': calculate_avg_strength(cluster_articles, common_words)
-        })
+    for cluster in cluster_dict.values():
+        if len(cluster) >= min_cluster_size:
+            cluster_articles = [articles[i] for i in cluster]
+            common_words = set.intersection(*[set(extract_capitalized_words(article['content'])) for article in cluster_articles])
+            if len(common_words) >= min_common_words:
+                clustered_articles.append({
+                    'articles': cluster_articles,
+                    'common_words': common_words,
+                    'avg_strength': calculate_avg_strength(cluster_articles, common_words)
+                })
 
     # Sort clusters by size and strength
     clustered_articles.sort(key=lambda x: (len(x['articles']), x['avg_strength']), reverse=True)
 
     return clustered_articles
-
-def merge_similar_clusters(clusters, vectors, similarity_threshold=0.5):
-    merged = []
-    for cluster in clusters:
-        if len(cluster) == 0:
-            continue
-        cluster_vector = np.mean([vectors[i] for i in cluster], axis=0)
-        merged_to_existing = False
-        for existing_cluster in merged:
-            existing_vector = np.mean([vectors[i] for i in existing_cluster], axis=0)
-            if cosine_similarity([cluster_vector], [existing_vector])[0][0] > similarity_threshold:
-                existing_cluster.extend(cluster)
-                merged_to_existing = True
-                break
-        if not merged_to_existing:
-            merged.append(cluster)
-    return merged
 
 def calculate_avg_strength(cluster_articles, common_words):
     strengths = []
@@ -108,11 +90,15 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--days', type=int, default=1, help='Number of days to look back')
-        parser.add_argument('--n_clusters', type=int, default=10, help='Number of initial clusters')
+        parser.add_argument('--min_common_words', type=int, default=3, help='Minimum number of common words for a cluster')
+        parser.add_argument('--min_cluster_size', type=int, default=5, help='Minimum number of articles in a cluster')
+        parser.add_argument('--max_distance', type=float, default=0.7, help='Maximum distance for clustering (0.0 to 1.0)')
 
     def handle(self, *args, **options):
         days_back = options['days']
-        n_clusters = options['n_clusters']
+        min_common_words = options['min_common_words']
+        min_cluster_size = options['min_cluster_size']
+        max_distance = options['max_distance']
 
         def get_publication_date(entry):
             if 'published_parsed' in entry:
@@ -177,7 +163,8 @@ class Command(BaseCommand):
 
         articles = [article for site_articles in all_articles.values() for article in site_articles]
 
-        clustered_articles = cluster_articles(articles, n_clusters=n_clusters)
+        clustered_articles = cluster_articles(articles, min_common_words=min_common_words, 
+                                              min_cluster_size=min_cluster_size, max_distance=max_distance)
 
         for i, cluster in enumerate(clustered_articles, 1):
             print(f"Cluster {i}:")
@@ -188,3 +175,6 @@ class Command(BaseCommand):
             for article in cluster['articles'][:5]:
                 print(f"- {article['title']}")
             print()
+
+        print(f"Total clusters: {len(clustered_articles)}")
+        print(f"Unclustered articles: {len(articles) - sum(len(c['articles']) for c in clustered_articles)}")
