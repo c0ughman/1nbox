@@ -44,7 +44,7 @@ def merge_clusters(clusters, max_clusters, min_common_words):
     
     return clusters
 
-def simple_clustering(articles, min_word_freq=3, max_word_freq=30, min_common_words=3, max_clusters=10, misc_threshold=2):
+def simple_clustering(articles, min_word_freq=3, max_word_freq=30, min_common_words=3, max_clusters=10, misc_threshold=2, max_cluster_size=50):
     all_words = []
     article_words = {}
     for article in articles:
@@ -66,12 +66,14 @@ def simple_clustering(articles, min_word_freq=3, max_word_freq=30, min_common_wo
         best_common_words = 0
         
         for cluster in clusters:
+            if len(cluster['articles']) >= max_cluster_size:
+                continue
             common_words = len(article_valid_words.intersection(cluster['common_words']))
-            if common_words > best_common_words:
+            if common_words > best_common_words and common_words >= min_common_words:
                 best_common_words = common_words
                 best_cluster = cluster
         
-        if best_common_words >= min_common_words:
+        if best_cluster:
             best_cluster['articles'].append(article)
             best_cluster['common_words'].intersection_update(article_valid_words)
         else:
@@ -108,15 +110,7 @@ def simple_clustering(articles, min_word_freq=3, max_word_freq=30, min_common_wo
 
     return final_clusters
 
-def calculate_avg_strength(cluster, article_words):
-    strengths = []
-    for article in cluster['articles']:
-        article_words_set = article_words[article['title']]
-        if article_words_set:  # Only proceed if article_words_set is not empty
-            strength = len(cluster['common_words'].intersection(article_words_set)) / len(article_words_set)
-            strengths.append(strength)
-    return sum(strengths) / len(strengths) if strengths else 0
-
+# Update the Command class
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds and display statistics'
 
@@ -127,6 +121,7 @@ class Command(BaseCommand):
         parser.add_argument('--min_common_words', type=int, default=3, help='Minimum number of common words for clustering')
         parser.add_argument('--max_clusters', type=int, default=10, help='Maximum number of clusters')
         parser.add_argument('--misc_threshold', type=int, default=2, help='Minimum cluster size before moving to miscellaneous')
+        parser.add_argument('--max_cluster_size', type=int, default=50, help='Maximum size of a single cluster')
 
     def handle(self, *args, **options):
         days_back = options['days']
@@ -199,14 +194,22 @@ class Command(BaseCommand):
 
         articles = [article for site_articles in all_articles.values() for article in site_articles]
 
-        clustered_articles = simple_clustering(articles, min_word_freq=min_word_freq, max_word_freq=max_word_freq, min_common_words=min_common_words, max_clusters=max_clusters, misc_threshold=misc_threshold)
+        clustered_articles = simple_clustering(
+            articles, 
+            min_word_freq=options['min_word_freq'],
+            max_word_freq=options['max_word_freq'],
+            min_common_words=options['min_common_words'],
+            max_clusters=options['max_clusters'],
+            misc_threshold=options['misc_threshold'],
+            max_cluster_size=options['max_cluster_size']
+        )
 
         for i, cluster in enumerate(clustered_articles, 1):
             print(f"Cluster {i}:")
             print(f"Number of articles: {len(cluster['articles'])}")
             print(f"Common words: {', '.join(cluster['common_words'])}")
-            print(f"Average strength: {cluster['avg_strength']:.2f}")
-            print("Articles:")
-            for article in cluster['articles']:
-                print(f"- {article['title']} ({article['link']})")
-            print("\n")
+            print(f"Average cluster strength: {cluster['avg_strength']:.2%}")
+            print("Example articles:")
+            for article in cluster['articles'][:5]:
+                print(f"- {article['title']}")
+            print()
