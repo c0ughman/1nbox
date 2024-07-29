@@ -10,7 +10,7 @@ from itertools import combinations
 def extract_capitalized_words(text):
     sentences = re.split(r'[.!?]+', text)
     words = []
-    common_capitalized = set(calendar.month_name[1:] + calendar.day_name + ['I', 'U', 'A'])
+    common_capitalized = set(list(calendar.month_name[1:]) + list(calendar.day_name) + ['I', 'U', 'A'])
     for sentence in sentences:
         sentence_words = sentence.strip().split()
         if len(sentence_words) > 1:
