@@ -4,9 +4,11 @@ import pytz
 from django.core.management.base import BaseCommand
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import cosine_similarity
 from collections import defaultdict, Counter
 import re
 import spacy
+import numpy as np
 
 # Load spaCy model
 nlp = spacy.load("en_core_web_sm")
@@ -36,7 +38,7 @@ def extract_key_topics(articles, top_n=50):
     
     return key_topics
 
-def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5):
+def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clusters=None, min_cluster_size=5, similarity_threshold=0.3):
     # Extract key topics
     key_topics = extract_key_topics(articles)
     
@@ -44,8 +46,84 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5):
     vectorizer = TfidfVectorizer(vocabulary=key_topics, max_df=max_df, min_df=min_df)
     tfidf_matrix = vectorizer.fit_transform([article['content'] for article in articles])
     
-    # Determine optimal number of clusters using elbow method
-    max_clusters = min(20, len(articles) // 10)  # Adjust as needed
+    # Determine optimal number of clusters if not specified
+    if n_clusters is None:
+        max_clusters = min(20, len(articles) // 10)
+        n_clusters = determine_optimal_clusters(tfidf_matrix, max_clusters)
+    
+    # Perform clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    cluster_labels = kmeans.fit_predict(tfidf_matrix)
+    
+    # Calculate cluster centers
+    cluster_centers = kmeans.cluster_centers_
+    
+    # Group articles by cluster
+    clustered_articles = defaultdict(list)
+    for article, label in zip(articles, cluster_labels):
+        clustered_articles[label].append(article)
+    
+    # Prepare the result
+    result = []
+    feature_names = vectorizer.get_feature_names_out()
+    miscellaneous_cluster = []
+    
+    for cluster_id, cluster_articles in clustered_articles.items():
+        if len(cluster_articles) < min_cluster_size:
+            miscellaneous_cluster.extend(cluster_articles)
+            continue
+        
+        cluster_tfidf = tfidf_matrix[cluster_labels == cluster_id]
+        top_word_indices = cluster_tfidf.sum(0).argsort()[0, -5:].tolist()[0]
+        top_words = [feature_names[i] for i in top_word_indices]
+        
+        # Calculate average similarity within cluster
+        cluster_vectors = tfidf_matrix[cluster_labels == cluster_id]
+        avg_similarity = np.mean(cosine_similarity(cluster_vectors, cluster_centers[cluster_id]))
+        
+        # Filter articles based on similarity threshold
+        filtered_articles = [
+            article for article, vector in zip(cluster_articles, cluster_vectors)
+            if cosine_similarity(vector, cluster_centers[cluster_id])[0][0] >= similarity_threshold
+        ]
+        
+        if len(filtered_articles) < min_cluster_size:
+            miscellaneous_cluster.extend(filtered_articles)
+            continue
+        
+        total_word_count = sum(len(article['content'].split()) for article in filtered_articles)
+        total_char_count = sum(len(article['content']) for article in filtered_articles)
+        openai_tokens = total_char_count // 4  # Approximate conversion
+        
+        result.append({
+            'cluster_id': cluster_id + 1,
+            'top_words': top_words,
+            'articles': filtered_articles,
+            'total_word_count': total_word_count,
+            'total_char_count': total_char_count,
+            'openai_tokens': openai_tokens,
+            'avg_similarity': avg_similarity
+        })
+    
+    # Add miscellaneous cluster
+    if miscellaneous_cluster:
+        total_word_count = sum(len(article['content'].split()) for article in miscellaneous_cluster)
+        total_char_count = sum(len(article['content']) for article in miscellaneous_cluster)
+        openai_tokens = total_char_count // 4
+        
+        result.append({
+            'cluster_id': 'Miscellaneous',
+            'top_words': ['miscellaneous'],
+            'articles': miscellaneous_cluster,
+            'total_word_count': total_word_count,
+            'total_char_count': total_char_count,
+            'openai_tokens': openai_tokens,
+            'avg_similarity': 0  # Not applicable for miscellaneous cluster
+        })
+    
+    return result
+
+def determine_optimal_clusters(tfidf_matrix, max_clusters):
     inertias = []
     for k in range(2, max_clusters + 1):
         kmeans = KMeans(n_clusters=k, random_state=42)
@@ -59,60 +137,28 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5):
             optimal_clusters = i + 2
             break
     
-    # Perform final clustering
-    kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
-    cluster_labels = kmeans.fit_predict(tfidf_matrix)
-    
-    # Group articles by cluster
-    clustered_articles = defaultdict(list)
-    for article, label in zip(articles, cluster_labels):
-        clustered_articles[label].append(article)
-    
-    # Prepare the result
-    result = []
-    feature_names = vectorizer.get_feature_names_out()
-    for cluster_id, cluster_articles in clustered_articles.items():
-        cluster_tfidf = tfidf_matrix[cluster_labels == cluster_id]
-        top_word_indices = cluster_tfidf.sum(0).argsort()[0, -5:].tolist()[0]
-        top_words = [feature_names[i] for i in top_word_indices]
-        
-        total_word_count = sum(len(article['content'].split()) for article in cluster_articles)
-        total_char_count = sum(len(article['content']) for article in cluster_articles)
-        openai_tokens = total_char_count // 4  # Approximate conversion
-        
-        result.append({
-            'cluster_id': cluster_id + 1,
-            'top_words': top_words,
-            'articles': cluster_articles,
-            'total_word_count': total_word_count,
-            'total_char_count': total_char_count,
-            'openai_tokens': openai_tokens
-        })
-    
-    return result
+    return optimal_clusters
 
-def calculate_dataset_stats(all_articles):
-    total_articles = sum(len(articles) for articles in all_articles.values())
-    articles_per_source = {url: len(articles) for url, articles in all_articles.items()}
-    avg_article_size_per_source = {url: sum(len(article['content']) for article in articles) / len(articles) if articles else 0 
-                                   for url, articles in all_articles.items()}
-    avg_article_size_general = sum(len(article['content']) for articles in all_articles.values() for article in articles) / total_articles if total_articles else 0
-    
-    return {
-        'total_articles': total_articles,
-        'articles_per_source': articles_per_source,
-        'avg_article_size_per_source': avg_article_size_per_source,
-        'avg_article_size_general': avg_article_size_general
-    }
+# ... (rest of the code remains the same)
 
 class Command(BaseCommand):
-    help = 'Fetch articles from RSS feeds and display statistics'
+    help = 'Fetch articles from RSS feeds, cluster them, and display statistics'
 
     def add_arguments(self, parser):
         parser.add_argument('--days', type=int, default=1, help='Number of days to look back')
+        parser.add_argument('--min-df', type=float, default=0.01, help='Minimum document frequency for TF-IDF')
+        parser.add_argument('--max-df', type=float, default=0.5, help='Maximum document frequency for TF-IDF')
+        parser.add_argument('--n-clusters', type=int, help='Number of clusters (if not specified, determined automatically)')
+        parser.add_argument('--min-cluster-size', type=int, default=5, help='Minimum number of articles per cluster')
+        parser.add_argument('--similarity-threshold', type=float, default=0.3, help='Minimum cosine similarity for articles in a cluster')
 
     def handle(self, *args, **options):
         days_back = options['days']
+        min_df = options['min_df']
+        max_df = options['max_df']
+        n_clusters = options['n_clusters']
+        min_cluster_size = options['min_cluster_size']
+        similarity_threshold = options['similarity_threshold']
 
         def get_publication_date(entry):
             if 'published_parsed' in entry:
@@ -191,10 +237,17 @@ class Command(BaseCommand):
         print(f"Average article size in general: {dataset_stats['avg_article_size_general']:.2f} characters")
         print()
 
-        # Clustering
+         # Clustering
         articles = [article for site_articles in all_articles.values() for article in site_articles]
         
-        clustered_articles = cluster_articles(articles)
+        clustered_articles = cluster_articles(
+            articles, 
+            min_df=min_df, 
+            max_df=max_df, 
+            n_clusters=n_clusters, 
+            min_cluster_size=min_cluster_size, 
+            similarity_threshold=similarity_threshold
+        )
 
         for cluster in clustered_articles:
             print(f"Cluster {cluster['cluster_id']}:")
@@ -203,6 +256,7 @@ class Command(BaseCommand):
             print(f"Total word count: {cluster['total_word_count']}")
             print(f"Total character count: {cluster['total_char_count']}")
             print(f"Approximate OpenAI tokens: {cluster['openai_tokens']}")
+            print(f"Average similarity: {cluster['avg_similarity']:.4f}")
             print("Example articles:")
             for article in cluster['articles'][:6]:  # Displaying 6 example articles
                 print(f"- {article['title']}")
