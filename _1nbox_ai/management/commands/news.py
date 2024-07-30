@@ -1,104 +1,118 @@
-import calendar
 import feedparser
 from datetime import datetime, timedelta
 import pytz
 from django.core.management.base import BaseCommand
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
 from collections import defaultdict, Counter
 import re
-from itertools import combinations
-import math
-from sklearn.cluster import AgglomerativeClustering
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
+import spacy
 
-def extract_capitalized_words(text):
-    sentences = re.split(r'[.!?]+', text)
-    words = []
-    common_capitalized = set(list(calendar.month_name[1:]) + list(calendar.day_name) + ['I', 'U', 'A'])
-    for sentence in sentences:
-        sentence_words = sentence.strip().split()
-        if len(sentence_words) > 1:
-            words.extend([word for word in sentence_words[1:] if word.istitle() and word not in common_capitalized and len(word) > 1])
-    return words
+# Load spaCy model
+nlp = spacy.load("en_core_web_sm")
 
-def calculate_tfidf(word_counts, total_docs):
-    word_tfidf = {}
-    for word, count in word_counts.items():
-        tf = count
-        idf = math.log(total_docs / (count + 1))
-        word_tfidf[word] = tf * idf
-    return word_tfidf
+def preprocess(text):
+    # Basic preprocessing
+    return ' '.join([word.lower() for word in re.findall(r'\w+', text)])
 
-def vectorize_article(article, word_tfidf, all_words):
-    article_words = set(extract_capitalized_words(article['content']))
-    vector = [word_tfidf.get(word, 0) if word in article_words else 0 for word in all_words]
-    return vector
+def extract_key_topics(articles, top_n=50):
+    # Combine all article content
+    all_text = ' '.join([article['content'] for article in articles])
+    
+    # Process the text with spaCy
+    doc = nlp(all_text)
+    
+    # Extract named entities and nouns
+    entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ['PERSON', 'ORG', 'GPE', 'EVENT']]
+    nouns = [token.text.lower() for token in doc if token.pos_ == 'NOUN']
+    
+    # Combine and count occurrences
+    key_words = Counter(entities + nouns)
+    
+    # Filter out common words and single-character words
+    common_words = set(['said', 'year', 'day', 'time', 'people', 'way', 'man', 'woman'])
+    key_topics = [word for word, count in key_words.most_common(top_n) 
+                  if word not in common_words and len(word) > 1]
+    
+    return key_topics
 
-def cluster_articles(articles, min_common_words=3, min_cluster_size=5, max_distance=0.7):
-    # Preprocessing
-    all_words = []
-    word_counts = Counter()
-    for article in articles:
-        words = extract_capitalized_words(article['content'])
-        all_words.extend(words)
-        word_counts.update(words)
+def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5):
+    # Extract key topics
+    key_topics = extract_key_topics(articles)
+    
+    # Create TF-IDF vectorizer with key topics as features
+    vectorizer = TfidfVectorizer(vocabulary=key_topics, max_df=max_df, min_df=min_df)
+    tfidf_matrix = vectorizer.fit_transform([article['content'] for article in articles])
+    
+    # Determine optimal number of clusters using elbow method
+    max_clusters = min(20, len(articles) // 10)  # Adjust as needed
+    inertias = []
+    for k in range(2, max_clusters + 1):
+        kmeans = KMeans(n_clusters=k, random_state=42)
+        kmeans.fit(tfidf_matrix)
+        inertias.append(kmeans.inertia_)
+    
+    # Find elbow point
+    optimal_clusters = 2
+    for i in range(1, len(inertias) - 1):
+        if (inertias[i-1] - inertias[i]) / (inertias[i] - inertias[i+1]) < 0.5:
+            optimal_clusters = i + 2
+            break
+    
+    # Perform final clustering
+    kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
+    cluster_labels = kmeans.fit_predict(tfidf_matrix)
+    
+    # Group articles by cluster
+    clustered_articles = defaultdict(list)
+    for article, label in zip(articles, cluster_labels):
+        clustered_articles[label].append(article)
+    
+    # Prepare the result
+    result = []
+    feature_names = vectorizer.get_feature_names_out()
+    for cluster_id, cluster_articles in clustered_articles.items():
+        cluster_tfidf = tfidf_matrix[cluster_labels == cluster_id]
+        top_word_indices = cluster_tfidf.sum(0).argsort()[0, -5:].tolist()[0]
+        top_words = [feature_names[i] for i in top_word_indices]
+        
+        total_word_count = sum(len(article['content'].split()) for article in cluster_articles)
+        total_char_count = sum(len(article['content']) for article in cluster_articles)
+        openai_tokens = total_char_count // 4  # Approximate conversion
+        
+        result.append({
+            'cluster_id': cluster_id + 1,
+            'top_words': top_words,
+            'articles': cluster_articles,
+            'total_word_count': total_word_count,
+            'total_char_count': total_char_count,
+            'openai_tokens': openai_tokens
+        })
+    
+    return result
 
-    # Word Weighting
-    word_tfidf = calculate_tfidf(word_counts, len(articles))
-    all_words = list(word_tfidf.keys())
-
-    # Article Vectorization
-    article_vectors = [vectorize_article(article, word_tfidf, all_words) for article in articles]
-
-    # Clustering
-    clustering = AgglomerativeClustering(n_clusters=None, distance_threshold=max_distance, linkage='complete')
-    clusters = clustering.fit_predict(article_vectors)
-
-    # Post-processing
-    cluster_dict = defaultdict(list)
-    for i, cluster in enumerate(clusters):
-        cluster_dict[cluster].append(i)
-
-    # Prepare results
-    clustered_articles = []
-    for cluster in cluster_dict.values():
-        if len(cluster) >= min_cluster_size:
-            cluster_articles = [articles[i] for i in cluster]
-            common_words = set.intersection(*[set(extract_capitalized_words(article['content'])) for article in cluster_articles])
-            if len(common_words) >= min_common_words:
-                clustered_articles.append({
-                    'articles': cluster_articles,
-                    'common_words': common_words,
-                    'avg_strength': calculate_avg_strength(cluster_articles, common_words)
-                })
-
-    # Sort clusters by size and strength
-    clustered_articles.sort(key=lambda x: (len(x['articles']), x['avg_strength']), reverse=True)
-
-    return clustered_articles
-
-def calculate_avg_strength(cluster_articles, common_words):
-    strengths = []
-    for article in cluster_articles:
-        article_words = set(extract_capitalized_words(article['content']))
-        strength = len(common_words.intersection(article_words)) / len(article_words) if article_words else 0
-        strengths.append(strength)
-    return sum(strengths) / len(strengths) if strengths else 0
+def calculate_dataset_stats(all_articles):
+    total_articles = sum(len(articles) for articles in all_articles.values())
+    articles_per_source = {url: len(articles) for url, articles in all_articles.items()}
+    avg_article_size_per_source = {url: sum(len(article['content']) for article in articles) / len(articles) if articles else 0 
+                                   for url, articles in all_articles.items()}
+    avg_article_size_general = sum(len(article['content']) for articles in all_articles.values() for article in articles) / total_articles if total_articles else 0
+    
+    return {
+        'total_articles': total_articles,
+        'articles_per_source': articles_per_source,
+        'avg_article_size_per_source': avg_article_size_per_source,
+        'avg_article_size_general': avg_article_size_general
+    }
 
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds and display statistics'
 
     def add_arguments(self, parser):
         parser.add_argument('--days', type=int, default=1, help='Number of days to look back')
-        parser.add_argument('--min_common_words', type=int, default=3, help='Minimum number of common words for a cluster')
-        parser.add_argument('--min_cluster_size', type=int, default=5, help='Minimum number of articles in a cluster')
-        parser.add_argument('--max_distance', type=float, default=0.7, help='Maximum distance for clustering (0.0 to 1.0)')
 
     def handle(self, *args, **options):
         days_back = options['days']
-        min_common_words = options['min_common_words']
-        min_cluster_size = options['min_cluster_size']
-        max_distance = options['max_distance']
 
         def get_publication_date(entry):
             if 'published_parsed' in entry:
@@ -134,6 +148,7 @@ class Command(BaseCommand):
 
             return articles
 
+        # List of RSS feed URLs
         rss_urls = [
             'https://rss.cnn.com/rss/edition.rss',
             'https://feeds.bbci.co.uk/news/rss.xml',
@@ -161,20 +176,34 @@ class Command(BaseCommand):
         for url in rss_urls:
             all_articles[url] = get_articles_from_rss(url, days_back)
 
+        # Calculate dataset statistics
+        dataset_stats = calculate_dataset_stats(all_articles)
+
+        # Print dataset statistics
+        print("Dataset Statistics:")
+        print(f"Total number of articles: {dataset_stats['total_articles']}")
+        print("Number of articles per news source:")
+        for source, count in dataset_stats['articles_per_source'].items():
+            print(f"- {source}: {count}")
+        print("Average article size per news source (in characters):")
+        for source, avg_size in dataset_stats['avg_article_size_per_source'].items():
+            print(f"- {source}: {avg_size:.2f}")
+        print(f"Average article size in general: {dataset_stats['avg_article_size_general']:.2f} characters")
+        print()
+
+        # Clustering
         articles = [article for site_articles in all_articles.values() for article in site_articles]
+        
+        clustered_articles = cluster_articles(articles)
 
-        clustered_articles = cluster_articles(articles, min_common_words=min_common_words, 
-                                              min_cluster_size=min_cluster_size, max_distance=max_distance)
-
-        for i, cluster in enumerate(clustered_articles, 1):
-            print(f"Cluster {i}:")
+        for cluster in clustered_articles:
+            print(f"Cluster {cluster['cluster_id']}:")
+            print(f"Top words: {', '.join(cluster['top_words'])}")
             print(f"Number of articles: {len(cluster['articles'])}")
-            print(f"Common words: {', '.join(cluster['common_words'])}")
-            print(f"Average cluster strength: {cluster['avg_strength']:.2%}")
+            print(f"Total word count: {cluster['total_word_count']}")
+            print(f"Total character count: {cluster['total_char_count']}")
+            print(f"Approximate OpenAI tokens: {cluster['openai_tokens']}")
             print("Example articles:")
-            for article in cluster['articles'][:5]:
+            for article in cluster['articles'][:6]:  # Displaying 6 example articles
                 print(f"- {article['title']}")
             print()
-
-        print(f"Total clusters: {len(clustered_articles)}")
-        print(f"Unclustered articles: {len(articles) - sum(len(c['articles']) for c in clustered_articles)}")
