@@ -139,7 +139,19 @@ def determine_optimal_clusters(tfidf_matrix, max_clusters):
     
     return optimal_clusters
 
-# ... (rest of the code remains the same)
+def calculate_dataset_stats(all_articles):
+    total_articles = sum(len(articles) for articles in all_articles.values())
+    articles_per_source = {url: len(articles) for url, articles in all_articles.items()}
+    avg_article_size_per_source = {url: sum(len(article['content']) for article in articles) / len(articles) if articles else 0 
+                                   for url, articles in all_articles.items()}
+    avg_article_size_general = sum(len(article['content']) for articles in all_articles.values() for article in articles) / total_articles if total_articles else 0
+    
+    return {
+        'total_articles': total_articles,
+        'articles_per_source': articles_per_source,
+        'avg_article_size_per_source': avg_article_size_per_source,
+        'avg_article_size_general': avg_article_size_general
+    }
 
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds, cluster them, and display statistics'
