@@ -129,7 +129,6 @@ class Command(BaseCommand):
         max_df = options['max_df']
         n_clusters = options['n_clusters']
         min_cluster_size = options['min_cluster_size']
-        similarity_threshold = options['similarity_threshold']
 
         def get_publication_date(entry):
             if 'published_parsed' in entry:
