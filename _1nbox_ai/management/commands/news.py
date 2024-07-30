@@ -10,6 +10,8 @@ import spacy
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import warnings
+from scipy.sparse import csr_matrix
+
 
 # Suppress warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -72,8 +74,8 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clu
             miscellaneous_cluster.extend(cluster_articles)
             continue
         
-        cluster_tfidf = np.sum(cluster_vectors, axis=0)
-        top_word_indices = cluster_tfidf.argsort()[0, -5:].tolist()[0]
+        cluster_tfidf = csr_matrix(np.sum(cluster_vectors, axis=0))
+        top_word_indices = np.argsort(cluster_tfidf.toarray().flatten())[-5:][::-1]
         top_words = [feature_names[i] for i in top_word_indices]
         
         total_word_count = sum(len(article['content'].split()) for article in cluster_articles)
