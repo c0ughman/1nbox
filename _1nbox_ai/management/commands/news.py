@@ -36,7 +36,7 @@ def extract_key_topics(articles, top_n=50):
 def calculate_cluster_similarity(cluster_vectors):
     if len(cluster_vectors) < 2:
         return 1.0
-    similarities = cosine_similarity(cluster_vectors)
+    similarities = cosine_similarity(cluster_vectors.todense())  # Convert to dense
     return np.mean(similarities)
 
 def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clusters=None, min_cluster_size=5, similarity_threshold=0.3):
@@ -68,36 +68,19 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clu
             continue
         
         cluster_tfidf = np.sum(cluster_vectors, axis=0)
-        top_word_indices = cluster_tfidf.argsort()[0, -5:].tolist()[0]
-        top_words = [feature_names[i] for i in top_word_indices]
-        
-        total_word_count = sum(len(article['content'].split()) for article in cluster_articles)
-        total_char_count = sum(len(article['content']) for article in cluster_articles)
-        openai_tokens = total_char_count // 4
-        
-        result.append({
-            'cluster_id': cluster_id + 1,
-            'top_words': top_words,
-            'articles': cluster_articles,
-            'total_word_count': total_word_count,
-            'total_char_count': total_char_count,
-            'openai_tokens': openai_tokens,
-            'similarity_score': similarity_score
-        })
+        top_keywords = [feature_names[i] for i in cluster_tfidf.argsort()[::-1][:10]]
+        cluster_info = {
+            'cluster_id': cluster_id,
+            'top_keywords': top_keywords,
+            'articles': [article for article, _ in cluster_data]
+        }
+        result.append(cluster_info)
     
     if miscellaneous_cluster:
-        total_word_count = sum(len(article['content'].split()) for article in miscellaneous_cluster)
-        total_char_count = sum(len(article['content']) for article in miscellaneous_cluster)
-        openai_tokens = total_char_count // 4
-        
         result.append({
-            'cluster_id': 'Miscellaneous',
-            'top_words': ['miscellaneous'],
-            'articles': miscellaneous_cluster,
-            'total_word_count': total_word_count,
-            'total_char_count': total_char_count,
-            'openai_tokens': openai_tokens,
-            'similarity_score': 0.0
+            'cluster_id': 'miscellaneous',
+            'top_keywords': [],
+            'articles': miscellaneous_cluster
         })
     
     return result
