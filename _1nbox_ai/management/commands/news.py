@@ -8,6 +8,7 @@ from collections import defaultdict, Counter
 import re
 import spacy
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -17,15 +18,28 @@ def preprocess(text):
 def extract_key_topics(articles, top_n=50):
     all_text = ' '.join([article['content'] for article in articles])
     doc = nlp(all_text)
-    entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ['PERSON', 'ORG', 'GPE', 'EVENT']]
-    nouns = [token.text.lower() for token in doc if token.pos_ == 'NOUN']
-    key_words = Counter(entities + nouns)
+    
+    # Prioritize capitalized words
+    capitalized_words = re.findall(r'\b(?!(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b)[A-Z][a-z]+', all_text)
+    capitalized_words = [word for word in capitalized_words if len(word) > 1]
+    
+    entities = [ent.text for ent in doc.ents if ent.label_ in ['PERSON', 'ORG', 'GPE', 'EVENT']]
+    nouns = [token.text for token in doc if token.pos_ == 'NOUN']
+    
+    key_words = Counter(capitalized_words + entities + nouns)
     common_words = set(['said', 'year', 'day', 'time', 'people', 'way', 'man', 'woman'])
     key_topics = [word for word, count in key_words.most_common(top_n) 
-                  if word not in common_words and len(word) > 1]
+                  if word.lower() not in common_words and len(word) > 1]
+    
     return key_topics
 
-def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clusters=None, min_cluster_size=5):
+def calculate_cluster_similarity(cluster_vectors):
+    if len(cluster_vectors) < 2:
+        return 1.0
+    similarities = cosine_similarity(cluster_vectors)
+    return np.mean(similarities)
+
+def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clusters=None, min_cluster_size=5, similarity_threshold=0.3):
     key_topics = extract_key_topics(articles)
     vectorizer = TfidfVectorizer(vocabulary=key_topics, max_df=max_df, min_df=min_df)
     tfidf_matrix = vectorizer.fit_transform([article['content'] for article in articles])
@@ -37,20 +51,24 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clu
     cluster_labels = kmeans.fit_predict(tfidf_matrix)
     
     clustered_articles = defaultdict(list)
-    for article, label in zip(articles, cluster_labels):
-        clustered_articles[label].append(article)
+    for article, label, vector in zip(articles, cluster_labels, tfidf_matrix):
+        clustered_articles[label].append((article, vector))
     
     result = []
     feature_names = vectorizer.get_feature_names_out()
     miscellaneous_cluster = []
     
-    for cluster_id, cluster_articles in clustered_articles.items():
-        if len(cluster_articles) < min_cluster_size:
+    for cluster_id, cluster_data in clustered_articles.items():
+        cluster_articles, cluster_vectors = zip(*cluster_data)
+        
+        similarity_score = calculate_cluster_similarity(cluster_vectors)
+        
+        if len(cluster_articles) < min_cluster_size or similarity_score < similarity_threshold:
             miscellaneous_cluster.extend(cluster_articles)
             continue
         
-        cluster_tfidf = tfidf_matrix[cluster_labels == cluster_id]
-        top_word_indices = cluster_tfidf.sum(0).argsort()[0, -5:].tolist()[0]
+        cluster_tfidf = np.sum(cluster_vectors, axis=0)
+        top_word_indices = cluster_tfidf.argsort()[0, -5:].tolist()[0]
         top_words = [feature_names[i] for i in top_word_indices]
         
         total_word_count = sum(len(article['content'].split()) for article in cluster_articles)
@@ -64,6 +82,7 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clu
             'total_word_count': total_word_count,
             'total_char_count': total_char_count,
             'openai_tokens': openai_tokens,
+            'similarity_score': similarity_score
         })
     
     if miscellaneous_cluster:
@@ -78,10 +97,10 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clu
             'total_word_count': total_word_count,
             'total_char_count': total_char_count,
             'openai_tokens': openai_tokens,
+            'similarity_score': 0.0
         })
     
     return result
-
 
 def determine_optimal_clusters(tfidf_matrix, max_clusters):
     inertias = []
@@ -122,6 +141,7 @@ class Command(BaseCommand):
         parser.add_argument('--max-df', type=float, default=0.5, help='Maximum document frequency for TF-IDF')
         parser.add_argument('--n-clusters', type=int, help='Number of clusters (if not specified, determined automatically)')
         parser.add_argument('--min-cluster-size', type=int, default=5, help='Minimum number of articles per cluster')
+        parser.add_argument('--similarity-threshold', type=float, default=0.3, help='Minimum similarity score for clusters')
 
     def handle(self, *args, **options):
         days_back = options['days']
@@ -129,6 +149,7 @@ class Command(BaseCommand):
         max_df = options['max_df']
         n_clusters = options['n_clusters']
         min_cluster_size = options['min_cluster_size']
+        similarity_threshold = options['similarity_threshold']
 
         def get_publication_date(entry):
             if 'published_parsed' in entry:
@@ -173,59 +194,36 @@ class Command(BaseCommand):
             'https://www.theguardian.com/world/rss',
             'http://rss.cnn.com/rss/cnn_topstories.rss',
             'http://feeds.foxnews.com/foxnews/latest',
-            'https://www.aljazeera.com/xml/rss/all.xml',
-            'https://news.google.com/rss',
-            'https://www.npr.org/rss/rss.php?id=1001',
-            'https://www.washingtonpost.com/rss',
-            'https://www.wsj.com/xml/rss/3_7085.xml',
-            'https://feeds.a.dj.com/rss/RSSWorldNews.xml',
-            'https://feeds.skynews.com/feeds/rss/world.xml',
-            'https://feeds.nbcnews.com/nbcnews/public/news',
-            'https://feeds.feedburner.com/ndtvnews-world-news',
-            'https://abcnews.go.com/abcnews/internationalheadlines',
-            'https://rss.dw.com/rdf/rss-en-all',
-            'https://www.cbsnews.com/latest/rss/world',
-            'https://rss.app/feeds/UokAeMGlNa7Cgf9j.xml'
+            'https://www.nbcnews.com/id/3032091/device/rss/rss.xml',
+            'https://rss.msnbc.msn.com/id/3032506/device/rss/rss.xml'
         ]
 
-        all_articles = {}
-        for url in rss_urls:
-            all_articles[url] = get_articles_from_rss(url, days_back)
+        all_articles = {url: get_articles_from_rss(url, days_back) for url in rss_urls}
 
-        # Calculate dataset statistics
         dataset_stats = calculate_dataset_stats(all_articles)
+        self.stdout.write(self.style.SUCCESS('Dataset Statistics:'))
+        self.stdout.write(f"Total articles: {dataset_stats['total_articles']}")
+        self.stdout.write(f"Articles per source: {dataset_stats['articles_per_source']}")
+        self.stdout.write(f"Average article size per source: {dataset_stats['avg_article_size_per_source']}")
+        self.stdout.write(f"Average article size general: {dataset_stats['avg_article_size_general']}")
 
-        # Print dataset statistics
-        print("Dataset Statistics:")
-        print(f"Total number of articles: {dataset_stats['total_articles']}")
-        print("Number of articles per news source:")
-        for source, count in dataset_stats['articles_per_source'].items():
-            print(f"- {source}: {count}")
-        print("Average article size per news source (in characters):")
-        for source, avg_size in dataset_stats['avg_article_size_per_source'].items():
-            print(f"- {source}: {avg_size:.2f}")
-        print(f"Average article size in general: {dataset_stats['avg_article_size_general']:.2f} characters")
-        print()
-
-         # Clustering
-        articles = [article for site_articles in all_articles.values() for article in site_articles]
+        flattened_articles = [article for articles in all_articles.values() for article in articles]
         
-        clustered_articles = cluster_articles(
-            articles, 
-            min_df=options['min_df'], 
-            max_df=options['max_df'], 
-            n_clusters=options['n_clusters'], 
-            min_cluster_size=options['min_cluster_size']
-        )
+        clusters = cluster_articles(flattened_articles, min_df=min_df, max_df=max_df, n_clusters=n_clusters,
+                                    min_cluster_size=min_cluster_size, similarity_threshold=similarity_threshold)
 
-        for cluster in clustered_articles:
-            print(f"Cluster {cluster['cluster_id']}:")
-            print(f"Top words: {', '.join(cluster['top_words'])}")
-            print(f"Number of articles: {len(cluster['articles'])}")
-            print(f"Total word count: {cluster['total_word_count']}")
-            print(f"Total character count: {cluster['total_char_count']}")
-            print(f"Approximate OpenAI tokens: {cluster['openai_tokens']}")
-            print("Example articles:")
-            for article in cluster['articles'][:6]:
-                print(f"- {article['title']}")
-            print()
+        self.stdout.write(self.style.SUCCESS('Clustered Articles:'))
+        for cluster in clusters:
+            self.stdout.write(f"Cluster ID: {cluster['cluster_id']}")
+            self.stdout.write(f"Top words: {cluster['top_words']}")
+            self.stdout.write(f"Number of articles: {len(cluster['articles'])}")
+            self.stdout.write(f"Total word count: {cluster['total_word_count']}")
+            self.stdout.write(f"Total character count: {cluster['total_char_count']}")
+            self.stdout.write(f"OpenAI tokens: {cluster['openai_tokens']}")
+            self.stdout.write(f"Similarity score: {cluster['similarity_score']:.2f}")
+            self.stdout.write('-' * 80)
+
+        if not n_clusters:
+            tfidf_matrix = TfidfVectorizer(max_df=max_df, min_df=min_df).fit_transform([article['content'] for article in flattened_articles])
+            optimal_clusters = determine_optimal_clusters(tfidf_matrix, max_clusters=20)
+            self.stdout.write(self.style.SUCCESS(f'Optimal number of clusters: {optimal_clusters}'))
