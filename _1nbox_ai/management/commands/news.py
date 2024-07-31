@@ -145,3 +145,4 @@ class Command(BaseCommand):
             all_articles.extend(get_articles_from_rss(url, days_back))
 
         print_article_info(all_articles, common_word_count, capitalized_word_range)
+
