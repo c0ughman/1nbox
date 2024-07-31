@@ -3,18 +3,21 @@ from datetime import datetime, timedelta
 import pytz
 from django.core.management.base import BaseCommand
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import MiniBatchKMeans, DBSCAN
+from sklearn.preprocessing import normalize
+from sklearn.metrics.pairwise import cosine_similarity
 from collections import defaultdict, Counter
 import re
 import spacy
 import numpy as np
+from hdbscan import HDBSCAN
 
 nlp = spacy.load("en_core_web_sm")
 
 def preprocess(text):
     return ' '.join([word.lower() for word in re.findall(r'\w+', text)])
 
-def extract_key_topics(articles, top_n=50):
+def extract_key_topics(articles, top_n=100):  # Increased from 50 to 100
     all_text = ' '.join([article['content'] for article in articles])
     doc = nlp(all_text)
     entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ['PERSON', 'ORG', 'GPE', 'EVENT']]
@@ -25,16 +28,65 @@ def extract_key_topics(articles, top_n=50):
                   if word not in common_words and len(word) > 1]
     return key_topics
 
+def reassign_low_similarity_articles(clustered_articles, tfidf_matrix, cluster_labels, centroids, similarity_threshold=0.1):
+    miscellaneous_cluster = []
+    
+    for cluster in clustered_articles:
+        if cluster['cluster_id'] == 'Miscellaneous':
+            continue
+        
+        cluster_articles = cluster['articles']
+        cluster_matrix = tfidf_matrix[cluster_labels == cluster['cluster_id']]
+        centroid = centroids[cluster['cluster_id']]
+        
+        similarities = cosine_similarity(cluster_matrix, centroid.reshape(1, -1)).flatten()
+        
+        new_cluster_articles = []
+        for article, similarity in zip(cluster_articles, similarities):
+            if similarity >= similarity_threshold:
+                new_cluster_articles.append(article)
+            else:
+                miscellaneous_cluster.append(article)
+        
+        cluster['articles'] = new_cluster_articles
+    
+    # Add or update the miscellaneous cluster
+    misc_cluster = next((c for c in clustered_articles if c['cluster_id'] == 'Miscellaneous'), None)
+    if misc_cluster:
+        misc_cluster['articles'].extend(miscellaneous_cluster)
+    else:
+        clustered_articles.append({
+            'cluster_id': 'Miscellaneous',
+            'top_words': ['miscellaneous'],
+            'articles': miscellaneous_cluster,
+            'total_word_count': sum(len(article['content'].split()) for article in miscellaneous_cluster),
+            'total_char_count': sum(len(article['content']) for article in miscellaneous_cluster),
+            'openai_tokens': sum(len(article['content']) for article in miscellaneous_cluster) // 4,
+        })
+    
+    return clustered_articles
+
 def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clusters=None, min_cluster_size=5):
     key_topics = extract_key_topics(articles)
     vectorizer = TfidfVectorizer(vocabulary=key_topics, max_df=max_df, min_df=min_df)
     tfidf_matrix = vectorizer.fit_transform([article['content'] for article in articles])
+    tfidf_matrix = normalize(tfidf_matrix, norm='l2', axis=1)
     
     if n_clusters is None:
         n_clusters = min(20, len(articles) // 10)
     
-    kmeans = MiniBatchKMeans(n_clusters=n_clusters, random_state=42, batch_size=1000)
-    cluster_labels = kmeans.fit_predict(tfidf_matrix)
+    # Try HDBSCAN first
+    hdbscan = HDBSCAN(min_cluster_size=min_cluster_size, min_samples=1)
+    cluster_labels = hdbscan.fit_predict(tfidf_matrix)
+    
+    # If HDBSCAN doesn't work well (too many noise points), fall back to MiniBatchKMeans
+    if (cluster_labels == -1).sum() / len(cluster_labels) > 0.5:
+        kmeans = MiniBatchKMeans(n_clusters=n_clusters, random_state=42, batch_size=1000)
+        cluster_labels = kmeans.fit_predict(tfidf_matrix)
+        centroids = kmeans.cluster_centers_
+    else:
+        centroids = np.array([tfidf_matrix[cluster_labels == i].mean(axis=0).A1 
+                              for i in range(cluster_labels.max() + 1)])
     
     clustered_articles = defaultdict(list)
     for article, label in zip(articles, cluster_labels):
@@ -45,7 +97,7 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clu
     miscellaneous_cluster = []
     
     for cluster_id, cluster_articles in clustered_articles.items():
-        if len(cluster_articles) < min_cluster_size:
+        if cluster_id == -1 or len(cluster_articles) < min_cluster_size:
             miscellaneous_cluster.extend(cluster_articles)
             continue
         
@@ -58,7 +110,7 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clu
         openai_tokens = total_char_count // 4
         
         result.append({
-            'cluster_id': cluster_id + 1,
+            'cluster_id': cluster_id,
             'top_words': top_words,
             'articles': cluster_articles,
             'total_word_count': total_word_count,
@@ -79,6 +131,8 @@ def cluster_articles(articles, max_features=1000, min_df=0.01, max_df=0.5, n_clu
             'total_char_count': total_char_count,
             'openai_tokens': openai_tokens,
         })
+    
+    result = reassign_low_similarity_articles(result, tfidf_matrix, cluster_labels, centroids)
     
     return result
 
