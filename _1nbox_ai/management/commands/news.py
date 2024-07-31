@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pytz
 from django.core.management.base import BaseCommand
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 
 def get_publication_date(entry):
     if 'published_parsed' in entry:
@@ -73,9 +73,18 @@ def extract_capitalized_words(articles):
 
 def print_article_info(articles):
     capitalized_words_list = extract_capitalized_words(articles)
+    clusters = defaultdict(list)
+
     for article, capitalized_words in zip(articles, capitalized_words_list):
-        print(article['title'])
-        print(f"Capitalized Words: {capitalized_words}")
+        if capitalized_words:
+            first_word = capitalized_words[0]
+            clusters[first_word].append((article['title'], capitalized_words))
+
+    for word, articles in clusters.items():
+        print(f"{{ {word.upper()} }} CLUSTER")
+        for title, words in articles:
+            print(title)
+            print(f"Capitalized Words: {words}")
         print()
 
 class Command(BaseCommand):
