@@ -62,6 +62,7 @@ def cluster_articles(articles, common_word_threshold, top_words_to_consider):
             common_words = set(article['significant_words'][:top_words_to_consider]) & set(cluster['common_words'])
             if len(common_words) >= common_word_threshold:
                 cluster['articles'].append(article)
+                cluster['common_words'] = list(set(cluster['common_words']) & set(article['significant_words'][:top_words_to_consider]))
                 found_cluster = True
                 break
         if not found_cluster:
@@ -71,9 +72,45 @@ def cluster_articles(articles, common_word_threshold, top_words_to_consider):
             })
     return clusters
 
+def merge_clusters(clusters, merge_threshold):
+    merged = True
+    while merged:
+        merged = False
+        for i, cluster1 in enumerate(clusters):
+            for j, cluster2 in enumerate(clusters[i+1:], i+1):
+                common_words = set(cluster1['common_words']) & set(cluster2['common_words'])
+                if len(common_words) >= merge_threshold:
+                    merged_cluster = {
+                        'common_words': list(common_words),
+                        'articles': cluster1['articles'] + cluster2['articles']
+                    }
+                    clusters[i] = merged_cluster
+                    clusters.pop(j)
+                    merged = True
+                    break
+            if merged:
+                break
+    return clusters
+
+def apply_minimum_articles(clusters, min_articles):
+    miscellaneous_cluster = {'common_words': ['Miscellaneous'], 'articles': []}
+    valid_clusters = []
+
+    for cluster in clusters:
+        if len(cluster['articles']) >= min_articles:
+            valid_clusters.append(cluster)
+        else:
+            miscellaneous_cluster['articles'].extend(cluster['articles'])
+
+    if miscellaneous_cluster['articles']:
+        valid_clusters.append(miscellaneous_cluster)
+
+    return valid_clusters
+
 def print_clusters(clusters):
     for i, cluster in enumerate(clusters):
         print(f"CLUSTER {i+1} {{{', '.join(cluster['common_words'])}}}")
+        print(f"Number of articles: {len(cluster['articles'])}")
         for article in cluster['articles']:
             print(f"{article['title']}")
             print(f"Significant Words: {', '.join(article['significant_words'])}")
@@ -87,11 +124,15 @@ class Command(BaseCommand):
         parser.add_argument('--days', type=int, default=1, help='Number of days to look back')
         parser.add_argument('--common_word_threshold', type=int, default=2, help='Number of common words required for clustering')
         parser.add_argument('--top_words_to_consider', type=int, default=3, help='Number of top words to consider for clustering')
+        parser.add_argument('--merge_threshold', type=int, default=2, help='Number of common words required to merge clusters')
+        parser.add_argument('--min_articles', type=int, default=3, help='Minimum number of articles per cluster')
 
     def handle(self, *args, **options):
         days_back = options['days']
         common_word_threshold = options['common_word_threshold']
         top_words_to_consider = options['top_words_to_consider']
+        merge_threshold = options['merge_threshold']
+        min_articles = options['min_articles']
 
         rss_urls = [
             'https://rss.cnn.com/rss/edition.rss',
@@ -135,5 +176,11 @@ class Command(BaseCommand):
         # Cluster articles
         clusters = cluster_articles(all_articles, common_word_threshold, top_words_to_consider)
 
+        # Merge clusters
+        merged_clusters = merge_clusters(clusters, merge_threshold)
+
+        # Apply minimum articles per cluster
+        final_clusters = apply_minimum_articles(merged_clusters, min_articles)
+
         # Print results
-        print_clusters(clusters)
+        print_clusters(final_clusters)
