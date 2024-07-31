@@ -71,46 +71,37 @@ def extract_capitalized_words(articles):
     word_freq = Counter(word.lower() for word in all_words)
     return [clean_and_sort_words(words, word_freq) for words in article_words]
 
-def print_article_info(articles):
+def print_article_info(articles, common_word_count, capitalized_word_range):
     capitalized_words_list = extract_capitalized_words(articles)
 
     # First level clustering
     first_level_clusters = defaultdict(list)
     for article, capitalized_words in zip(articles, capitalized_words_list):
-        key = tuple(capitalized_words[:3])
+        key = tuple(capitalized_words[:capitalized_word_range])
         first_level_clusters[key].append((article['title'], capitalized_words))
 
-    # Second level clustering
-    second_level_clusters = defaultdict(list)
-    for key, articles in first_level_clusters.items():
-        for i, (title1, words1) in enumerate(articles):
-            for j, (title2, words2) in enumerate(articles):
-                if i >= j:
-                    continue
-                common_words = set(words1) & set(words2)
-                if len(common_words) > 2 or len(common_words) >= 0.5 * min(len(words1), len(words2)):
-                    second_level_clusters[tuple(sorted(common_words))].append((title1, words1))
-                    second_level_clusters[tuple(sorted(common_words))].append((title2, words2))
-
     # Print clusters
-    for word_cluster, articles in second_level_clusters.items():
-        print(f"{{ {' '.join(word_cluster).upper()} }} CLUSTER")
-        seen_titles = set()
-        for title, words in articles:
-            if title not in seen_titles:
+    for key, articles in first_level_clusters.items():
+        if sum(word in key for word in set(key)) >= common_word_count:
+            common_words = ' '.join(sorted(set([word for words in key for word in words])))
+            print(f"{{ {common_words.upper()} }} CLUSTER")
+            for title, words in articles:
                 print(title)
                 print(f"Capitalized Words: {words}")
-                seen_titles.add(title)
-        print()
+            print()
 
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds and print titles and capitalized words'
 
     def add_arguments(self, parser):
         parser.add_argument('--days', type=int, default=1, help='Number of days to look back')
+        parser.add_argument('--common-word-count', type=int, default=2, help='Minimum number of common words for clustering')
+        parser.add_argument('--capitalized-word-range', type=int, default=3, help='Range of capitalized words to consider for clustering')
 
     def handle(self, *args, **options):
         days_back = options['days']
+        common_word_count = options['common_word_count']
+        capitalized_word_range = options['capitalized_word_range']
 
         rss_urls = [
             'https://rss.cnn.com/rss/edition.rss',
@@ -139,4 +130,4 @@ class Command(BaseCommand):
         for url in rss_urls:
             all_articles.extend(get_articles_from_rss(url, days_back))
 
-        print_article_info(all_articles)
+        print_article_info(all_articles, common_word_count, capitalized_word_range)
