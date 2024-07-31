@@ -54,9 +54,19 @@ def extract_capitalized_words(articles):
     for article in articles:
         content = article['content']
         title = article['title']
-        words = re.findall(r'\b[A-Z][a-z]*\b', content) + re.findall(r'\b[A-Z][a-z]*\b', title)
-        all_words.extend(words)
-        article_words.append(words)
+        
+        # Find all capitalized words
+        words_in_title = re.findall(r'\b[A-Z][a-z]*\b', title)
+        words_in_content = re.findall(r'\b[A-Z][a-z]*\b', content)
+        
+        # Remove words at the beginning of sentences and paragraphs in content
+        words_in_content = [
+            word for word in words_in_content 
+            if not re.search(r'(?:^|\.\s+|\n\s*)' + word, content)
+        ]
+        
+        all_words.extend(words_in_content + words_in_title)
+        article_words.append(words_in_content + words_in_title)
 
     word_freq = Counter(word.lower() for word in all_words)
     return [clean_and_sort_words(words, word_freq) for words in article_words]
@@ -105,4 +115,3 @@ class Command(BaseCommand):
             all_articles.extend(get_articles_from_rss(url, days_back))
 
         print_article_info(all_articles)
-
