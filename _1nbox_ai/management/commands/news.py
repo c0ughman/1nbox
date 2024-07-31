@@ -73,18 +73,34 @@ def extract_capitalized_words(articles):
 
 def print_article_info(articles):
     capitalized_words_list = extract_capitalized_words(articles)
-    clusters = defaultdict(list)
 
+    # First level clustering
+    first_level_clusters = defaultdict(list)
     for article, capitalized_words in zip(articles, capitalized_words_list):
-        if capitalized_words:
-            first_word = capitalized_words[0]
-            clusters[first_word].append((article['title'], capitalized_words))
+        key = tuple(capitalized_words[:3])
+        first_level_clusters[key].append((article['title'], capitalized_words))
 
-    for word, articles in clusters.items():
-        print(f"{{ {word.upper()} }} CLUSTER")
+    # Second level clustering
+    second_level_clusters = defaultdict(list)
+    for key, articles in first_level_clusters.items():
+        for i, (title1, words1) in enumerate(articles):
+            for j, (title2, words2) in enumerate(articles):
+                if i >= j:
+                    continue
+                common_words = set(words1) & set(words2)
+                if len(common_words) > 2 or len(common_words) >= 0.5 * min(len(words1), len(words2)):
+                    second_level_clusters[tuple(sorted(common_words))].append((title1, words1))
+                    second_level_clusters[tuple(sorted(common_words))].append((title2, words2))
+
+    # Print clusters
+    for word_cluster, articles in second_level_clusters.items():
+        print(f"{{ {' '.join(word_cluster).upper()} }} CLUSTER")
+        seen_titles = set()
         for title, words in articles:
-            print(title)
-            print(f"Capitalized Words: {words}")
+            if title not in seen_titles:
+                print(title)
+                print(f"Capitalized Words: {words}")
+                seen_titles.add(title)
         print()
 
 class Command(BaseCommand):
