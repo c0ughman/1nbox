@@ -62,7 +62,7 @@ def cluster_articles(articles, common_word_threshold, top_words_to_consider):
             common_words = set(article['significant_words'][:top_words_to_consider]) & set(cluster['common_words'])
             if len(common_words) >= common_word_threshold:
                 cluster['articles'].append(article)
-                cluster['common_words'] = list(set(cluster['common_words']) & set(article['significant_words'][:top_words_to_consider]))
+                cluster['common_words'] = list(set(cluster['common_words']) | set(article['significant_words'][:top_words_to_consider]))
                 found_cluster = True
                 break
         if not found_cluster:
@@ -81,7 +81,7 @@ def merge_clusters(clusters, merge_threshold):
                 common_words = set(cluster1['common_words']) & set(cluster2['common_words'])
                 if len(common_words) >= merge_threshold:
                     merged_cluster = {
-                        'common_words': list(common_words),
+                        'common_words': list(set(cluster1['common_words']) | set(cluster2['common_words'])),
                         'articles': cluster1['articles'] + cluster2['articles']
                     }
                     clusters[i] = merged_cluster
@@ -113,6 +113,7 @@ def recluster_miscellaneous(valid_clusters, miscellaneous_cluster, misc_check_nu
             common_words = set(article['significant_words']) & set(cluster['common_words'])
             if len(common_words) >= misc_check_number:
                 cluster['articles'].append(article)
+                cluster['common_words'] = list(set(cluster['common_words']) | set(article['significant_words']))
                 added_to_cluster = True
                 break
         
