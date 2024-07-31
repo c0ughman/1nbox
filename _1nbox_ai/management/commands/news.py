@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import pytz
 from django.core.management.base import BaseCommand
 import re
+from collections import Counter
 
 def get_publication_date(entry):
     if 'published_parsed' in entry:
@@ -38,10 +39,32 @@ def get_articles_from_rss(rss_url, days_back=1):
 
     return articles
 
-def print_article_info(articles):
+def clean_and_sort_words(words, word_freq):
+    days_of_week = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+    months = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
+    
+    words = set(words)
+    words = [word for word in words if len(word) > 1 and word not in days_of_week and word not in months]
+    return sorted(words, key=lambda word: word_freq[word.lower()])
+
+def extract_capitalized_words(articles):
+    all_words = []
+    article_words = []
+
     for article in articles:
+        content = article['content']
+        title = article['title']
+        words = re.findall(r'\b[A-Z][a-z]*\b', content) + re.findall(r'\b[A-Z][a-z]*\b', title)
+        all_words.extend(words)
+        article_words.append(words)
+
+    word_freq = Counter(word.lower() for word in all_words)
+    return [clean_and_sort_words(words, word_freq) for words in article_words]
+
+def print_article_info(articles):
+    capitalized_words_list = extract_capitalized_words(articles)
+    for article, capitalized_words in zip(articles, capitalized_words_list):
         print(article['title'])
-        capitalized_words = re.findall(r'\b[A-Z][a-z]*\b', article['content'])
         print(f"Capitalized Words: {capitalized_words}")
         print()
 
