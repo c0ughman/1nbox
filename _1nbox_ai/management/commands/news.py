@@ -81,14 +81,28 @@ def print_article_info(articles, common_word_count, capitalized_word_range):
         first_level_clusters[key].append((article['title'], capitalized_words))
 
     # Print clusters
+    printed_clusters = set()
     for key, articles in first_level_clusters.items():
-        if sum(word in key for word in set(key)) >= common_word_count:
-            common_words = ' '.join(sorted(set([word for words in key for word in words])))
-            print(f"{{ {common_words.upper()} }} CLUSTER")
+        if key in printed_clusters:
+            continue
+        
+        common_words = set(key)
+        for other_key in first_level_clusters:
+            if key == other_key or other_key in printed_clusters:
+                continue
+            if len(common_words.intersection(other_key)) >= common_word_count:
+                common_words.update(other_key)
+                articles.extend(first_level_clusters[other_key])
+                printed_clusters.add(other_key)
+        
+        if len(common_words) > 0:
+            common_words_str = ' '.join(sorted(common_words))
+            print(f"{{ {common_words_str.upper()} }} CLUSTER")
             for title, words in articles:
                 print(title)
                 print(f"Capitalized Words: {words}")
             print()
+        printed_clusters.add(key)
 
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds and print titles and capitalized words'
