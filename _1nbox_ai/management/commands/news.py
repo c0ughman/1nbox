@@ -102,7 +102,25 @@ def apply_minimum_articles(clusters, min_articles):
         else:
             miscellaneous_cluster['articles'].extend(cluster['articles'])
 
-    if miscellaneous_cluster['articles']:
+    return valid_clusters, miscellaneous_cluster
+
+def recluster_miscellaneous(valid_clusters, miscellaneous_cluster, misc_check_number):
+    remaining_misc_articles = []
+
+    for article in miscellaneous_cluster['articles']:
+        added_to_cluster = False
+        for cluster in valid_clusters:
+            common_words = set(article['significant_words']) & set(cluster['common_words'])
+            if len(common_words) >= misc_check_number:
+                cluster['articles'].append(article)
+                added_to_cluster = True
+                break
+        
+        if not added_to_cluster:
+            remaining_misc_articles.append(article)
+
+    if remaining_misc_articles:
+        miscellaneous_cluster['articles'] = remaining_misc_articles
         valid_clusters.append(miscellaneous_cluster)
 
     return valid_clusters
@@ -126,6 +144,7 @@ class Command(BaseCommand):
         parser.add_argument('--top_words_to_consider', type=int, default=3, help='Number of top words to consider for clustering')
         parser.add_argument('--merge_threshold', type=int, default=2, help='Number of common words required to merge clusters')
         parser.add_argument('--min_articles', type=int, default=3, help='Minimum number of articles per cluster')
+        parser.add_argument('--misc_check_number', type=int, default=1, help='Number of matching words required to move an article from miscellaneous to a cluster')
 
     def handle(self, *args, **options):
         days_back = options['days']
@@ -133,6 +152,7 @@ class Command(BaseCommand):
         top_words_to_consider = options['top_words_to_consider']
         merge_threshold = options['merge_threshold']
         min_articles = options['min_articles']
+        misc_check_number = options['misc_check_number']
 
         rss_urls = [
             'https://rss.cnn.com/rss/edition.rss',
@@ -180,7 +200,10 @@ class Command(BaseCommand):
         merged_clusters = merge_clusters(clusters, merge_threshold)
 
         # Apply minimum articles per cluster
-        final_clusters = apply_minimum_articles(merged_clusters, min_articles)
+        valid_clusters, miscellaneous_cluster = apply_minimum_articles(merged_clusters, min_articles)
+
+        # Recluster miscellaneous articles
+        final_clusters = recluster_miscellaneous(valid_clusters, miscellaneous_cluster, misc_check_number)
 
         # Print results
         print_clusters(final_clusters)
