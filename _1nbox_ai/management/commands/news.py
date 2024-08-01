@@ -4,6 +4,7 @@ import pytz
 from django.core.management.base import BaseCommand
 import re
 import os
+from openai import OpenAI
 from collections import Counter
 
 # List of insignificant words to exclude
