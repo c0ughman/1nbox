@@ -5,6 +5,20 @@ from django.core.management.base import BaseCommand
 import re
 from collections import Counter
 
+# List of insignificant words to exclude
+INSIGNIFICANT_WORDS = set([
+    'In', 'The', 'Continue', 'Fox', 'News', 'Newstalk', 'Newsweek', 'Is', 
+    'Why', 'Do', 'When', 'Where', 'What', 'It', 'Get', 'Examiner', 
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+    'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+    'September', 'October', 'November', 'December',
+    'A', 'An', 'And', 'At', 'By', 'For', 'From', 'Has', 'He', 'I', 'Of', 
+    'On', 'Or', 'She', 'That', 'This', 'To', 'Was', 'With', 'You',
+    'All', 'Are', 'As', 'Be', 'Been', 'But', 'Can', 'Had', 'Have', 'Her', 
+    'His', 'If', 'Into', 'More', 'My', 'Not', 'One', 'Our', 'Their', 'They'
+])
+
+
 def get_publication_date(entry):
     if 'published_parsed' in entry:
         return datetime(*entry.published_parsed[:6], tzinfo=pytz.utc)
@@ -44,10 +58,7 @@ def extract_significant_words(text):
         sentence_words = re.findall(r'\b[A-Z][a-z]{1,}\b', sentence)
         words.extend(sentence_words[1:])  # Exclude the first word of each sentence
     
-    insignificant_words = set(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
-                               'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
-                               'September', 'October', 'November', 'December'])
-    words = [word for word in words if word not in insignificant_words]
+    words = [word for word in words if word not in INSIGNIFICANT_WORDS]
     
     return list(dict.fromkeys(words))
 
@@ -184,3 +195,4 @@ class Command(BaseCommand):
 
         # Print results
         print_clusters(final_clusters)
+
