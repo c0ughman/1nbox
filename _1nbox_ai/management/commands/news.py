@@ -18,7 +18,6 @@ INSIGNIFICANT_WORDS = set([
     'His', 'If', 'Into', 'More', 'My', 'Not', 'One', 'Our', 'Their', 'They'
 ])
 
-
 def get_publication_date(entry):
     if 'published_parsed' in entry:
         return datetime(*entry.published_parsed[:6], tzinfo=pytz.utc)
@@ -103,7 +102,11 @@ def merge_clusters(clusters, merge_threshold):
                 break
     return clusters
 
-def apply_minimum_articles(clusters, min_articles):
+def calculate_match_percentage(words1, words2):
+    common_words = set(words1) & set(words2)
+    return len(common_words) / len(words1) if words1 else 0
+
+def apply_minimum_articles_and_reassign(clusters, min_articles, join_percentage):
     miscellaneous_cluster = {'common_words': ['Miscellaneous'], 'articles': []}
     valid_clusters = []
 
@@ -113,10 +116,45 @@ def apply_minimum_articles(clusters, min_articles):
         else:
             miscellaneous_cluster['articles'].extend(cluster['articles'])
 
+    # Reassign miscellaneous articles to clusters if they meet the join_percentage criteria
+    reassigned_articles = []
+    for article in miscellaneous_cluster['articles']:
+        for cluster in valid_clusters:
+            cluster_words = [word for article in cluster['articles'] for word in article['significant_words']]
+            if calculate_match_percentage(article['significant_words'], cluster_words) >= join_percentage:
+                cluster['articles'].append(article)
+                reassigned_articles.append(article)
+                break
+
+    # Remove reassigned articles from miscellaneous cluster
+    miscellaneous_cluster['articles'] = [article for article in miscellaneous_cluster['articles'] if article not in reassigned_articles]
+
     if miscellaneous_cluster['articles']:
         valid_clusters.append(miscellaneous_cluster)
 
     return valid_clusters
+
+def merge_clusters_by_percentage(clusters, join_percentage):
+    merged = True
+    while merged:
+        merged = False
+        for i, cluster1 in enumerate(clusters):
+            for j, cluster2 in enumerate(clusters[i+1:], i+1):
+                words1 = [word for article in cluster1['articles'] for word in article['significant_words']]
+                words2 = [word for article in cluster2['articles'] for word in article['significant_words']]
+                if (calculate_match_percentage(words1, words2) >= join_percentage and
+                    calculate_match_percentage(words2, words1) >= join_percentage):
+                    merged_cluster = {
+                        'common_words': list(set(cluster1['common_words']) & set(cluster2['common_words'])),
+                        'articles': cluster1['articles'] + cluster2['articles']
+                    }
+                    clusters[i] = merged_cluster
+                    clusters.pop(j)
+                    merged = True
+                    break
+            if merged:
+                break
+    return clusters
 
 def print_clusters(clusters):
     for i, cluster in enumerate(clusters):
@@ -137,6 +175,7 @@ class Command(BaseCommand):
         parser.add_argument('--top_words_to_consider', type=int, default=3, help='Number of top words to consider for clustering')
         parser.add_argument('--merge_threshold', type=int, default=2, help='Number of common words required to merge clusters')
         parser.add_argument('--min_articles', type=int, default=3, help='Minimum number of articles per cluster')
+        parser.add_argument('--join_percentage', type=float, default=0.5, help='Percentage of matching words required to join or merge clusters')
 
     def handle(self, *args, **options):
         days_back = options['days']
@@ -144,6 +183,7 @@ class Command(BaseCommand):
         top_words_to_consider = options['top_words_to_consider']
         merge_threshold = options['merge_threshold']
         min_articles = options['min_articles']
+        join_percentage = options['join_percentage']
 
         rss_urls = [
             'https://rss.cnn.com/rss/edition.rss',
@@ -158,14 +198,7 @@ class Command(BaseCommand):
             'https://www.npr.org/rss/rss.php?id=1001',
             'https://www.washingtonpost.com/rss',
             'https://www.wsj.com/xml/rss/3_7085.xml',
-            'https://feeds.a.dj.com/rss/RSSWorldNews.xml',
-            'https://feeds.skynews.com/feeds/rss/world.xml',
-            'https://feeds.nbcnews.com/nbcnews/public/news',
-            'https://feeds.feedburner.com/ndtvnews-world-news',
-            'https://abcnews.go.com/abcnews/internationalheadlines',
-            'https://rss.dw.com/rdf/rss-en-all',
-            'https://www.cbsnews.com/latest/rss/world',
-            'https://rss.app/feeds/UokAeMGlNa7Cgf9j.xml'
+            'https://feeds.a.dj.com/rss/R'
         ]
 
         all_articles = []
@@ -187,12 +220,14 @@ class Command(BaseCommand):
         # Cluster articles
         clusters = cluster_articles(all_articles, common_word_threshold, top_words_to_consider)
 
-        # Merge clusters
+        # Merge clusters based on merge_threshold
         merged_clusters = merge_clusters(clusters, merge_threshold)
 
-        # Apply minimum articles per cluster
-        final_clusters = apply_minimum_articles(merged_clusters, min_articles)
+        # Apply minimum articles per cluster and reassign miscellaneous articles
+        clusters_with_min_articles = apply_minimum_articles_and_reassign(merged_clusters, min_articles, join_percentage)
+
+        # Merge clusters based on join_percentage
+        final_clusters = merge_clusters_by_percentage(clusters_with_min_articles, join_percentage)
 
         # Print results
         print_clusters(final_clusters)
-
