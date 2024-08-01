@@ -273,9 +273,10 @@ class Command(BaseCommand):
         # Make openai summaries for each cluster and print
         list_of_cluster_summaries = []
         for cluster in final_clusters:
-            list_of_cluster_summaries.append(get_openai_response(cluster))
+            summary = get_openai_response(cluster)
+            list_of_cluster_summaries.append(summary)
+            print(summary)
             
-        print(list_of_cluster_summaries)
 
             
 
