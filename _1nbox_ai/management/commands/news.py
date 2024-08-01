@@ -19,7 +19,6 @@ INSIGNIFICANT_WORDS = set([
     'All', 'Are', 'As', 'Be', 'Been', 'But', 'Can', 'Had', 'Have', 'Her', 
     'His', 'If', 'Into', 'More', 'My', 'Not', 'One', 'Our', 'Their', 'They', 'Independent', 'Times'
     'Sign', 'Guardian'
-
 ])
 
 def get_publication_date(entry):
@@ -170,32 +169,89 @@ def print_clusters(clusters):
             print()
         print()
 
-def get_openai_response(cluster):
+def estimate_tokens(text):
+    return len(text.split())
+
+def calculate_cluster_tokens(cluster):
+    total_tokens = 0
+    for article in cluster['articles']:
+        total_tokens += estimate_tokens(article['title'])
+        total_tokens += estimate_tokens(article['summary'])
+        total_tokens += estimate_tokens(article['content'])
+    return total_tokens
+
+def get_openai_response(cluster, max_tokens=4000):
     openai_key = os.environ.get('OPENAI_KEY')
     client = OpenAI(api_key=openai_key)
 
-    # Prepare the content to be summarized
     cluster_content = f"Common words: {', '.join(cluster['common_words'])}\n\n"
-    for article in cluster['articles']:
-        cluster_content += f"Title: {article['title']}\n"
-        cluster_content += f"Summary: {article['summary']}\n"
-        cluster_content += f"Content: {article['content']}\n\n"
+    current_tokens = 0
+    sub_clusters = []
+    current_sub_cluster = []
 
-    prompt = ("You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
-            "all the facts from each of the articles in a small but fact-dense summary"
-            "including all the dates, names and key factors to provide full context on the events.")
+    for article in cluster['articles']:
+        article_content = f"Title: {article['title']}\n"
+        article_content += f"URL: {article['link']}\n"
+        article_content += f"Summary: {article['summary']}\n"
+        article_content += f"Content: {article['content']}\n\n"
+        
+        article_tokens = estimate_tokens(article_content)
+        
+        if current_tokens + article_tokens > max_tokens:
+            sub_clusters.append(current_sub_cluster)
+            current_sub_cluster = []
+            current_tokens = 0
+        
+        current_sub_cluster.append(article_content)
+        current_tokens += article_tokens
+
+    if current_sub_cluster:
+        sub_clusters.append(current_sub_cluster)
+
+    summaries = []
+    for sub_cluster in sub_clusters:
+        sub_cluster_content = cluster_content + ''.join(sub_cluster)
+        
+        prompt = ("You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
+                  "all the facts from each of the articles in a small but fact-dense summary "
+                  "including all the dates, names and key factors to provide full context on the events."
+                  "also, i want you to add the url where the information is from next to every fact you put in the summary in parentheses")
+
+        completion = client.chat.completions.create(
+            model="gpt-3.5-turbo-0125",
+            max_tokens=1000,
+            temperature=0.125,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": sub_cluster_content}
+            ]
+        )
+        summaries.append(completion.choices[0].message.content)
+
+    return ' '.join(summaries)
+
+def get_final_summary(cluster_summaries):
+    openai_key = os.environ.get('OPENAI_KEY')
+    client = OpenAI(api_key=openai_key)
+
+    all_summaries = "\n\n".join(cluster_summaries)
+
+    prompt = ("You are a News Overview Summarizer. I will give you"
+             "what happened in the news today and I want you to give a direct and simple summary"
+             "for each group of events portrayed."
+             "You will mix up similar topics together to not repeat yourself."
+             "The summary has to be simple and straightforward")
 
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
-        max_tokens=1000,
+        max_tokens=1500,
         temperature=0.125,
         messages=[
             {"role": "system", "content": prompt},
-            {"role": "user", "content": cluster_content}
+            {"role": "user", "content": all_summaries}
         ]
     )
-    summary = completion.choices[0].message.content
-    return summary
+    return completion.choices[0].message.content
 
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds, analyze significant words, and cluster articles'
@@ -278,7 +334,7 @@ class Command(BaseCommand):
             summary = get_openai_response(cluster)
             list_of_cluster_summaries.append(summary)
             print(summary)
-            
 
-            
-
+        # Get the final summary from openai and print
+        final = get_final_summary(list_of_cluster_summaries)
+        print(final)
