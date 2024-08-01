@@ -15,7 +15,9 @@ INSIGNIFICANT_WORDS = set([
     'A', 'An', 'And', 'At', 'By', 'For', 'From', 'Has', 'He', 'I', 'Of', 
     'On', 'Or', 'She', 'That', 'This', 'To', 'Was', 'With', 'You',
     'All', 'Are', 'As', 'Be', 'Been', 'But', 'Can', 'Had', 'Have', 'Her', 
-    'His', 'If', 'Into', 'More', 'My', 'Not', 'One', 'Our', 'Their', 'They' 'Independent', 'Times'
+    'His', 'If', 'Into', 'More', 'My', 'Not', 'One', 'Our', 'Their', 'They', 'Independent', 'Times'
+    'Sign', 'Guardian'
+
 ])
 
 def get_publication_date(entry):
@@ -156,15 +158,46 @@ def merge_clusters_by_percentage(clusters, join_percentage):
                 break
     return clusters
 
+def calculate_article_similarity(article1, article2):
+    common_words = set(article1['significant_words']) & set(article2['significant_words'])
+    return len(common_words) / len(article1['significant_words'])
+
+def calculate_cluster_strength(cluster):
+    if len(cluster['articles']) < 2:
+        return 0
+    
+    total_similarity = 0
+    comparisons = 0
+    
+    for i, article1 in enumerate(cluster['articles']):
+        for article2 in cluster['articles'][i+1:]:
+            total_similarity += calculate_article_similarity(article1, article2)
+            comparisons += 1
+    
+    return total_similarity / comparisons if comparisons > 0 else 0
+
 def print_clusters(clusters):
+    total_strength = 0
+    non_misc_clusters = 0
+    
     for i, cluster in enumerate(clusters):
+        cluster_strength = calculate_cluster_strength(cluster)
+        if cluster['common_words'] != ['Miscellaneous']:
+            total_strength += cluster_strength
+            non_misc_clusters += 1
+        
         print(f"CLUSTER {i+1} {{{', '.join(cluster['common_words'])}}}")
         print(f"Number of articles: {len(cluster['articles'])}")
+        print(f"Cluster strength: {cluster_strength:.2f}")
         for article in cluster['articles']:
             print(f"{article['title']}")
             print(f"Significant Words: {', '.join(article['significant_words'])}")
             print()
         print()
+    
+    avg_cluster_strength = total_strength / non_misc_clusters if non_misc_clusters > 0 else 0
+    print(f"Average cluster strength: {avg_cluster_strength:.2f}")
+    print(f"Miscellaneous cluster size: {len(clusters[-1]['articles']) if clusters[-1]['common_words'] == ['Miscellaneous'] else 0}")
 
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds, analyze significant words, and cluster articles'
@@ -187,18 +220,30 @@ class Command(BaseCommand):
 
         rss_urls = [
             'https://rss.cnn.com/rss/edition.rss',
-            'https://feeds.bbci.co.uk/news/rss.xml',
-            'http://feeds.reuters.com/reuters/topNews',
             'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',
-            'https://www.theguardian.com/world/rss',
-            'http://rss.cnn.com/rss/cnn_topstories.rss',
-            'http://feeds.foxnews.com/foxnews/latest',
+            'http://feeds.bbci.co.uk/news/rss.xml',
             'https://www.aljazeera.com/xml/rss/all.xml',
-            'https://news.google.com/rss',
+            'https://www.reuters.com/tools/rss',
             'https://www.npr.org/rss/rss.php?id=1001',
             'https://www.washingtonpost.com/rss',
             'https://www.wsj.com/xml/rss/3_7085.xml',
-            'https://feeds.a.dj.com/rss/R'
+            'https://feeds.a.dj.com/rss/RSSWorldNews.xml',
+            'https://www.economist.com/feeds/print-sections/72/science-and-technology.xml',
+            'https://feeds.npr.org/1004/rss.xml',
+            'https://feeds.a.dj.com/rss/RSSLifestyle.xml',
+            'https://feeds.a.dj.com/rss/RSSOpinion.xml',
+            'https://www.politico.com/rss/politics08.xml',
+            'https://www.cnbc.com/id/100003114/device/rss/rss.html',
+            'https://www.bloomberg.com/feed/podcast/news.xml',
+            'https://www.foxnews.com/about/rss/',
+            'https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml',
+            'https://rss.nytimes.com/services/xml/rss/nyt/Science.xml',
+            'https://rss.nytimes.com/services/xml/rss/nyt/Health.xml',
+            'https://rss.nytimes.com/services/xml/rss/nyt/Environment.xml',
+            'https://www.npr.org/rss/rss.php?id=1007',
+            'https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml',
+            'https://feeds.a.dj.com/rss/RSSLifestyle.xml',
+            'https://feeds.a.dj.com/rss/RSSOpinion.xml'
         ]
 
         all_articles = []
