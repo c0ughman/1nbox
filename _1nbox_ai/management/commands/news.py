@@ -168,6 +168,31 @@ def print_clusters(clusters):
             print()
         print()
 
+def get_openai_response(cluster):
+    openai_key = os.environ.get('OPENAI_KEY')
+    client = OpenAI(api_key=openai_key)
+
+    # Prepare the content to be summarized
+    cluster_content = f"Common words: {', '.join(cluster['common_words'])}\n\n"
+    for article in cluster['articles']:
+        cluster_content += f"Title: {article['title']}\n"
+        cluster_content += f"Summary: {article['summary']}\n"
+        cluster_content += f"Content: {article['content']}\n\n"
+
+    prompt = "Please summarize the following cluster of news articles."
+
+    completion = client.chat.completions.create(
+        model="gpt-3.5-turbo-0125",
+        max_tokens=300,
+        temperature=0.125,
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": cluster_content}
+        ]
+    )
+    summary = completion.choices[0].message.content
+    return summary
+
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds, analyze significant words, and cluster articles'
 
@@ -186,84 +211,30 @@ class Command(BaseCommand):
         merge_threshold = options['merge_threshold']
         min_articles = options['min_articles']
         join_percentage = options['join_percentage']
+        final_merge_percentage = options['final_merge_percentage']
 
         rss_urls = [
-              'http://feeds.bbci.co.uk/news/world/rss.xml',
-              'http://rss.cnn.com/rss/edition_world.rss',
-              'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
-              'http://feeds.reuters.com/reuters/worldNews',
-              'https://www.theguardian.com/world/rss',
-              'https://www.aljazeera.com/xml/rss/all.xml',
-              'https://www.bloomberg.com/feed/podcast/world',
-              'https://www.nbcnews.com/rss/world',
-              'https://abcnews.go.com/abcnews/internationalheadlines',
-              'https://www.cbsnews.com/latest/rss/world/',
-              'https://feeds.washingtonpost.com/rss/world',
-              'https://www.independent.co.uk/news/world/rss',
-              'https://rssfeeds.usatoday.com/UsatodaycomWorld-TopStories',
-              'https://www.thetimes.co.uk/rss/world/',
-              'https://www.ft.com/?format=rss',
-              'https://feeds.a.dj.com/rss/RSSWorldNews.xml',
-              'https://news.sky.com/feeds/rss/world.xml',
-              'https://www.reuters.com/rssFeed/world',
-              'https://www.theatlantic.com/feed/rss/',
-              'https://www.politico.com/rss/politics.xml',
-              'https://www.huffpost.com/section/world-news/feed',
-              'https://www.npr.org/rss/rss.php?id=1004',
-              'https://www.dw.com/en/top-stories/s-9097',
-              'https://www.economist.com/rss/external',
-              'https://www.smh.com.au/rss/feed.xml',
-              'https://www.sbs.com.au/news/feed',
-              'https://www.theverge.com/rss/index.xml',
-              'https://www.cnbc.com/world/?rss=1',
-              'https://www.bbc.co.uk/news/10628460',
-              'https://www.thehill.com/rss/syndicator/190',
-              'https://www.hindustantimes.com/rss/world',
-              'https://www.jpost.com/rss',
-              'https://www.theloop.au/rss',
-              'https://www.chicagotribune.com/rss/world/',
-              'https://www.abc.net.au/news/feed/7280',
-              'https://www.msn.com/en-us/news/world',
-              'https://www.france24.com/en/rss',
-              'https://www.motherjones.com/feed/',
-              'https://www.pbs.org/newshour/rss',
-              'https://www.thedailybeast.com/rss.xml',
-              'https://www.voanews.com/rss',
-              'https://www.bbc.com/news/10628460',
-              'https://www.al.com/news/rss/',
-              'https://www.spectator.co.uk/feed',
-              'https://www.theonion.com/rss',
-              'https://www.nation.co.ke/rss',
-              'https://www.foxnews.com/world/index.rss',
-              'https://www.deutschewelle.com/rss',
-              'https://www.reuters.com/rssFeed/world',
-              'https://www.bbc.co.uk/news/world/rss.xml',
-              'https://www.economist.com/rss/external',
-              'https://www.nytimes.com/rss/world',
-              'https://www.washingtonpost.com/rss/world/',
-              'https://www.forbes.com/world-news/feed/',
-              'https://www.theverge.com/rss/index.xml',
-              'https://www.salon.com/rss.xml',
-              'https://www.theaustralian.com.au/world/rss',
-              'https://www.newyorker.com/feed/news',
-              'https://www.scmp.com/rss/feed/world',
-              'https://www.thecut.com/rss',
-              'https://www.huffpost.com/world-news/rss',
-              'https://www.cnn.com/world/rss',
-              'https://www.reuters.com/rssFeed/world',
-              'https://www.economist.com/rss/external',
-              'https://rss.cnn.com/rss/edition.rss',
-              'https://feeds.bbci.co.uk/news/rss.xml',
-              'http://feeds.reuters.com/reuters/topNews',
-              'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',
-              'http://rss.cnn.com/rss/cnn_topstories.rss',
-              'http://feeds.foxnews.com/foxnews/latest',
-              'https://news.google.com/rss',
-              'https://www.npr.org/rss/rss.php?id=1001',
-              'https://www.washingtonpost.com/rss',
-              'https://www.wsj.com/xml/rss/3_7085.xml',
-              'https://feeds.a.dj.com/rss/R'
-            ]
+            'http://feeds.bbci.co.uk/news/world/rss.xml',
+            'http://feeds.reuters.com/reuters/worldNews',
+            'https://www.theguardian.com/world/rss',
+            'https://www.aljazeera.com/xml/rss/all.xml',
+            'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
+            'https://www.npr.org/rss/rss.php?id=1004',
+            'https://www.bloomberg.com/feed/podcast/world',
+            'http://rss.cnn.com/rss/edition_world.rss',
+            'https://www.independent.co.uk/news/world/rss',
+            'https://rssfeeds.usatoday.com/UsatodaycomWorld-TopStories',
+            'https://www.thetimes.co.uk/rss/world/',
+            'https://feeds.a.dj.com/rss/RSSWorldNews.xml',
+            'https://news.sky.com/feeds/rss/world.xml',
+            'https://www.theatlantic.com/feed/rss/',
+            'https://www.politico.com/rss/politics.xml',
+            'https://www.huffpost.com/section/world-news/feed',
+            'https://www.dw.com/en/top-stories/s-9097',
+            'https://www.economist.com/rss/external',
+            'https://www.smh.com.au/rss/feed.xml',
+            'https://www.sbs.com.au/news/feed'
+        ]
 
         all_articles = []
         for url in rss_urls:
@@ -291,7 +262,19 @@ class Command(BaseCommand):
         clusters_with_min_articles = apply_minimum_articles_and_reassign(merged_clusters, min_articles, join_percentage)
 
         # Merge clusters based on join_percentage
-        final_clusters = merge_clusters_by_percentage(clusters_with_min_articles, join_percentage)
+        final_clusters = merge_clusters_by_percentage(clusters_with_min_articles, final_merge_percentage)
 
         # Print results
         print_clusters(final_clusters)
+
+        '''
+        # Make openai summaries for each cluster and print
+        list_of_cluster_summaries = []
+        for cluster in final_clusters:
+            list_of_cluster_summaries.append(get_openai_response(cluster))
+            
+        print(list_of_cluster_summaries)
+        '''
+
+            
+
