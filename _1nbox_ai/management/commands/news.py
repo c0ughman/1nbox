@@ -158,50 +158,15 @@ def merge_clusters_by_percentage(clusters, join_percentage):
                 break
     return clusters
 
-def calculate_article_similarity(article1, article2):
-    if not article1['significant_words']:
-        return 0
-    common_words = set(article1['significant_words']) & set(article2['significant_words'])
-    return len(common_words) / len(article1['significant_words'])
-
-
-def calculate_cluster_strength(cluster):
-    if len(cluster['articles']) < 2:
-        return 0
-    
-    total_similarity = 0
-    comparisons = 0
-    
-    for i, article1 in enumerate(cluster['articles']):
-        for article2 in cluster['articles'][i+1:]:
-            if article1['significant_words'] and article2['significant_words']:
-                total_similarity += calculate_article_similarity(article1, article2)
-                comparisons += 1
-    
-    return total_similarity / comparisons if comparisons > 0 else 0
-
 def print_clusters(clusters):
-    total_strength = 0
-    non_misc_clusters = 0
-    
     for i, cluster in enumerate(clusters):
-        cluster_strength = calculate_cluster_strength(cluster)
-        if cluster['common_words'] != ['Miscellaneous']:
-            total_strength += cluster_strength
-            non_misc_clusters += 1
-        
         print(f"CLUSTER {i+1} {{{', '.join(cluster['common_words'])}}}")
         print(f"Number of articles: {len(cluster['articles'])}")
-        print(f"Cluster strength: {cluster_strength:.2f}")
         for article in cluster['articles']:
             print(f"{article['title']}")
             print(f"Significant Words: {', '.join(article['significant_words'])}")
             print()
         print()
-    
-    avg_cluster_strength = total_strength / non_misc_clusters if non_misc_clusters > 0 else 0
-    print(f"Average cluster strength: {avg_cluster_strength:.2f}")
-    print(f"Miscellaneous cluster size: {len(clusters[-1]['articles']) if clusters[-1]['common_words'] == ['Miscellaneous'] else 0}")
 
 class Command(BaseCommand):
     help = 'Fetch articles from RSS feeds, analyze significant words, and cluster articles'
@@ -223,32 +188,82 @@ class Command(BaseCommand):
         join_percentage = options['join_percentage']
 
         rss_urls = [
-            'https://rss.cnn.com/rss/edition.rss',
-            'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',
-            'http://feeds.bbci.co.uk/news/rss.xml',
-            'https://www.aljazeera.com/xml/rss/all.xml',
-            'https://www.reuters.com/tools/rss',
-            'https://www.npr.org/rss/rss.php?id=1001',
-            'https://www.washingtonpost.com/rss',
-            'https://www.wsj.com/xml/rss/3_7085.xml',
-            'https://feeds.a.dj.com/rss/RSSWorldNews.xml',
-            'https://www.economist.com/feeds/print-sections/72/science-and-technology.xml',
-            'https://feeds.npr.org/1004/rss.xml',
-            'https://feeds.a.dj.com/rss/RSSLifestyle.xml',
-            'https://feeds.a.dj.com/rss/RSSOpinion.xml',
-            'https://www.politico.com/rss/politics08.xml',
-            'https://www.cnbc.com/id/100003114/device/rss/rss.html',
-            'https://www.bloomberg.com/feed/podcast/news.xml',
-            'https://www.foxnews.com/about/rss/',
-            'https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml',
-            'https://rss.nytimes.com/services/xml/rss/nyt/Science.xml',
-            'https://rss.nytimes.com/services/xml/rss/nyt/Health.xml',
-            'https://rss.nytimes.com/services/xml/rss/nyt/Environment.xml',
-            'https://www.npr.org/rss/rss.php?id=1007',
-            'https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml',
-            'https://feeds.a.dj.com/rss/RSSLifestyle.xml',
-            'https://feeds.a.dj.com/rss/RSSOpinion.xml'
-        ]
+              'http://feeds.bbci.co.uk/news/world/rss.xml',
+              'http://rss.cnn.com/rss/edition_world.rss',
+              'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
+              'http://feeds.reuters.com/reuters/worldNews',
+              'https://www.theguardian.com/world/rss',
+              'https://www.aljazeera.com/xml/rss/all.xml',
+              'https://www.bloomberg.com/feed/podcast/world',
+              'https://www.nbcnews.com/rss/world',
+              'https://abcnews.go.com/abcnews/internationalheadlines',
+              'https://www.cbsnews.com/latest/rss/world/',
+              'https://feeds.washingtonpost.com/rss/world',
+              'https://www.independent.co.uk/news/world/rss',
+              'https://rssfeeds.usatoday.com/UsatodaycomWorld-TopStories',
+              'https://www.thetimes.co.uk/rss/world/',
+              'https://www.ft.com/?format=rss',
+              'https://feeds.a.dj.com/rss/RSSWorldNews.xml',
+              'https://news.sky.com/feeds/rss/world.xml',
+              'https://www.reuters.com/rssFeed/world',
+              'https://www.theatlantic.com/feed/rss/',
+              'https://www.politico.com/rss/politics.xml',
+              'https://www.huffpost.com/section/world-news/feed',
+              'https://www.npr.org/rss/rss.php?id=1004',
+              'https://www.dw.com/en/top-stories/s-9097',
+              'https://www.economist.com/rss/external',
+              'https://www.smh.com.au/rss/feed.xml',
+              'https://www.sbs.com.au/news/feed',
+              'https://www.theverge.com/rss/index.xml',
+              'https://www.cnbc.com/world/?rss=1',
+              'https://www.bbc.co.uk/news/10628460',
+              'https://www.thehill.com/rss/syndicator/190',
+              'https://www.hindustantimes.com/rss/world',
+              'https://www.jpost.com/rss',
+              'https://www.theloop.au/rss',
+              'https://www.chicagotribune.com/rss/world/',
+              'https://www.abc.net.au/news/feed/7280',
+              'https://www.msn.com/en-us/news/world',
+              'https://www.france24.com/en/rss',
+              'https://www.motherjones.com/feed/',
+              'https://www.pbs.org/newshour/rss',
+              'https://www.thedailybeast.com/rss.xml',
+              'https://www.voanews.com/rss',
+              'https://www.bbc.com/news/10628460',
+              'https://www.al.com/news/rss/',
+              'https://www.spectator.co.uk/feed',
+              'https://www.theonion.com/rss',
+              'https://www.nation.co.ke/rss',
+              'https://www.foxnews.com/world/index.rss',
+              'https://www.deutschewelle.com/rss',
+              'https://www.reuters.com/rssFeed/world',
+              'https://www.bbc.co.uk/news/world/rss.xml',
+              'https://www.economist.com/rss/external',
+              'https://www.nytimes.com/rss/world',
+              'https://www.washingtonpost.com/rss/world/',
+              'https://www.forbes.com/world-news/feed/',
+              'https://www.theverge.com/rss/index.xml',
+              'https://www.salon.com/rss.xml',
+              'https://www.theaustralian.com.au/world/rss',
+              'https://www.newyorker.com/feed/news',
+              'https://www.scmp.com/rss/feed/world',
+              'https://www.thecut.com/rss',
+              'https://www.huffpost.com/world-news/rss',
+              'https://www.cnn.com/world/rss',
+              'https://www.reuters.com/rssFeed/world',
+              'https://www.economist.com/rss/external',
+              'https://rss.cnn.com/rss/edition.rss',
+              'https://feeds.bbci.co.uk/news/rss.xml',
+              'http://feeds.reuters.com/reuters/topNews',
+              'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',
+              'http://rss.cnn.com/rss/cnn_topstories.rss',
+              'http://feeds.foxnews.com/foxnews/latest',
+              'https://news.google.com/rss',
+              'https://www.npr.org/rss/rss.php?id=1001',
+              'https://www.washingtonpost.com/rss',
+              'https://www.wsj.com/xml/rss/3_7085.xml',
+              'https://feeds.a.dj.com/rss/R'
+            ]
 
         all_articles = []
         for url in rss_urls:
