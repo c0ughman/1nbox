@@ -183,7 +183,7 @@ def get_openai_response(cluster):
 
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
-        max_tokens=300,
+        max_tokens=100000,
         temperature=0.125,
         messages=[
             {"role": "system", "content": prompt},
@@ -268,14 +268,12 @@ class Command(BaseCommand):
         # Print results
         print_clusters(final_clusters)
 
-        '''
         # Make openai summaries for each cluster and print
         list_of_cluster_summaries = []
         for cluster in final_clusters:
             list_of_cluster_summaries.append(get_openai_response(cluster))
             
         print(list_of_cluster_summaries)
-        '''
 
             
 
