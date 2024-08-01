@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import pytz
 from django.core.management.base import BaseCommand
 import re
+import os
 from collections import Counter
 
 # List of insignificant words to exclude
