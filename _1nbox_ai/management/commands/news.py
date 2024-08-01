@@ -202,7 +202,8 @@ class Command(BaseCommand):
         parser.add_argument('--top_words_to_consider', type=int, default=3, help='Number of top words to consider for clustering')
         parser.add_argument('--merge_threshold', type=int, default=2, help='Number of common words required to merge clusters')
         parser.add_argument('--min_articles', type=int, default=3, help='Minimum number of articles per cluster')
-        parser.add_argument('--join_percentage', type=float, default=0.5, help='Percentage of matching words required to join or merge clusters')
+        parser.add_argument('--join_percentage', type=float, default=0.5, help='Percentage of matching words required to join clusters from misc')
+        parser.add_argument('--final_merge_percentage', type=float, default=0.5, help='Percentage of matching words required or merge clusters')
 
     def handle(self, *args, **options):
         days_back = options['days']
