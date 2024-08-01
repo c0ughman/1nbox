@@ -15,7 +15,7 @@ INSIGNIFICANT_WORDS = set([
     'A', 'An', 'And', 'At', 'By', 'For', 'From', 'Has', 'He', 'I', 'Of', 
     'On', 'Or', 'She', 'That', 'This', 'To', 'Was', 'With', 'You',
     'All', 'Are', 'As', 'Be', 'Been', 'But', 'Can', 'Had', 'Have', 'Her', 
-    'His', 'If', 'Into', 'More', 'My', 'Not', 'One', 'Our', 'Their', 'They'
+    'His', 'If', 'Into', 'More', 'My', 'Not', 'One', 'Our', 'Their', 'They' 'Independent', 'Times'
 ])
 
 def get_publication_date(entry):
