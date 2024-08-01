@@ -159,8 +159,11 @@ def merge_clusters_by_percentage(clusters, join_percentage):
     return clusters
 
 def calculate_article_similarity(article1, article2):
+    if not article1['significant_words']:
+        return 0
     common_words = set(article1['significant_words']) & set(article2['significant_words'])
     return len(common_words) / len(article1['significant_words'])
+
 
 def calculate_cluster_strength(cluster):
     if len(cluster['articles']) < 2:
@@ -171,8 +174,9 @@ def calculate_cluster_strength(cluster):
     
     for i, article1 in enumerate(cluster['articles']):
         for article2 in cluster['articles'][i+1:]:
-            total_similarity += calculate_article_similarity(article1, article2)
-            comparisons += 1
+            if article1['significant_words'] and article2['significant_words']:
+                total_similarity += calculate_article_similarity(article1, article2)
+                comparisons += 1
     
     return total_similarity / comparisons if comparisons > 0 else 0
 
