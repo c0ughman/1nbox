@@ -181,9 +181,9 @@ def get_openai_response(cluster):
         cluster_content += f"Summary: {article['summary']}\n"
         cluster_content += f"Content: {article['content']}\n\n"
 
-    prompt = "You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
+    prompt = ("You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
             "all the facts from each of the articles in a small but fact-dense summary"
-            "including all the dates, names and key factors to provide full context on the events."
+            "including all the dates, names and key factors to provide full context on the events.")
 
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
