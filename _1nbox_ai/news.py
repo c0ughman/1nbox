@@ -286,15 +286,24 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
     # Merge clusters based on join_percentage
     final_clusters = merge_clusters_by_percentage(clusters_with_min_articles, final_merge_percentage)
 
+    # Print the clusters
+    print_clusters(final_clusters)
+
     # Get OpenAI summaries for each cluster
     cluster_summaries = {}
     for cluster in final_clusters:
         key = ' '.join([word.capitalize() for word in cluster['common_words']])
         summary = get_openai_response(cluster)
+        print(summary)
+        print("                       ")
+        print("                       ")
+        print("                       ")
         cluster_summaries[key] = summary
 
     # Get the final summary
     final_summary = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
+    print(f"SUMMARY for {topic.name}")
+    print(final_summary)
 
     # Update the Topic instance
     topic.cluster_summaries = cluster_summaries
