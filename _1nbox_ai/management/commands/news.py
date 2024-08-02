@@ -240,7 +240,7 @@ def get_final_summary(cluster_summaries):
              "what happened in the news today and I want you to give a direct and simple summary"
              "for each group of events portrayed."
              "You will mix up similar topics together to not repeat yourself."
-             "Give me 2 to 3 sentences per topic giving a full explanation of the situation")
+             "Give me 4 to 5 sentences per topic giving a full explanation of the situation")
 
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
