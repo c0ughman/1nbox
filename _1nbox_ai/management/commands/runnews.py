@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from ...news import process_all_topics
+import traceback
 
 class Command(BaseCommand):
     help = 'Run news processing for all topics'
@@ -16,14 +17,19 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('Starting news processing...'))
-        process_all_topics(
-            days_back=options['days'],
-            common_word_threshold=options['common_word_threshold'],
-            top_words_to_consider=options['top_words_to_consider'],
-            merge_threshold=options['merge_threshold'],
-            min_articles=options['min_articles'],
-            join_percentage=options['join_percentage'],
-            final_merge_percentage=options['final_merge_percentage'],
-            sentences_final_summary=options['sentences_final_summary']
-        )
-        self.stdout.write(self.style.SUCCESS('News processing completed successfully.'))
+        try:
+            process_all_topics(
+                days_back=options['days'],
+                common_word_threshold=options['common_word_threshold'],
+                top_words_to_consider=options['top_words_to_consider'],
+                merge_threshold=options['merge_threshold'],
+                min_articles=options['min_articles'],
+                join_percentage=options['join_percentage'],
+                final_merge_percentage=options['final_merge_percentage'],
+                sentences_final_summary=options['sentences_final_summary']
+            )
+            self.stdout.write(self.style.SUCCESS('News processing completed successfully.'))
+        except Exception as e:
+            self.stderr.write(self.style.ERROR('Error during news processing:'))
+            self.stderr.write(self.style.ERROR(str(e)))
+            self.stderr.write(self.style.ERROR(traceback.format_exc()))
