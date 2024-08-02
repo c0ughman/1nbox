@@ -215,7 +215,7 @@ def get_openai_response(cluster, max_tokens=4000):
         prompt = ("You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
                   "all the facts from each of the articles in a small but fact-dense summary "
                   "including all the dates, names and key factors to provide full context on the events."
-                  "also, i want you to add the url where the information is from next to every fact you put in the summary in parentheses")
+                  "also, i want you to add the corresponding url next to every line you put in the summary in parentheses")
 
         completion = client.chat.completions.create(
             model="gpt-3.5-turbo-0125",
@@ -240,7 +240,7 @@ def get_final_summary(cluster_summaries):
              "what happened in the news today and I want you to give a direct and simple summary"
              "for each group of events portrayed."
              "You will mix up similar topics together to not repeat yourself."
-             "The summary has to be simple and straightforward")
+             "Give me 2 to 3 sentences per topic giving a full explanation of the situation")
 
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
