@@ -230,7 +230,7 @@ def get_openai_response(cluster, max_tokens=4000):
 
     return ' '.join(summaries)
 
-def get_final_summary(cluster_summaries):
+def get_final_summary(cluster_summaries, sentences_final_summary):
     openai_key = os.environ.get('OPENAI_KEY')
     client = OpenAI(api_key=openai_key)
 
@@ -240,7 +240,7 @@ def get_final_summary(cluster_summaries):
              "what happened in the news today and I want you to give a direct and simple summary"
              "for each group of events portrayed."
              "You will mix up similar topics together to not repeat yourself."
-             "Give me 4 to 5 sentences per topic giving a full explanation of the situation")
+             f"Give me {sentences_final_summary} sentences per topic giving a full explanation of the situation")
 
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
@@ -264,6 +264,7 @@ class Command(BaseCommand):
         parser.add_argument('--min_articles', type=int, default=3, help='Minimum number of articles per cluster')
         parser.add_argument('--join_percentage', type=float, default=0.5, help='Percentage of matching words required to join clusters from misc')
         parser.add_argument('--final_merge_percentage', type=float, default=0.5, help='Percentage of matching words required or merge clusters')
+        parser.add_argument('--sentences_final_summary', type=float, default=3, help='Amount of sentences per topic in the final summary')
 
     def handle(self, *args, **options):
         days_back = options['days']
@@ -273,6 +274,7 @@ class Command(BaseCommand):
         min_articles = options['min_articles']
         join_percentage = options['join_percentage']
         final_merge_percentage = options['final_merge_percentage']
+        sentences_final_summary = options['sentences_final_summary']
 
         rss_urls = [
             'http://feeds.bbci.co.uk/news/world/rss.xml',
@@ -336,5 +338,5 @@ class Command(BaseCommand):
             print(summary)
 
         # Get the final summary from openai and print
-        final = get_final_summary(list_of_cluster_summaries)
+        final = get_final_summary(list_of_cluster_summaries, sentences_final_summary)
         print(final)
