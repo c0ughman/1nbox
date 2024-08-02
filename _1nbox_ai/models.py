@@ -1,4 +1,15 @@
 from django.db import models
+from django.contrib.postgres.fields import ArrayField
+import json
+
+class Topic(models.Model):
+    name = models.CharField(max_length=255)
+    sources = ArrayField(models.CharField(max_length=255), blank=True, default=list)
+    cluster_summaries = models.JSONField(default=dict,blank=True, null=True)
+    summary = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
 
 class User(models.Model):
     email = models.CharField(max_length=255, blank=True, null=True)
@@ -22,6 +33,9 @@ class User(models.Model):
     provider_token = models.CharField(max_length=255, blank=True, null=True)
     refresh_token = models.CharField(max_length=255, blank=True, null=True)
     provider_refresh_token = models.CharField(max_length=255, blank=True, null=True)
+    messaging_app = models.CharField(max_length=255, blank=True, null=True)
+    topics = models.JSONField(default=list,blank=True, null=True)
+    days_since = models.IntegerField(default=0,blank=True, null=True)
 
     def __str__(self):
         return f"{self.email}"
