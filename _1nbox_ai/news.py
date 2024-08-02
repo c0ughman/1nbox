@@ -6,6 +6,8 @@ import re
 import os
 from openai import OpenAI
 from collections import Counter
+from .models import Topic, User
+
 
 # List of insignificant words to exclude
 INSIGNIFICANT_WORDS = set([
