@@ -69,6 +69,27 @@ def new_user(request):
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
 
+@require_http_methods(["GET"])
+def get_user_data(request, user_id):
+    try:
+        user = User.objects.get(id=user_id)
+        user_data = {
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'supabase_user_id': user.supabase_user_id,
+            'plan': user.plan,
+            'negative_keywords': user.negative_keywords,
+            'positive_keywords': user.positive_keywords,
+            'language': user.language,
+            'time_zone': user.time_zone,
+            'messaging_app': user.messaging_app,
+            'topics': user.topics,
+            'days_since': user.days_since,
+        }
+        return JsonResponse(user_data)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+
 @csrf_exempt
 def new_settings(request):
     if request.method == 'POST':
