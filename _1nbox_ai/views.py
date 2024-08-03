@@ -70,9 +70,9 @@ def new_user(request):
         
 
 @require_http_methods(["GET"])
-def get_user_data(request, user_id):
+def get_user_data(request, supabase_user_id):
     try:
-        user = User.objects.get(id=user_id)
+        user = User.objects.get(supabase_user_id=supabase_user_id)
         user_data = {
             'email': user.email,
             'phone_number': user.phone_number,
