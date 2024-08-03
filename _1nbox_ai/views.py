@@ -31,11 +31,12 @@ def new_lead(request):
             topics = request_data.get('record', {}).get('topics')
             
             try:
+                print(f"Attempting to create user with: phone={phone_number}, app={messaging_app}, topics={topics}")
                 new_user = User.objects.create(phone_number=phone_number, topics=topics, messaging_app=messaging_app)
+                print(f"User created: {new_user.id}")
             except Exception as e:
-                print(e)
-
-            return JsonResponse({'good': "Everything's good"}, status=200)
+                print(f"Error creating user: {str(e)}")
+                return JsonResponse({'error': str(e)}, status=500)
 
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
