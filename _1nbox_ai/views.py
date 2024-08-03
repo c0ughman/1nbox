@@ -25,24 +25,22 @@ def new_lead(request):
     if request.method == 'POST':
         try:
             request_data = json.loads(request.body.decode('utf-8'))
-            print(request_data)
-            phone_number = request_data.get('record', {}).get('phone_number')
-            messaging_app = request_data.get('record', {}).get('messaging_app')
-            topics = request_data.get('record', {}).get('topics')
+            print("Full request data:", request_data)
+            phone_number = request_data.get('phone_number')
+            messaging_app = request_data.get('messaging_app')
+            topics = request_data.get('topics')
+            print(f"Extracted data: phone={phone_number}, app={messaging_app}, topics={topics}")
             
             try:
-                print(f"Attempting to create user with: phone={phone_number}, app={messaging_app}, topics={topics}")
                 new_user = User.objects.create(phone_number=phone_number, topics=topics, messaging_app=messaging_app)
                 print(f"User created: {new_user.id}")
+                return JsonResponse({'success': True, 'user_id': new_user.id}, status=200)
             except Exception as e:
                 print(f"Error creating user: {str(e)}")
                 return JsonResponse({'error': str(e)}, status=500)
-
         except Exception as e:
+            print(f"Error processing request: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
-            print(str(e))
-            sys.stdout.flush()
-
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
             
