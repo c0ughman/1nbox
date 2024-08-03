@@ -5,7 +5,7 @@ from _1nbox_ai.models import User
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from _1nbox_ai.workflow import main
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 import jwt
 import os
 import sys
