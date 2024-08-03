@@ -29,8 +29,11 @@ def new_lead(request):
             phone_number = request_data.get('record', {}).get('phone_number')
             messaging_app = request_data.get('record', {}).get('messaging_app')
             topics = request_data.get('record', {}).get('topics')
-
-            new_user = User.objects.create(phone_number=phone_number, topics=topics, messaging_app=messaging_app)
+            
+            try:
+                new_user = User.objects.create(phone_number=phone_number, topics=topics, messaging_app=messaging_app)
+            except Exception as e:
+                print(e)
 
             return JsonResponse({'good': "Everything's good"}, status=200)
 
