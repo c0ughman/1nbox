@@ -42,7 +42,32 @@ def new_lead(request):
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
             
+@csrf_exempt
+def new_user(request):
+    if request.method == 'POST':
+        try:
+            request_data = json.loads(request.body.decode('utf-8'))
+            print(request_data)
+            phone_number = request_data.get('record', {}).get('phone_number')
+            email = request_data.get('record', {}).get('email')
+            user_id = request_data.get('record', {}).get('user_id')
 
+            user = User.objects.filter(phone_number=phone_number).first()
+            if user:
+                user.email = email
+                user.supabase_user_id = user_id
+            else:
+                return JsonResponse({'no user': "User does not exist with phone number"}, status=500)
+
+            return JsonResponse({'good': "Everything's good"}, status=200)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+            print(str(e))
+            sys.stdout.flush()
+
+    else:
+        return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
 
 @csrf_exempt
 def new_settings(request):
