@@ -90,6 +90,49 @@ def get_user_data(request, supabase_user_id):
     except User.DoesNotExist:
         return JsonResponse({'error': 'User not found'}, status=404)
 
+
+@csrf_exempt
+def sign_up(request):
+    if request.method == 'POST':
+        try:
+            request_data = json.loads(request.body.decode('utf-8'))
+            print("Full request data:", request_data)
+            
+            phone_number = request_data.get('phone_number')
+            messaging_app = request_data.get('messaging_app')
+            topics = request_data.get('topics')
+            email = request_data.get('email')
+            user_id = request_data.get('user_id')
+            
+            print(f"Extracted data: phone={phone_number}, app={messaging_app}, topics={topics}, email={email}, user_id={user_id}")
+            
+            user, created = User.objects.get_or_create(phone_number=phone_number)
+            
+            if created:
+                user.topics = topics
+                user.messaging_app = messaging_app
+                user.email = email
+                user.supabase_user_id = user_id
+                user.save()
+                print(f"New user created: {user.id}")
+                return JsonResponse({'success': True, 'user_id': user.id, 'message': 'User created successfully'}, status=201)
+            else:
+                user.messaging_app = messaging_app
+                user.topics = topics
+                if email:
+                    user.email = email
+                if user_id:
+                    user.supabase_user_id = user_id
+                user.save()
+                print(f"Existing user updated: {user.id}")
+                return JsonResponse({'success': True, 'user_id': user.id, 'message': 'User updated successfully'}, status=200)
+        
+        except Exception as e:
+            print(f"Error processing request: {str(e)}")
+            return JsonResponse({'error': str(e)}, status=500)
+    else:
+        return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
+
 @csrf_exempt
 def new_settings(request):
     if request.method == 'POST':
