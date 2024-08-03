@@ -21,6 +21,30 @@ supabase_url = os.environ.get('SUPABASE_URL')
 supabase_key = os.environ.get('SUPABASE_KEY')
 
 @csrf_exempt
+def new_lead(request):
+    if request.method == 'POST':
+        try:
+            request_data = json.loads(request.body.decode('utf-8'))
+            print(request_data)
+            phone_number = request_data.get('record', {}).get('phone_number')
+            messaging_app = request_data.get('record', {}).get('messaging_app')
+            topics = request_data.get('record', {}).get('topics')
+
+            new_user = User.objects.create(phone_number=phone_number, topics=topics, messaging_app=messaging_app)
+
+            return JsonResponse({'good': "Everything's good"}, status=200)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+            print(str(e))
+            sys.stdout.flush()
+
+    else:
+        return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
+            
+
+
+@csrf_exempt
 def new_settings(request):
     if request.method == 'POST':
         try:
