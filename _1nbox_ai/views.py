@@ -77,7 +77,10 @@ def get_user_data(request, supabase_user_id):
         summaries_list = []
         for topic in user.topics:
             chosenTopic = Topic.objects.filter(name=topic).first()
-            summaries_list.append(chosenTopic.summary)
+            if chosenTopic:
+                summaries_list.append(chosenTopic.summary)
+            else:
+                print("OJO!!! - Missing a Topic here")
         
         user_data = {
             'email': user.email,
