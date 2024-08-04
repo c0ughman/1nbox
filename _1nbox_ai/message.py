@@ -1,6 +1,6 @@
 import os
 from twilio.rest import Client
-from .models import Topics, User
+from .models import Topic, User
 
 # Fetch environment variables
 def get_twilio_client():
@@ -18,7 +18,7 @@ def send_summaries():
         topic_names = []
 
         for topic in topics:
-            topic_obj = Topics.objects.filter(name=topic.name).first()
+            topic_obj = Topic.objects.filter(name=topic.name).first()
             if topic_obj:
                 summaries.append(topic_obj.summary)
                 topic_names.append(topic_obj.name)
