@@ -13,7 +13,7 @@ client = get_twilio_client()
 def send_summaries():
     users = User.objects.all()
     for user in users:
-        topics = user.topics.all()
+        topics = user.topics
         summaries = []
         topic_names = []
 
