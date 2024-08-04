@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 import json
 from django.views.decorators.csrf import csrf_exempt
-from _1nbox_ai.models import User
+from _1nbox_ai.models import User, Topic
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from _1nbox_ai.workflow import main
@@ -73,6 +73,12 @@ def new_user(request):
 def get_user_data(request, supabase_user_id):
     try:
         user = User.objects.get(supabase_user_id=supabase_user_id)
+
+        summaries_list = []
+        for topic in user.topics:
+            chosenTopic = Topic.objects.filter(name=topic).first()
+            summaries_list.append(chosenTopic.summary)
+        
         user_data = {
             'email': user.email,
             'phone_number': user.phone_number,
@@ -85,6 +91,7 @@ def get_user_data(request, supabase_user_id):
             'messaging_app': user.messaging_app,
             'topics': user.topics,
             'days_since': user.days_since,
+            'summaries_list': summaries_list,
         }
         return JsonResponse(user_data)
     except User.DoesNotExist:
