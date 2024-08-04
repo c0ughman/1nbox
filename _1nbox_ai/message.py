@@ -57,13 +57,26 @@ def send_sms(phone_number, template_data):
     json_data = json.dumps(template_data)
     print(f"Sending SMS to {phone_number} with data: {json_data}")
     
-    client.messages.create(
-        content_sid=content_sid,
-        from_=phone_number_from,
-        to=phone_number,
-        content_variables=json_data,
-        body="This is a fallback message body in case content variables are not properly configured."
-    )
+    try:
+        message = client.messages.create(
+            content_sid=content_sid,
+            from_=phone_number_from,
+            to=phone_number,
+            content_variables=json_data
+        )
+        print(f"SMS sent successfully. SID: {message.sid}")
+    except TwilioRestException as e:
+        print(f"Error sending SMS: {str(e)}")
+        # Fallback to a simple message if template fails
+        try:
+            message = client.messages.create(
+                from_=phone_number_from,
+                to=phone_number,
+                body="This is a fallback message body in case content variables are not properly configured."
+            )
+            print(f"Fallback SMS sent successfully. SID: {message.sid}")
+        except TwilioRestException as e:
+            print(f"Error sending fallback SMS: {str(e)}")
 
 def send_facebook_message(facebook_id, template_data):
     content_sid = os.getenv('TWILIO_CONTENT_SID')
@@ -76,24 +89,23 @@ def send_facebook_message(facebook_id, template_data):
         content_sid=content_sid,
         messaging_service_sid=messaging_service_sid,
         to=f'messenger:{facebook_id}',
-        content_variables=json_data,
-        body="This is a fallback message body in case content variables are not properly configured."
+        content_variables=json_data
     )
+
+from twilio.base.exceptions import TwilioRestException
 
 def send_whatsapp_message(phone_number, template_data):
-    content_sid = os.getenv('TWILIO_CONTENT_SID')
+    whatsapp_template_sid = os.getenv('TWILIO_WHATSAPP_TEMPLATE_SID')
     whatsapp_number_from = os.getenv('TWILIO_WHATSAPP_NUMBER')
-
-    json_data = json.dumps(template_data)
-    print(f"Sending WhatsApp to {phone_number} with data: {json_data}")
     
-    client.messages.create(
-        content_sid=content_sid,
-        from_=f'whatsapp:{whatsapp_number_from}',
-        to=f'whatsapp:{phone_number}',
-        content_variables=json_data,
-        body="This is a fallback message body in case content variables are not properly configured."
-    )
+    try:
+        message = client.messages.create(
+            from_=f'whatsapp:{whatsapp_number_from}',
+            to=f'whatsapp:{phone_number}'
+        )
+        print(f"WhatsApp message sent successfully. SID: {message.sid}")
+    except TwilioRestException as e:
+        print(f"Error sending WhatsApp message: {str(e)}")
 
 # This function can be called at a specific time to trigger the sending of summaries
 def scheduled_summary_sender():
