@@ -2,6 +2,8 @@ import os
 from twilio.rest import Client
 import json
 from .models import Topic, User
+from twilio.base.exceptions import TwilioRestException
+
 
 def get_twilio_client():
     account_sid = os.getenv('TWILIO_ACCOUNT_SID')
