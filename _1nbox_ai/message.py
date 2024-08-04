@@ -11,8 +11,17 @@ client = Client(account_sid, auth_token)
 
 def get_user_topics_summary(user):
     topics = ', '.join(user.topics)
-    summaries = '\n'.join([Topic.objects.get(name=topic).summary for topic in user.topics])
-    return topics, summaries
+    summaries = []
+    
+    for topic in user.topics:
+        try:
+            topic_obj = Topic.objects.get(name=topic)
+            summaries.append(topic_obj.summary)
+        except Topic.DoesNotExist:
+            print(f"Topic '{topic}' does not exist and will be skipped.")
+    
+    summaries_str = '\n'.join(summaries)
+    return topics, summaries_str
 
 def format_content_variables(topics, summaries):
     return {
