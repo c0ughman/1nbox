@@ -1,104 +1,65 @@
 import os
+from django.conf import settings
 from twilio.rest import Client
 import json
 from .models import Topic, User
-from twilio.base.exceptions import TwilioRestException
 
+# Twilio client setup
+account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
+auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
+client = Client(account_sid, auth_token)
 
-def get_twilio_client():
-    account_sid = os.getenv('TWILIO_ACCOUNT_SID')
-    auth_token = os.getenv('TWILIO_AUTH_TOKEN')
-    return Client(account_sid, auth_token)
+def get_user_topics_summary(user):
+    topics = ', '.join(user.topics)
+    summaries = '\n'.join([Topic.objects.get(name=topic).summary for topic in user.topics])
+    return topics, summaries
 
-client = get_twilio_client()
-
-def send_summaries():
-    users = User.objects.all()
-    for user in users:
-        topics = user.topics
-        summaries = []
-        topic_names = []
-
-        for topic in topics:
-            topic_obj = Topic.objects.filter(name=topic).first()
-            if topic_obj:
-                summaries.append(topic_obj.summary)
-                topic_names.append(topic_obj.name)
-
-        if summaries:
-            send_message(user, topic_names, summaries)
-
-def send_message(user, topics, summaries):
-    topics_text = ", ".join(topics)
-    summaries_text = "\n\n".join(summaries)
-    example_questions = [
-        "Expand on the first news story.",
-        "What are the sources of these summaries?",
-        "How does this news impact the global economy?"
-    ]
-
-    template_data = {
-        '1': topics_text,
-        '2': summaries_text,
-        '3': 112,
-        '4': "\n".join(example_questions)
+def format_content_variables(topics, summaries):
+    return {
+        "1": topics,
+        "2": summaries,
+        "3": "over 100",
+        "4": "Expand on the first news story.\nWhat are the sources of these summaries?\nCan you provide more details on the most recent development?"
     }
 
-    print(template_data)
-    print(json.dumps(template_data))
-    print(os.getenv('TWILIO_CONTENT_SID'))
-
-    if user.messaging_app == 'SMS':
-        send_sms(user.phone_number, template_data)
-    elif user.messaging_app == 'Facebook Messenger':
-        send_facebook_message(user.facebook_id, template_data)
-    elif user.messaging_app == 'WhatsApp':
-        send_whatsapp_message(user.phone_number, template_data)
-
-def send_sms(phone_number, template_data):
-    phone_number_from = os.getenv('TWILIO_PHONE_NUMBER')
-    
+def send_message(user, content_variables):
     try:
-        message = client.messages.create(
-            content_sid=os.getenv('TWILIO_CONTENT_SID'),
-            from_=phone_number_from,
-            to=phone_number,
-            content_variables=json.dumps(template_data)
-        )
-        print(f"SMS sent successfully. SID: {message.sid}")
-    except TwilioRestException as e:
-        print(f"Error sending SMS: {str(e)}")
+        if user.messaging_app == 'SMS':
+            message = client.messages.create(
+                content_sid=os.environ.get('TWILIO_CONTENT_SID'),
+                to=user.phone_number,
+                messaging_service_sid=os.environ.get('TWILIO_MESSAGING_SERVICE_SID'),
+                content_variables=json.dumps(content_variables)
+            )
+        elif user.messaging_app == 'Facebook Messenger':
+            message = client.messages.create(
+                content_sid=os.environ.get('TWILIO_CONTENT_SID'),
+                to=f'messenger:{"FACEBOOK ID DOES NOT EXIST"}',
+                messaging_service_sid=os.environ.get('TWILIO_MESSAGING_SERVICE_SID'),
+                content_variables=json.dumps(content_variables)
+            )
+        elif user.messaging_app == 'WhatsApp':
+            message = client.messages.create(
+                content_sid=os.environ.get('TWILIO_CONTENT_SID'),
+                to=f"whatsapp:{user.phone_number}",
+                from_=f"whatsapp:{os.environ.get('TWILIO_WHATSAPP_NUMBER')}",
+                content_variables=json.dumps(content_variables)
+            )
+        else:
+            return False, "Invalid messaging app"
+        
+        return True, message.sid
+    except Exception as e:
+        return False, str(e)
 
-def send_facebook_message(facebook_id, template_data):
-    messaging_service_sid = os.getenv('TWILIO_MESSAGING_SERVICE_SID')
-    
-    try:
-        message = client.messages.create(
-            content_sid=os.getenv('TWILIO_CONTENT_SID'),
-            messaging_service_sid=messaging_service_sid,
-            to=f'messenger:{facebook_id}',
-            content_variables=json.dumps(template_data),
-            body="These are today's news in {{1}}:/n{{2}}/nSourced from {{3}} articles,/nSummarized using OpenAI./nAsk me anything!/nExample questions:/n{{4}}"
-        )
-        print(f"Facebook message sent successfully. SID: {message.sid}")
-    except TwilioRestException as e:
-        print(f"Error sending Facebook message: {str(e)}")
+def send_summaries():
+    for user in User.objects.all():
+        topics, summaries = get_user_topics_summary(user)
+        content_variables = format_content_variables(topics, summaries)
 
-def send_whatsapp_message(phone_number, template_data):
-    whatsapp_number_from = os.getenv('TWILIO_WHATSAPP_NUMBER')
-    
-    try:
-        message = client.messages.create(
-            content_sid=os.getenv('TWILIO_CONTENT_SID'),
-            from_=f'whatsapp:{whatsapp_number_from}',
-            to=f'whatsapp:{phone_number}',
-            content_variables=json.dumps(template_data),
-            body="These are today's news in {{1}}:/n{{2}}/nSourced from {{3}} articles,/nSummarized using OpenAI./nAsk me anything!/nExample questions:/n{{4}}"
-        )
-        print(f"WhatsApp message sent successfully. SID: {message.sid}")
-    except TwilioRestException as e:
-        print(f"Error sending WhatsApp message: {str(e)}")
+        success, result = send_message(user, content_variables)
 
-# This function can be called at a specific time to trigger the sending of summaries
-def scheduled_summary_sender():
-    send_summaries()
+        if success:
+            print(f"Message sent to {user.username} via {user.messaging_app}. SID: {result}")
+        else:
+            print(f"Failed to send message to {user.username}. Error: {result}")
