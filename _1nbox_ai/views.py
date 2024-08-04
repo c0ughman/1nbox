@@ -134,6 +134,11 @@ def sign_up(request):
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
 
 @csrf_exempt
+def message_received(request):
+    print(request)
+    return JsonResponse({'good': "Received message"}, status=200)
+    
+@csrf_exempt
 def new_settings(request):
     if request.method == 'POST':
         try:
