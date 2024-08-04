@@ -77,7 +77,8 @@ def send_facebook_message(facebook_id, template_data):
             content_sid=os.getenv('TWILIO_CONTENT_SID'),
             messaging_service_sid=messaging_service_sid,
             to=f'messenger:{facebook_id}',
-            content_variables=json.dumps(template_data)
+            content_variables=json.dumps(template_data),
+            body="These are today's news in {{1}}:/n{{2}}/nSourced from {{3}} articles,/nSummarized using OpenAI./nAsk me anything!/nExample questions:/n{{4}}"
         )
         print(f"Facebook message sent successfully. SID: {message.sid}")
     except TwilioRestException as e:
@@ -91,7 +92,8 @@ def send_whatsapp_message(phone_number, template_data):
             content_sid=os.getenv('TWILIO_CONTENT_SID'),
             from_=f'whatsapp:{whatsapp_number_from}',
             to=f'whatsapp:{phone_number}',
-            content_variables=json.dumps(template_data)
+            content_variables=json.dumps(template_data),
+            body="These are today's news in {{1}}:/n{{2}}/nSourced from {{3}} articles,/nSummarized using OpenAI./nAsk me anything!/nExample questions:/n{{4}}"
         )
         print(f"WhatsApp message sent successfully. SID: {message.sid}")
     except TwilioRestException as e:
