@@ -18,7 +18,7 @@ def send_summaries():
         topic_names = []
 
         for topic in topics:
-            topic_obj = Topic.objects.filter(name=topic.name).first()
+            topic_obj = Topic.objects.filter(name=topic).first()
             if topic_obj:
                 summaries.append(topic_obj.summary)
                 topic_names.append(topic_obj.name)
