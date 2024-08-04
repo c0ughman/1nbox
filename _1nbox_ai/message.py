@@ -3,7 +3,6 @@ from twilio.rest import Client
 import json
 from .models import Topic, User
 
-# Fetch environment variables
 def get_twilio_client():
     account_sid = os.getenv('TWILIO_ACCOUNT_SID')
     auth_token = os.getenv('TWILIO_AUTH_TOKEN')
@@ -51,57 +50,42 @@ def send_message(user, topics, summaries):
         send_whatsapp_message(user.phone_number, template_data)
 
 def send_sms(phone_number, template_data):
-    content_sid = os.getenv('TWILIO_CONTENT_SID')
     phone_number_from = os.getenv('TWILIO_PHONE_NUMBER')
-    
-    json_data = json.dumps(template_data)
-    print(f"Sending SMS to {phone_number} with data: {json_data}")
     
     try:
         message = client.messages.create(
-            content_sid=content_sid,
+            content_sid=CONTENT_SID,
             from_=phone_number_from,
             to=phone_number,
-            content_variables=json_data
+            content_variables=json.dumps(template_data)
         )
         print(f"SMS sent successfully. SID: {message.sid}")
     except TwilioRestException as e:
         print(f"Error sending SMS: {str(e)}")
-        # Fallback to a simple message if template fails
-        try:
-            message = client.messages.create(
-                from_=phone_number_from,
-                to=phone_number,
-                body="This is a fallback message body in case content variables are not properly configured."
-            )
-            print(f"Fallback SMS sent successfully. SID: {message.sid}")
-        except TwilioRestException as e:
-            print(f"Error sending fallback SMS: {str(e)}")
 
 def send_facebook_message(facebook_id, template_data):
-    content_sid = os.getenv('TWILIO_CONTENT_SID')
     messaging_service_sid = os.getenv('TWILIO_MESSAGING_SERVICE_SID')
-
-    json_data = json.dumps(template_data)
-    print(f"Sending Facebook Message to {facebook_id} with data: {json_data}")
     
-    client.messages.create(
-        content_sid=content_sid,
-        messaging_service_sid=messaging_service_sid,
-        to=f'messenger:{facebook_id}',
-        content_variables=json_data
-    )
-
-from twilio.base.exceptions import TwilioRestException
+    try:
+        message = client.messages.create(
+            content_sid=CONTENT_SID,
+            messaging_service_sid=messaging_service_sid,
+            to=f'messenger:{facebook_id}',
+            content_variables=json.dumps(template_data)
+        )
+        print(f"Facebook message sent successfully. SID: {message.sid}")
+    except TwilioRestException as e:
+        print(f"Error sending Facebook message: {str(e)}")
 
 def send_whatsapp_message(phone_number, template_data):
-    whatsapp_template_sid = os.getenv('TWILIO_WHATSAPP_TEMPLATE_SID')
     whatsapp_number_from = os.getenv('TWILIO_WHATSAPP_NUMBER')
     
     try:
         message = client.messages.create(
+            content_sid=CONTENT_SID,
             from_=f'whatsapp:{whatsapp_number_from}',
-            to=f'whatsapp:{phone_number}'
+            to=f'whatsapp:{phone_number}',
+            content_variables=json.dumps(template_data)
         )
         print(f"WhatsApp message sent successfully. SID: {message.sid}")
     except TwilioRestException as e:
