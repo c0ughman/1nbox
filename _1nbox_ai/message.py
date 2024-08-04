@@ -40,7 +40,7 @@ def send_message(user, topics, summaries):
     template_data = {
         '1': topics_text,
         '2': summaries_text,
-        '3': 'over 100',
+        '3': 112,
         '4': "\n".join(example_questions)
     }
 
