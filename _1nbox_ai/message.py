@@ -44,6 +44,10 @@ def send_message(user, topics, summaries):
         '4': "\n".join(example_questions)
     }
 
+    print(template_data)
+    print(json.dumps(template_data))
+    print(os.getenv('TWILIO_CONTENT_SID'))
+
     if user.messaging_app == 'SMS':
         send_sms(user.phone_number, template_data)
     elif user.messaging_app == 'Facebook Messenger':
