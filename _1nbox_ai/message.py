@@ -69,6 +69,6 @@ def send_summaries():
         success, result = send_message(user, content_variables)
 
         if success:
-            print(f"Message sent to {user.username} via {user.messaging_app}. SID: {result}")
+            print(f"Message sent to {user.email} via {user.messaging_app}. SID: {result}")
         else:
-            print(f"Failed to send message to {user.username}. Error: {result}")
+            print(f"Failed to send message to {user.email}. Error: {result}")
