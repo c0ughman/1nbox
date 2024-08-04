@@ -29,6 +29,7 @@ urlpatterns = [
     path('user/<str:supabase_user_id>/', views.get_user_data),
     path('sign_up/', views.sign_up),
     path('message_received/', views.message_received),
+    path('update_user_data/', views.update_user_data),
     path('new_settings/', views.new_settings),
     path('new_keywords/', views.new_keywords),
     path('redirect/', views.oauth_redirect, name='redirect'),
