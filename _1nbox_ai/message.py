@@ -56,7 +56,7 @@ def send_sms(phone_number, template_data):
     
     try:
         message = client.messages.create(
-            content_sid=CONTENT_SID,
+            content_sid=os.getenv('TWILIO_CONTENT_SID'),
             from_=phone_number_from,
             to=phone_number,
             content_variables=json.dumps(template_data)
@@ -70,7 +70,7 @@ def send_facebook_message(facebook_id, template_data):
     
     try:
         message = client.messages.create(
-            content_sid=CONTENT_SID,
+            content_sid=os.getenv('TWILIO_CONTENT_SID'),
             messaging_service_sid=messaging_service_sid,
             to=f'messenger:{facebook_id}',
             content_variables=json.dumps(template_data)
@@ -84,7 +84,7 @@ def send_whatsapp_message(phone_number, template_data):
     
     try:
         message = client.messages.create(
-            content_sid=CONTENT_SID,
+            content_sid=os.getenv('TWILIO_CONTENT_SID'),
             from_=f'whatsapp:{whatsapp_number_from}',
             to=f'whatsapp:{phone_number}',
             content_variables=json.dumps(template_data)
