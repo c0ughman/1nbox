@@ -14,12 +14,12 @@ client = get_twilio_client()
 def send_summaries():
     users = User.objects.all()
     for user in users:
-        topics = user.topics
+        topics = user.topics.all()
         summaries = []
         topic_names = []
 
         for topic in topics:
-            topic_obj = Topic.objects.filter(name=topic).first()
+            topic_obj = Topic.objects.filter(name=topic.name).first()
             if topic_obj:
                 summaries.append(topic_obj.summary)
                 topic_names.append(topic_obj.name)
@@ -54,36 +54,47 @@ def send_sms(phone_number, template_data):
     content_sid = os.getenv('TWILIO_CONTENT_SID')
     phone_number_from = os.getenv('TWILIO_PHONE_NUMBER')
     
+    json_data = json.dumps(template_data)
+    print(f"Sending SMS to {phone_number} with data: {json_data}")
+    
     client.messages.create(
         content_sid=content_sid,
         from_=phone_number_from,
         to=phone_number,
-        content_variables=json.dumps(template_data)  # Convert to JSON string
+        content_variables=json_data,
+        body="This is a fallback message body in case content variables are not properly configured."
     )
 
 def send_facebook_message(facebook_id, template_data):
     content_sid = os.getenv('TWILIO_CONTENT_SID')
     messaging_service_sid = os.getenv('TWILIO_MESSAGING_SERVICE_SID')
 
+    json_data = json.dumps(template_data)
+    print(f"Sending Facebook Message to {facebook_id} with data: {json_data}")
+    
     client.messages.create(
         content_sid=content_sid,
         messaging_service_sid=messaging_service_sid,
         to=f'messenger:{facebook_id}',
-        content_variables=json.dumps(template_data)  # Convert to JSON string
+        content_variables=json_data,
+        body="This is a fallback message body in case content variables are not properly configured."
     )
 
 def send_whatsapp_message(phone_number, template_data):
     content_sid = os.getenv('TWILIO_CONTENT_SID')
     whatsapp_number_from = os.getenv('TWILIO_WHATSAPP_NUMBER')
 
+    json_data = json.dumps(template_data)
+    print(f"Sending WhatsApp to {phone_number} with data: {json_data}")
+    
     client.messages.create(
         content_sid=content_sid,
         from_=f'whatsapp:{whatsapp_number_from}',
         to=f'whatsapp:{phone_number}',
-        content_variables=json.dumps(template_data)  # Convert to JSON string
+        content_variables=json_data,
+        body="This is a fallback message body in case content variables are not properly configured."
     )
 
 # This function can be called at a specific time to trigger the sending of summaries
 def scheduled_summary_sender():
     send_summaries()
-
