@@ -90,6 +90,52 @@ def get_user_data(request, supabase_user_id):
     except User.DoesNotExist:
         return JsonResponse({'error': 'User not found'}, status=404)
 
+@csrf_exempt
+def update_user_data(request):
+    try:
+        # Parse the JSON data from the request body
+        data = json.loads(request.body.decode('utf-8'))
+        
+        # Get the user ID from the request data
+        supabase_user_id = data.get('supabase_user_id')
+        if not supabase_user_id:
+            return JsonResponse({'error': 'supabase_user_id is required'}, status=400)
+        
+        # Retrieve the user instance by user ID
+        user = User.objects.get(supabase_user_id=supabase_user_id)
+        
+        # Update user fields if present in the request data
+        if 'email' in data:
+            user.email = data['email']
+        if 'phone_number' in data:
+            user.phone_number = data['phone_number']
+        if 'plan' in data:
+            user.plan = data['plan']
+        if 'negative_keywords' in data:
+            user.negative_keywords = data['negative_keywords']
+        if 'positive_keywords' in data:
+            user.positive_keywords = data['positive_keywords']
+        if 'language' in data:
+            user.language = data['language']
+        if 'time_zone' in data:
+            user.time_zone = data['time_zone']
+        if 'messaging_app' in data:
+            user.messaging_app = data['messaging_app']
+        if 'topics' in data:
+            user.topics = data['topics']
+        if 'days_since' in data:
+            user.days_since = data['days_since']
+        
+        # Save the updated user instance
+        user.save()
+        
+        # Return a success message
+        return JsonResponse({'message': 'User data updated successfully'})
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
 
 @csrf_exempt
 def sign_up(request):
