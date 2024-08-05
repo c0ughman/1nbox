@@ -5,6 +5,9 @@ def generate_answer(from_number, body):
     if ":" in from_number:
         from_number = from_number.split(":", 1)[1]
 
+    print("GENERATING ANSWER")
+    print(from_number)
+    print(body)
     # Find the user with the matching phone number
     user = User.objects.filter(phone_number=from_number).first()
 
