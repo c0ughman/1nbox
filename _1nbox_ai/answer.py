@@ -1,5 +1,5 @@
 from _1nbox_ai.models import User, Topic  # Adjust the import to your actual module path
-import openai
+from openai import OpenAI
 import os
 
 def generate_answer(from_number, body):
