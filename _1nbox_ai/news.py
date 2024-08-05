@@ -300,9 +300,13 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         cluster_summaries[key] = summary
 
     # Get the final summary
-    final_summary = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
+    openai_response = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
     print(f"SUMMARY for {topic.name}")
-    print(final_summary['summary'])
+    final_summary = openai_response['summary']
+    questions = openai_response['questions']
+    print(final_summary)
+    print("----------------------OJO")
+    print(questions)
 
     # Update the Topic instance
     topic.cluster_summaries = cluster_summaries
