@@ -18,8 +18,11 @@ def generate_answer(from_number, body):
 
     # Iterate through the user's topics
     for topic in user.topics:
+        print(topic)
         chosen_topic = Topic.objects.get(name=topic)
+        print("inside")
         if chosen_topic:
+            print("42")
             # Add the Topic summary to the general list
             general_list.append(chosen_topic.summary)
             
