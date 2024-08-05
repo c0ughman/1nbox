@@ -21,13 +21,15 @@ def get_user_topics_summary(user):
             print(f"Topic '{topic}' does not exist and will be skipped.")
     
     summaries_str = '\n'.join(summaries)
+    
     return topics, summaries_str
 
 def format_content_variables(topics, summaries):
     return {
         "1": topics,
-        "2": summaries,
+        "2": repr(summaries),
         "3": "over 100",
+        "4": r"Expand on the first story please?\nHow would this affect the global economy?\nWhat do you think is the real reason this happened?",
     }
 
 def send_message(user, content_variables):
