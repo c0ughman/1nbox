@@ -8,29 +8,26 @@ def generate_answer(from_number, body):
     print("GENERATING ANSWER")
     print(from_number)
     print(body)
+    
     # Find the user with the matching phone number
     user = User.objects.filter(phone_number=from_number).first()
-    print("1")
     if not user:
-        print("1.5")
         return "Error: User not found."
-    print("2")
 
     general_list = []
 
-    # Iterate through the user's topics
-    for topic in user.topics:
-        print("3")
-        print(topic)
+# Iterate through the user's topics
+for topic in user.topics:
+    try:
         chosen_topic = Topic.objects.get(name=topic)
-        print("inside")
-        if chosen_topic:
-            print("42")
-            # Add the Topic summary to the general list
-            general_list.append(chosen_topic.summary)
-            
-            # Add each cluster summary to the general list
-            general_list.extend(chosen_topic.cluster_summaries)
+        # Add the Topic summary to the general list
+        general_list.append(chosen_topic.summary)
+        
+        # Add each cluster summary to the general list
+        general_list.extend(chosen_topic.cluster_summaries)
+    except Topic.DoesNotExist:
+        # Skip to the next topic if the Topic instance does not exist
+        continue
 
     # Print the general list
     print(general_list)
