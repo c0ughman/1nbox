@@ -1,4 +1,4 @@
-from models import User, Topic
+from _1nbox_ai.models import User, Topic
 
 def generate_answer(from_number, body):
     # Check if from_number contains ":" and extract the part after it if present
