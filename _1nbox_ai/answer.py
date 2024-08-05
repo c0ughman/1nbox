@@ -15,7 +15,7 @@ def generate_answer(from_number, body):
 
     # Iterate through the user's topics
     for topic in user.topics:
-            chosen_topic = Topic.objects.get(name=topic)
+        chosen_topic = Topic.objects.get(name=topic)
         if chosen_topic:
             # Add the Topic summary to the general list
             general_list.append(chosen_topic.summary)
