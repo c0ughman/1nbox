@@ -34,7 +34,7 @@ def format_content_variables(topics, summaries):
 def generate_body(content_variables):
     return {
 
-        f"These are today's news in {content_variables["1"]}:\n{content_variables["2"]}\nSourced from {content_variables["3"]} articles,\nSummarized using OpenAI.\nAsk me anything!\nExample questions:\n{content_variables["4"]}"
+        f'These are today\'s news in {content_variables["1"]}:\n{content_variables["2"]}\nSourced from {content_variables["3"]} articles,\nSummarized using OpenAI.\nAsk me anything!\nExample questions:\n{content_variables["4"]}'
 
     }
 
