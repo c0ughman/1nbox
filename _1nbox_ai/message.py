@@ -51,7 +51,7 @@ def send_message(user, content_variables):
             message = client.messages.create(
                 content_sid=os.environ.get('TWILIO_CONTENT_SID'),
                 to=f"whatsapp:{user.phone_number}",
-                from_={os.environ.get('TWILIO_MESSAGING_SERVICE_SID')},
+                from_=os.environ.get('TWILIO_MESSAGING_SERVICE_SID'),
                 content_variables=json.dumps(content_variables)
             )
         else:
