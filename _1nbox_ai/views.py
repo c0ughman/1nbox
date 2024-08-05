@@ -104,7 +104,7 @@ def get_user_data(request, supabase_user_id):
 def update_user_data(request):
     try:
         # Parse the JSON data from the request body
-        data = json.loads(request.body.decode('utf-8'))
+        data = request.body.decode('utf-8')
         
         # Get the user ID from the request data
         supabase_user_id = data.get('supabase_user_id')
