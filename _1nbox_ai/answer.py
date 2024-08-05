@@ -6,7 +6,7 @@ def generate_answer(from_number, body):
         from_number = from_number.split(":", 1)[1]
 
     # Find the user with the matching phone number
-    user = User.objects.filter(phone_number=phone_number).first()
+    user = User.objects.filter(phone_number=from_number).first()
 
     if not user:
         return "Error: User not found."
