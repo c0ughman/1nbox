@@ -7,6 +7,7 @@ import os
 from openai import OpenAI
 from collections import Counter
 from .models import Topic, User
+import json
 
 
 # List of insignificant words to exclude
