@@ -25,7 +25,10 @@ def generate_answer(from_number, body):
             
             # Add each cluster summary to the general list
             for cluster in chosen_topic.cluster_summaries:
-                general_list.append(cluster)
+                for key, value in cluster.items():
+                    combined_string = f"{key}: {value}"
+                    general_list.append(combined_string)
+                    
         except Topic.DoesNotExist:
             # Skip to the next topic if the Topic instance does not exist
             continue
