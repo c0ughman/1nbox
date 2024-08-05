@@ -44,7 +44,7 @@ def generate_answer(from_number, body):
         )
     
     # Extract the generated answer
-    answer = response.choices[0].message['content'].strip()
+    answer = response.choices[0].message.content.strip()
     
     # Print the generated answer
     print(answer)
