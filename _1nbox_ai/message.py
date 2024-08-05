@@ -25,8 +25,8 @@ def get_user_topics_summary(user):
 
 def format_content_variables(topics, summaries):
     return {
-        "1": topics,
-        "2": summaries,
+        "1": "This, That, The other",
+        "2": "This is a summary wow",
         "3": "over 100",
         "4": "Expand on the first news story.\nWhat are the sources of these summaries?\nCan you provide more details on the most recent development?"
     }
