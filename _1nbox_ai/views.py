@@ -191,14 +191,14 @@ def sign_up(request):
 
 @csrf_exempt
 def message_received(request):
-    data = request.body.decode('utf-8')
-
-    from_numb = data.get('From')
-    print(from_numb)
-    body = data.get('Body')
-    print(body)
-    
-    return JsonResponse({'good': "Received message"}, status=200)
+    if request.method == 'POST':
+        from_number = request.POST.get('From', '')
+        body = request.POST.get('Body', '')
+        response_message = f"From: {from_number}, Body: {body}"
+        print(response_message)  # This will print the message to the console or logs
+        return HttpResponse(response_message)
+    else:
+        return HttpResponse("Only POST requests are allowed.", status=405)
     
 @csrf_exempt
 def new_settings(request):
