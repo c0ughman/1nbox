@@ -1,6 +1,8 @@
 from _1nbox_ai.models import User, Topic  # Adjust the import to your actual module path
 from openai import OpenAI
 import os
+from twilio.rest import Client
+
 
 def generate_answer(from_number, body):
     # Check if from_number contains ":" and extract the part after it if present
@@ -46,8 +48,40 @@ def generate_answer(from_number, body):
     
     # Extract the generated answer
     answer = response.choices[0].message.content.strip()
-    
-    # Print the generated answer
-    print(answer)
-    
+    send_answer(user,answer)
+   
     return answer
+
+def send_answer(user,answer):
+    # Twilio client setup
+    account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
+    auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
+    client = Client(account_sid, auth_token)
+
+    try:
+        if user.messaging_app == 'SMS':
+            message = client.messages.create(
+                to=user.phone_number,
+                messaging_service_sid=os.environ.get('TWILIO_MESSAGING_SERVICE_SID'),
+                body=answer,
+            )
+        elif user.messaging_app == 'Facebook Messenger':
+            message = client.messages.create(
+                to=f'messenger:{"FACEBOOK ID DOES NOT EXIST"}',
+                messaging_service_sid=os.environ.get('TWILIO_MESSAGING_SERVICE_SID'),
+                body=answer,
+            )
+        elif user.messaging_app == 'WhatsApp':
+            message = client.messages.create(
+                to=f"whatsapp:{user.phone_number}",
+                from_=os.environ.get('TWILIO_MESSAGING_SERVICE_SID'),
+                body=answer,
+            )
+        else:
+            return False, "Invalid messaging app"
+        
+        return True, message.sid
+    except Exception as e:
+        return False, str(e)
+
+
