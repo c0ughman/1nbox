@@ -10,14 +10,17 @@ def generate_answer(from_number, body):
     print(body)
     # Find the user with the matching phone number
     user = User.objects.filter(phone_number=from_number).first()
-
+    print("1")
     if not user:
+        print("1.5")
         return "Error: User not found."
+    print("2")
 
     general_list = []
 
     # Iterate through the user's topics
     for topic in user.topics:
+        print("3")
         print(topic)
         chosen_topic = Topic.objects.get(name=topic)
         print("inside")
