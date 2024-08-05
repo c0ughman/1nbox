@@ -14,14 +14,15 @@ def generate_answer(from_number, body):
     user = User.objects.filter(phone_number=from_number).first()
     if not user:
         return "Error: User not found."
-    
+
+    summaries = []
     general_list = []
     # Iterate through the user's topics
     for topic in user.topics:
         try:
             chosen_topic = Topic.objects.get(name=topic)
             # Add the Topic summary to the general list
-            general_list.append(chosen_topic.summary)
+            summaries.append(repr(chosen_topic.summary))
             
             # Add each cluster summary to the general list
             general_list.append(repr(chosen_topic.cluster_summaries))
@@ -39,7 +40,7 @@ def generate_answer(from_number, body):
             temperature=0.125,
             messages=[
             {"role": "system", "content": "You are a news assistant. Use the provided information to answer the question concisely."},
-            {"role": "user", "content": f"Information: {general_list}\n\nQuestion: {body}\n\nProvide a short and concise answer."}
+            {"role": "user", "content": f"Information: {general_list}\nThis is what the user received: {summaries}\nQuestion: {body}\n\nProvide a short and concise answer."}
             ]
         )
     
