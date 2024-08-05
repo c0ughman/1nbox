@@ -30,7 +30,7 @@ def format_content_variables(topics, summaries):
         "1": topics,
         "2": repr(summaries),
         "3": "over 100",
-        "4": r"Expand on the first story please?\nHow would this affect the global economy?\nWhat do you think is the real reason this happened?",
+        "4": "Expand on the first story please?\nHow would this affect the global economy?\nWhat do you think is the real reason this happened?",
     }
 
 def send_message(user, content_variables):
