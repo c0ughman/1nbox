@@ -220,7 +220,7 @@ def get_openai_response(cluster, max_tokens=4000):
                   "also, i want you to add the corresponding url next to every line you put in the summary in parentheses")
 
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo-0125",
             max_tokens=1000,
             temperature=0.125,
             messages=[
@@ -235,16 +235,17 @@ def get_openai_response(cluster, max_tokens=4000):
 def get_final_summary(cluster_summaries, sentences_final_summary):
     openai_key = os.environ.get('OPENAI_KEY')
     client = OpenAI(api_key=openai_key)
+
     all_summaries = "\n\n".join(cluster_summaries)
-    prompt = ("You are a News Overview Summarizer. I will give you "
-              "what happened in the news today and I want you to give a direct and simple summary "
-              "for each group of events portrayed. "
-              "You will mix up similar topics together to not repeat yourself. "
-              f"Give me {sentences_final_summary} sentences per topic giving a full explanation of the situation. "
-              "Provide your response in JSON format with a 'summary' field containing the summary "
-              "and a 'questions' field containing a string separated by line breaks of three short follow-up questions about the summary.")
+
+    prompt = ("You are a News Overview Summarizer. I will give you"
+             "what happened in the news today and I want you to give a direct and simple summary"
+             "for each group of events portrayed."
+             "You will mix up similar topics together to not repeat yourself."
+             f"Give me {sentences_final_summary} sentences per topic giving a full explanation of the situation")
+
     completion = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-3.5-turbo-0125",
         max_tokens=1500,
         temperature=0.125,
         messages=[
@@ -300,13 +301,9 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         cluster_summaries[key] = summary
 
     # Get the final summary
-    openai_response = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
+    final_summary = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
     print(f"SUMMARY for {topic.name}")
-    final_summary = openai_response['summary']
-    questions = openai_response['questions']
     print(final_summary)
-    print("----------------------OJO")
-    print(questions)
 
     # Update the Topic instance
     topic.cluster_summaries = cluster_summaries
