@@ -2,9 +2,6 @@ from _1nbox_ai.models import User, Topic  # Adjust the import to your actual mod
 import openai
 import os
 
-# Set up your OpenAI API key
-openai.api_key = os.environ.get('OPENAI_KEY')
-
 def generate_answer(from_number, body):
     # Check if from_number contains ":" and extract the part after it if present
     if ":" in from_number:
@@ -33,6 +30,8 @@ def generate_answer(from_number, body):
             # Skip to the next topic if the Topic instance does not exist
             continue
     
+    client = OpenAI(api_key=os.environ.get('OPENAI_KEY'))
+
     # Make the OpenAI API request
     response = client.chat.completions.create(
             model="gpt-4o-mini",
