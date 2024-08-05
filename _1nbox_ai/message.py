@@ -10,17 +10,18 @@ auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
 client = Client(account_sid, auth_token)
 
 def get_user_topics_summary(user):
-    topics = ', '.join(user.topics)
     summaries = []
-    
+    topic_list = []
     for topic in user.topics:
         try:
             topic_obj = Topic.objects.get(name=topic)
             summaries.append(topic_obj.summary)
+            topic_list.append(topic)
         except Topic.DoesNotExist:
             print(f"Topic '{topic}' does not exist and will be skipped.")
     
     summaries_str = '\n'.join(summaries)
+    topics = ', '.join(topic_list)
     
     return topics, summaries_str
 
