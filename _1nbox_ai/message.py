@@ -34,7 +34,16 @@ def format_content_variables(topics, summaries):
 def generate_body(content_variables):
     return {
 
-        f'These are today\'s news in {content_variables["1"]}:\n{content_variables["2"]}\nSourced from {content_variables["3"]} articles,\nSummarized using OpenAI.\nAsk me anything!\nExample questions:\n{content_variables["4"]}'
+        f'''
+        These are today's news in {content_variables["1"]}:
+        {content_variables["2"]}
+        Sourced from {content_variables["3"]} articles,
+        Summarized using OpenAI.
+        
+        Ask me anything!
+        Example questions:
+        {content_variables["4"]}
+        '''
 
     }
 
@@ -57,6 +66,7 @@ def send_message(user, content_variables):
         elif user.messaging_app == 'WhatsApp':
             message = client.messages.create(
                 content_sid=os.environ.get('TWILIO_CONTENT_SID'),
+                body = generate_body(content_variables)
                 to=f"whatsapp:{user.phone_number}",
                 from_=f"whatsapp:{os.environ.get('TWILIO_WHATSAPP_NUMBER')}",
                 content_variables=json.dumps(content_variables)
