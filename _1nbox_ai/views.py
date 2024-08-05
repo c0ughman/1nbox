@@ -191,7 +191,13 @@ def sign_up(request):
 
 @csrf_exempt
 def message_received(request):
-    print(request.body.decode('utf-8'))
+    data = json.loads(request.body.decode('utf-8'))
+
+    from_numb = data.get('From')
+    print(from_numb)
+    body = data.get('Body')
+    print(body)
+    
     return JsonResponse({'good': "Received message"}, status=200)
     
 @csrf_exempt
