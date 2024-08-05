@@ -28,7 +28,6 @@ def format_content_variables(topics, summaries):
         "1": topics,
         "2": summaries,
         "3": "over 100",
-        "4": "Expand on the first news story.\nWhat are the sources of these summaries?\nCan you provide more details on the most recent development?"
     }
 
 def send_message(user, content_variables):
