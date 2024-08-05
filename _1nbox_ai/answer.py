@@ -24,8 +24,7 @@ def generate_answer(from_number, body):
             general_list.append(chosen_topic.summary)
             
             # Add each cluster summary to the general list
-            for cluster in chosen_topic.cluster_summaries:
-                general_list.append(repr(cluster))
+            general_list.append(repr(chosen_topic.cluster_summaries))
                     
         except Topic.DoesNotExist:
             # Skip to the next topic if the Topic instance does not exist
