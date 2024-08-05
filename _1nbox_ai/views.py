@@ -5,6 +5,7 @@ from _1nbox_ai.models import User, Topic
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from _1nbox_ai.workflow import main
+from _1nbox_ai.answer import generate_answer
 from django.views.decorators.http import require_POST, require_http_methods
 import jwt
 import os
@@ -19,6 +20,16 @@ from supabase import create_client, Client
 
 supabase_url = os.environ.get('SUPABASE_URL')
 supabase_key = os.environ.get('SUPABASE_KEY')
+
+@csrf_exempt
+def message_received(request):
+    if request.method == 'POST':
+        from_number = request.POST.get('From', '')
+        body = request.POST.get('Body', '')
+        generate_answer(from_number, body)
+        return HttpResponse("All good here", status=200)
+    else:
+        return HttpResponse("Only POST requests are allowed.", status=405)
 
 @csrf_exempt
 def new_lead(request):
@@ -189,16 +200,7 @@ def sign_up(request):
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
 
-@csrf_exempt
-def message_received(request):
-    if request.method == 'POST':
-        from_number = request.POST.get('From', '')
-        body = request.POST.get('Body', '')
-        response_message = f"From: {from_number}, Body: {body}"
-        print(response_message)  # This will print the message to the console or logs
-        return HttpResponse(response_message)
-    else:
-        return HttpResponse("Only POST requests are allowed.", status=405)
+# OLD 1NBOX TERRTORY
     
 @csrf_exempt
 def new_settings(request):
