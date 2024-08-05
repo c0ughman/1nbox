@@ -66,10 +66,9 @@ def send_message(user, content_variables):
         elif user.messaging_app == 'WhatsApp':
             message = client.messages.create(
                 content_sid=os.environ.get('TWILIO_CONTENT_SID'),
-                body = generate_body(content_variables),
                 to=f"whatsapp:{user.phone_number}",
                 from_=f"whatsapp:{os.environ.get('TWILIO_WHATSAPP_NUMBER')}",
-                content_variables=json.dumps(content_variables)
+                content_variables=json.dumps({"1": "x","2":"y","3":"z","4":"?"})
             )
         else:
             return False, "Invalid messaging app"
