@@ -1,4 +1,6 @@
 from _1nbox_ai.models import User, Topic  # Adjust the import to your actual module path
+import openai
+import os
 
 # Set up your OpenAI API key
 openai.api_key = os.environ.get('OPENAI_KEY')
