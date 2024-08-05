@@ -7,7 +7,6 @@ import os
 from openai import OpenAI
 from collections import Counter
 from .models import Topic, User
-import json
 
 
 # List of insignificant words to exclude
@@ -221,7 +220,7 @@ def get_openai_response(cluster, max_tokens=4000):
                   "also, i want you to add the corresponding url next to every line you put in the summary in parentheses")
 
         completion = client.chat.completions.create(
-            model="gpt-3.5-turbo-0125",
+            model="gpt-4o-mini",
             max_tokens=1000,
             temperature=0.125,
             messages=[
@@ -245,7 +244,7 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
               "Provide your response in JSON format with a 'summary' field containing the summary "
               "and a 'questions' field containing a string separated by line breaks of three short follow-up questions about the summary.")
     completion = client.chat.completions.create(
-        model="gpt-3.5-turbo-0125",
+        model="gpt-4o-mini",
         max_tokens=1500,
         temperature=0.125,
         messages=[
@@ -253,7 +252,7 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
             {"role": "user", "content": all_summaries}
         ]
     )
-    return json.loads(completion.choices[0].message.content)
+    return completion.choices[0].message.content
 
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                   merge_threshold=2, min_articles=3, join_percentage=0.5,
