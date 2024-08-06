@@ -15,7 +15,19 @@ def get_user_topics_summary(user):
     for topic in user.topics:
         try:
             topic_obj = Topic.objects.get(name=topic)
-            summaries.append(topic_obj.summary)
+
+            # make negative keywords into a list to iterate
+            summary = topic_obj.summary
+            negative = user.negative_keywords
+            if negative:
+                negative_list = negative.split(",")
+                summary_paragraphs = topic_obj.summary.split('\n\n')
+                filtered_paragraphs = [
+                    p for p in summary_paragraphs if not any(word.lower() in p.lower() for word in negative_list)
+                ]
+                summary = '\n\n'.join(filtered_paragraphs)     
+
+            summaries.append(summary)
             topic_list.append(topic)
         except Topic.DoesNotExist:
             print(f"Topic '{topic}' does not exist and will be skipped.")
