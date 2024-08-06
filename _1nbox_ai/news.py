@@ -314,9 +314,10 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
                        merge_threshold=2, min_articles=3, join_percentage=0.5,
                        final_merge_percentage=0.5, sentences_final_summary=3):
     for topic in Topic.objects.all():
-        process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
-                      merge_threshold, min_articles, join_percentage,
-                      final_merge_percentage, sentences_final_summary)
+        if User.objects.filter(topics__contains=topic.name).exists():
+            process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
+                          merge_threshold, min_articles, join_percentage,
+                          final_merge_percentage, sentences_final_summary)
 
 if __name__ == "__main__":
     # This block will not be executed when imported as a module
