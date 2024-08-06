@@ -59,7 +59,7 @@ def send_answer(user,answer):
     client = Client(account_sid, auth_token)
 
     try:
-        if user.messaging_app == 'SMS':
+        if user.messaging_app == 'SMS' or user.messaging_app == 'iMessage':
             message = client.messages.create(
                 to=user.phone_number,
                 messaging_service_sid=os.environ.get('TWILIO_MESSAGING_SERVICE_SID'),
