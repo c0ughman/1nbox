@@ -55,7 +55,7 @@ def format_content_variables(topics, summaries):
 
 def send_message(user, content_variables):
     try:
-        if user.messaging_app == 'SMS':
+        if user.messaging_app == 'SMS' or user.messaging_app == 'iMessage':
             message = client.messages.create(
                 content_sid=os.environ.get('TWILIO_CONTENT_SID'),
                 to=user.phone_number,
