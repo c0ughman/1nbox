@@ -7,6 +7,8 @@ class Topic(models.Model):
     sources = ArrayField(models.CharField(max_length=255), blank=True, default=list)
     cluster_summaries = models.JSONField(default=dict,blank=True, null=True)
     summary = models.TextField(blank=True, null=True)
+    questions = models.TextField(blank=True, null=True)
+    number_of_articles = models.IntegerField(default=0,blank=True, null=True)
     
     def __str__(self):
         return self.name
