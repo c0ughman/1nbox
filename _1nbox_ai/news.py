@@ -238,11 +238,14 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
 
     all_summaries = "\n\n".join(cluster_summaries)
 
-    prompt = ("You are a News Overview Summarizer. I will give you"
-             "what happened in the news today and I want you to give a direct and simple summary"
-             "for each group of events portrayed."
-             "You will mix up similar topics together to not repeat yourself."
-             f"Give me {sentences_final_summary} sentences per topic giving a full explanation of the situation")
+    prompt = ("You are a News Overview Summarizer. I will give you "
+              "what happened in the news today and I want you to give a direct and simple summary "
+              "for each group of events portrayed. "
+              "You will mix up similar topics together to not repeat yourself. "
+              f"Give me {sentences_final_summary} sentences per topic giving a full explanation of the situation. "
+              "Additionally, provide three follow-up questions that could be answered with the provided information. "
+              "Return your response as a JSON object with two fields: 'summary' and 'questions'. "
+              "The 'questions' field should be an array of three strings.")
 
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
@@ -264,6 +267,9 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
     all_articles = []
     for url in topic.sources:
         all_articles.extend(get_articles_from_rss(url, days_back))
+
+    # Count the number of articles
+    topic.number_of_articles = len(all_articles)
 
     # Extract and count significant words
     word_counts = Counter()
@@ -304,13 +310,24 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         cluster_summaries[key] = summary
 
     # Get the final summary
-    final_summary = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
+    final_summary_json = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
+    
+    try:
+        final_summary_data = json.loads(final_summary_json)
+        topic.summary = final_summary_data.get('summary', '')
+        topic.questions = '\n'.join(final_summary_data.get('questions', []))
+    except json.JSONDecodeError:
+        print(f"Error parsing JSON response for topic {topic.name}")
+        topic.summary = "Error processing summary"
+        topic.questions = "Error processing questions"
+
     print(f"SUMMARY for {topic.name}")
-    print(final_summary)
+    print(topic.summary)
+    print(f"QUESTIONS for {topic.name}")
+    print(topic.questions)
 
     # Update the Topic instance
     topic.cluster_summaries = cluster_summaries
-    topic.summary = final_summary
     topic.save()
 
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
