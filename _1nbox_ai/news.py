@@ -259,7 +259,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                   merge_threshold=2, min_articles=3, join_percentage=0.5,
                   final_merge_percentage=0.5, sentences_final_summary=3):
 
-    print(f"RUNNING PROCESS TOPIC FOR --- {topic.name}")
+    print(f"RUNNING PROCESS TOPIC FOR --- {topic.name}!!!!!")
                       
     all_articles = []
     for url in topic.sources:
