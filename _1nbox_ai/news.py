@@ -8,6 +8,7 @@ from openai import OpenAI
 from collections import Counter
 from .models import Topic, User
 import json
+import ast
 
 
 # List of insignificant words to exclude
@@ -246,6 +247,7 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
               f"Give me {sentences_final_summary} sentences per topic giving a full explanation of the situation. "
               "Additionally, provide three follow-up questions that could be answered with the provided information. "
               "Return your response as a JSON object with two fields: 'summary' and 'questions'. "
+              "The fields MUST be named 'summary' and 'questions' exactly variating from those names is prohibited."
               "The 'questions' field should be an array of three strings.")
 
     completion = client.chat.completions.create(
@@ -269,6 +271,16 @@ def extract_braces_content(s):
         
     # Include the end_index in the slice by adding 1
     return s[start_index:end_index + 1]
+
+def parse_input(input_string):
+    # Safely evaluate the string to a dictionary
+    data = ast.literal_eval(input_string)
+    
+    # Extract the summary and questions
+    summary = data.get('summary', '')
+    questions = data.get('questions', [])
+    
+    return summary, questions
 
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                   merge_threshold=2, min_articles=3, join_percentage=0.5,
@@ -326,18 +338,9 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
     print(final_summary_json)
     final_summary_json = extract_braces_content(final_summary_json)
     print(final_summary_json)
-    
-    try:
-        final_summary_data = json.loads(final_summary_json)
-        print(final_summary_data)
-        topic.summary = final_summary_data.get('summary', '')
-        print(topic.summary)
-        topic.questions = '\n'.join(final_summary_data.get('questions', []))
-        print(topic.questions)
-    except Exception as e:
-        print(e)
-        topic.summary = "Error processing summary"
-        topic.questions = "Error processing questions"
+    summary, questions = parse_input(final_summary_json)
+    topic.summary = summary
+    topic.questions = '\n'.join(questions)             
 
     print(f"SUMMARY for {topic.name}")
     print(topic.summary)
