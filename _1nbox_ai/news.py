@@ -259,6 +259,17 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
     )
     return completion.choices[0].message.content
 
+    def extract_braces_content(s):
+        start_index = s.find('{')
+        end_index = s.rfind('}')
+        
+        if start_index == -1 or end_index == -1:
+            # If there is no '{' or '}', return an empty string or handle as needed
+            return ""
+        
+        # Include the end_index in the slice by adding 1
+        return s[start_index:end_index + 1]
+
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                   merge_threshold=2, min_articles=3, join_percentage=0.5,
                   final_merge_percentage=0.5, sentences_final_summary=3):
@@ -312,6 +323,8 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
 
     # Get the final summary
     final_summary_json = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
+    print(final_summary_json)
+    final_summary_json = extract_braces_content(final_summary_json)
     print(final_summary_json)
     
     try:
