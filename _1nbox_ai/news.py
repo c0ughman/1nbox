@@ -259,16 +259,16 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
     )
     return completion.choices[0].message.content
 
-    def extract_braces_content(s):
-        start_index = s.find('{')
-        end_index = s.rfind('}')
+def extract_braces_content(s):
+    start_index = s.find('{')
+    end_index = s.rfind('}')
         
-        if start_index == -1 or end_index == -1:
-            # If there is no '{' or '}', return an empty string or handle as needed
-            return ""
+    if start_index == -1 or end_index == -1:
+        # If there is no '{' or '}', return an empty string or handle as needed
+        return ""
         
-        # Include the end_index in the slice by adding 1
-        return s[start_index:end_index + 1]
+    # Include the end_index in the slice by adding 1
+    return s[start_index:end_index + 1]
 
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                   merge_threshold=2, min_articles=3, join_percentage=0.5,
