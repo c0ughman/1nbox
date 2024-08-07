@@ -39,10 +39,10 @@ def get_user_topics_summary(user):
     summaries_str = '\n'.join(summaries)
     topics = ', '.join(topic_list)
     
-    return topics, summaries_str, total_articles, all_questions
+    return topics, summaries_str, total_articles, all_questions, len(user.topics)
 
-def format_content_variables_sms(topics, summaries, total_articles, all_questions):
-    random_questions = "\n".join(random.sample(all_questions, min(3, len(all_questions)))) if len(user.topics) > 1 else "Expand on the first story please.\nHow would this affect the global economy?\nWhat does this mean for the future?"
+def format_content_variables_sms(topics, summaries, total_articles, all_questions, topic_count):
+    random_questions = "\n".join(random.sample(all_questions, min(3, len(all_questions)))) if topic_count > 1 else "Expand on the first story please.\nHow would this affect the global economy?\nWhat does this mean for the future?"
     return {
         "1": topics,
         "2": summaries,
@@ -50,8 +50,8 @@ def format_content_variables_sms(topics, summaries, total_articles, all_question
         "4": random_questions,
     }
 
-def format_content_variables(topics, summaries, total_articles, all_questions):
-    random_questions = "\n".join(random.sample(all_questions, min(3, len(all_questions)))) if len(user.topics) > 1 else "Expand on the first story please.\nHow would this affect the global economy?\nWhat does this mean for the future?"
+def format_content_variables(topics, summaries, total_articles, all_questions, topic_count):
+    random_questions = "\n".join(random.sample(all_questions, min(3, len(all_questions)))) if topic_count > 1 else "Expand on the first story please.\nHow would this affect the global economy?\nWhat does this mean for the future?"
     return {
         "1": topics,
         "2": repr(summaries),
@@ -91,9 +91,9 @@ def send_message(user, content_variables):
 
 def send_summaries():
     for user in User.objects.all():
-        topics, summaries, total_articles, all_questions = get_user_topics_summary(user)
-        content_variables = format_content_variables(topics, summaries, total_articles, all_questions)
-        sms_content_variables = format_content_variables_sms(topics, summaries, total_articles, all_questions)
+        topics, summaries, total_articles, all_questions, topic_count = get_user_topics_summary(user)
+        content_variables = format_content_variables(topics, summaries, total_articles, all_questions, topic_count)
+        sms_content_variables = format_content_variables_sms(topics, summaries, total_articles, all_questions, topic_count)
         if user.messaging_app == "SMS":
             success, result = send_message(user, sms_content_variables)
         else:
