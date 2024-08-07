@@ -56,7 +56,7 @@ def format_content_variables(topics, summaries, total_articles, all_questions, t
         "1": topics,
         "2": repr(summaries),
         "3": str(total_articles),
-        "4": repr(random_questions),
+        "4": random_questions,
     }
 
 def send_message(user, content_variables):
