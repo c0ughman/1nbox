@@ -312,13 +312,17 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
 
     # Get the final summary
     final_summary_json = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
+    print(final_summary_json)
     
     try:
         final_summary_data = json.loads(final_summary_json)
+        print(final_summary_data)
         topic.summary = final_summary_data.get('summary', '')
+        print(topic.summary)
         topic.questions = '\n'.join(final_summary_data.get('questions', []))
-    except json.JSONDecodeError:
-        print(f"Error parsing JSON response for topic {topic.name}")
+        print(topic.questions)
+    except Exception as e:
+        print(e)
         topic.summary = "Error processing summary"
         topic.questions = "Error processing questions"
 
