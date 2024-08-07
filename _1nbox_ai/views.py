@@ -15,7 +15,6 @@ from django.conf import settings
 import stripe
 import requests
 from supabase import create_client, Client
-import json
 
 
 
