@@ -247,8 +247,9 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
               f"Give me {sentences_final_summary} sentences per topic giving a full explanation of the situation. "
               "Additionally, provide three follow-up questions that could be answered with the provided information. "
               "Return your response as a JSON object with two fields: 'summary' and 'questions'. "
-              "The fields MUST be named 'summary' and 'questions' exactly variating from those names is prohibited."
-              "The 'questions' field should be an array of three strings.")
+              "The structure should be like this {{'summary':{{'THE FULL SUMMARY'}}'questions':['question 1', 'question 2', 'question 3']}} "
+              "The fields MUST be named 'summary' and 'questions' exactly variating from those names is prohibited. Variating from the structure is prohibited"
+              "The 'questions' field should be an array of three strings. Thanks a lot.")
 
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
