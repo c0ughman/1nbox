@@ -222,7 +222,7 @@ def get_openai_response(cluster, max_tokens=4000):
                   "also, i want you to add the corresponding url next to every line you put in the summary in parentheses")
 
         completion = client.chat.completions.create(
-            model="gpt-3.5-turbo-0125",
+            model="gpt-4o-mini",
             max_tokens=1000,
             temperature=0.125,
             messages=[
@@ -252,7 +252,7 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
               "The 'questions' field should be an array of three strings. Thanks a lot.")
 
     completion = client.chat.completions.create(
-        model="gpt-3.5-turbo-0125",
+        model="gpt-4o-mini",
         max_tokens=1500,
         temperature=0.125,
         messages=[
