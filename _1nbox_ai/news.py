@@ -234,7 +234,7 @@ def get_openai_response(cluster, max_tokens=4000):
 
     return ' '.join(summaries)
 
-def get_final_summary(cluster_summaries, sentences_final_summary):
+def get_final_summary(topic, cluster_summaries, sentences_final_summary):
     openai_key = os.environ.get('OPENAI_KEY')
     client = OpenAI(api_key=openai_key)
 
@@ -244,6 +244,7 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
               "what happened in the news today and I want you to give a direct and simple summary "
               "for each group of events portrayed. "
               "You will mix up similar topics together to not repeat yourself. "
+              f"{topic.prompt}"
               f"Give me {sentences_final_summary} sentences per topic giving a full explanation of the situation. "
               "Additionally, provide three follow-up questions that could be answered with the provided information. "
               "Return your response as a JSON object with two fields: 'summary' and 'questions'. "
@@ -335,7 +336,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         cluster_summaries[key] = summary
 
     # Get the final summary
-    final_summary_json = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
+    final_summary_json = get_final_summary(topic, list(cluster_summaries.values()), sentences_final_summary)
     print(final_summary_json)
     final_summary_json = extract_braces_content(final_summary_json)
     print(final_summary_json)
