@@ -5,12 +5,10 @@ import json
 class Topic(models.Model):
     name = models.CharField(max_length=255)
     sources = ArrayField(models.CharField(max_length=255), blank=True, default=list)
-    prompt = models.TextField(blank=True, null=True)
     cluster_summaries = models.JSONField(default=dict,blank=True, null=True)
     summary = models.TextField(blank=True, null=True)
     questions = models.TextField(blank=True, null=True)
     number_of_articles = models.IntegerField(default=0,blank=True, null=True)
-    children = models.ManyToManyField('self', blank=True, related_name='parents')
 
     
     def __str__(self):
