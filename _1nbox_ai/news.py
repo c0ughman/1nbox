@@ -351,6 +351,10 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
 
     # Update the Topic instance
     topic.cluster_summaries = cluster_summaries
+    if topic.children:
+        for child in topic.children:
+            child.cluster_summaries = cluster_summaries
+            child.save
     topic.save()
 
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
