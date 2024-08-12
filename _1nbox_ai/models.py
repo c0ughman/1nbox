@@ -10,6 +10,8 @@ class Topic(models.Model):
     summary = models.TextField(blank=True, null=True)
     questions = models.TextField(blank=True, null=True)
     number_of_articles = models.IntegerField(default=0,blank=True, null=True)
+    children = models.ManyToManyField('self', blank=True, related_name='parents')
+
     
     def __str__(self):
         return self.name
