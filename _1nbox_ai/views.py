@@ -80,7 +80,7 @@ def new_user(request):
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
         
-
+@csrf_exempt
 @require_http_methods(["GET"])
 def get_user_data(request, supabase_user_id):
     try:
@@ -112,6 +112,7 @@ def get_user_data(request, supabase_user_id):
     except User.DoesNotExist:
         return JsonResponse({'error': 'User not found'}, status=404)
 
+@csrf_exempt
 @require_http_methods(["GET"])
 def get_summaries(request):
     try:
