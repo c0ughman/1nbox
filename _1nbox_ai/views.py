@@ -116,17 +116,20 @@ def get_user_data(request, supabase_user_id):
 @require_http_methods(["GET"])
 def get_summaries(request):
     try:
-        # Decode the JSON data from the request body
-        request_data = json.loads(request.body.decode('utf-8'))
+        # Get the 'topics' query parameter from the URL
+        topics = request.GET.get('topics', '')
         
+        # Split the topics string into a list
+        topic_names = topics.split(',')
+    
         # Initialize an empty dictionary to store summaries
         summaries_dict = {}
-
-        # Iterate through all Topic objects
+    
+        # Iterate through all Topic objects and check if they match any of the requested topics
         for topic in Topic.objects.all():
-            if topic.name in request_data:  # Assuming request_data is a list of topic names
+            if topic.name in topic_names:
                 summaries_dict[topic.name] = topic.summary
-
+    
         # Return the summaries as a JSON response
         return JsonResponse(summaries_dict)
 
