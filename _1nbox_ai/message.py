@@ -15,7 +15,6 @@ def get_user_topics_summary(user):
     for topic in user.topics:
         try:
             topic_obj = Topic.objects.get(name=topic)
-
             # make negative keywords into a list to iterate
             summary = topic_obj.summary
             negative = user.negative_keywords
@@ -26,31 +25,27 @@ def get_user_topics_summary(user):
                     p for p in summary_paragraphs if not any(word.lower() in p.lower() for word in negative_list)
                 ]
                 summary = '\n\n'.join(filtered_paragraphs)     
-
             summaries.append(summary)
-            topic_list.append(topic)
+            topic_list.append(topic_obj)
         except Topic.DoesNotExist:
             print(f"Topic '{topic}' does not exist and will be skipped.")
     
-    summaries_str = '\n'.join(summaries)
-    topics = ', '.join(topic_list)
-    
-    return topics, summaries_str
+    return topic_list, summaries
 
-def format_content_variables_sms(topics, summaries):
+def format_content_variables_sms(topic, summary):
     return {
-        "1": topics,
-        "2": summaries,
-        "3": "over 100",
-        "4": "Expand on the first story please.\nHow would this affect the global economy?\nWhat does this mean for the future?",
+        "1": topic.name,
+        "2": summary,
+        "3": str(topic.number_of_articles),
+        "4": topic.questions,
     }
 
-def format_content_variables(topics, summaries):
+def format_content_variables(topic, summary):
     return {
-        "1": topics,
-        "2": repr(summaries),
-        "3": "over 100",
-        "4": r"Expand on the first story please.\nHow would this affect the global economy?\nWhat does this mean for the future?",
+        "1": topic.name,
+        "2": repr(summary),
+        "3": str(topic.number_of_articles),
+        "4": repr(topic.questions),
     }
 
 def send_message(user, content_variables):
@@ -86,15 +81,14 @@ def send_message(user, content_variables):
 def send_summaries():
     for user in User.objects.all():
         topics, summaries = get_user_topics_summary(user)
-        content_variables = format_content_variables(topics, summaries)
-        sms_content_variables = format_content_variables_sms(topics, summaries)
-
-        if user.messaging_app == "SMS":
-            success, result = send_message(user, sms_content_variables)
-        else:
+        for topic, summary in zip(topics, summaries):
+            if user.messaging_app == "SMS":
+                content_variables = format_content_variables_sms(topic, summary)
+            else:
+                content_variables = format_content_variables(topic, summary)
+            
             success, result = send_message(user, content_variables)
-
-        if success:
-            print(f"Message sent to {user.email} via {user.messaging_app}. SID: {result}")
-        else:
-            print(f"Failed to send message to {user.email}. Error: {result}")
+            if success:
+                print(f"Message sent to {user.email} for topic {topic.name} via {user.messaging_app}. SID: {result}")
+            else:
+                print(f"Failed to send message to {user.email} for topic {topic.name}. Error: {result}")
