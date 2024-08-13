@@ -36,7 +36,7 @@ def format_content_variables(topic, summary):
     return {
         "1": topic.name,
         "2": repr(summary).replace("\\\'","'").replace('"','').replace("/","").replace("\\r","").replace("\\n","\n").replace("*","").replace("{","").replace("}","").replace("(","").replace(")","").replace("[","").replace("]",""),
-        "3": repr(topic.number_of_articles),
+        "3": str(topic.number_of_articles),
         "4": repr(topic.questions).replace("\\\'","'").replace('"','').replace("/","").replace("\\r","").replace("\\n","\n").replace("*","").replace("{","").replace("}","").replace("(","").replace(")","").replace("[","").replace("]",""),
     }
 
