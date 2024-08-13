@@ -112,6 +112,29 @@ def get_user_data(request, supabase_user_id):
     except User.DoesNotExist:
         return JsonResponse({'error': 'User not found'}, status=404)
 
+@require_http_methods(["GET"])
+def get_summaries(request):
+    try:
+        # Decode the JSON data from the request body
+        request_data = json.loads(request.body.decode('utf-8'))
+        
+        # Initialize an empty dictionary to store summaries
+        summaries_dict = {}
+
+        # Iterate through all Topic objects
+        for topic in Topic.objects.all():
+            if topic.name in request_data:  # Assuming request_data is a list of topic names
+                summaries_dict[topic.name] = topic.summary
+
+        # Return the summaries as a JSON response
+        return JsonResponse(summaries_dict)
+
+    except json.JSONDecodeError:
+        # Handle JSON decoding errors
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+
+
 @csrf_exempt
 def update_user_data(request):
     try:
