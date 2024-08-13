@@ -35,9 +35,9 @@ def get_user_topics_summary(user):
 def format_content_variables(topic, summary):
     return {
         "1": topic.name,
-        "2": repr(summary).replace("\\\'","'").replace('"','').replace("/","").replace("\\r","").replace("\\n","\n").replace("*",""),
+        "2": repr(summary).replace("\\\'","'").replace('"','').replace("/","").replace("\\r","").replace("\\n","\n").replace("*","").replace("{","").replace("}","").replace("(","").replace(")","").replace("[","").replace("]",""),
         "3": repr(topic.number_of_articles),
-        "4": repr(topic.questions).replace("\\\'","'").replace('"','').replace("/","").replace("\\r","").replace("\\n","\n").replace("*",""),
+        "4": repr(topic.questions).replace("\\\'","'").replace('"','').replace("/","").replace("\\r","").replace("\\n","\n").replace("*","").replace("{","").replace("}","").replace("(","").replace(")","").replace("[","").replace("]",""),
     }
 
 def send_message(user, content_variables):
