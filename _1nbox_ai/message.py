@@ -10,52 +10,39 @@ account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
 auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
 client = Client(account_sid, auth_token)
 
-def get_user_topics_summary(user):
-    summaries = []
-    topic_list = []
-    total_articles = 0
-    all_questions = []
+def get_topic_summary(user, topic):
+    try:
+        topic_obj = Topic.objects.get(name=topic)
+        summary = topic_obj.summary
+        negative = user.negative_keywords
+        if negative:
+            negative_list = negative.split(",")
+            summary_paragraphs = summary.split('\n\n')
+            filtered_paragraphs = [
+                p for p in summary_paragraphs if not any(word.lower() in p.lower() for word in negative_list)
+            ]
+            summary = '\n\n'.join(filtered_paragraphs)     
+        questions = topic_obj.questions.split('\n')
+        return summary, topic_obj.number_of_articles, questions
+    except Topic.DoesNotExist:
+        print(f"Topic '{topic}' does not exist and will be skipped.")
+        return None, 0, []
 
-    for topic in user.topics:
-        try:
-            topic_obj = Topic.objects.get(name=topic)
-            # make negative keywords into a list to iterate
-            summary = topic_obj.summary
-            negative = user.negative_keywords
-            if negative:
-                negative_list = negative.split(",")
-                summary_paragraphs = topic_obj.summary.split('\n\n')
-                filtered_paragraphs = [
-                    p for p in summary_paragraphs if not any(word.lower() in p.lower() for word in negative_list)
-                ]
-                summary = '\n\n'.join(filtered_paragraphs)     
-            summaries.append(summary)
-            topic_list.append(topic)
-            total_articles += topic_obj.number_of_articles
-            all_questions.extend(topic_obj.questions.split('\n'))
-        except Topic.DoesNotExist:
-            print(f"Topic '{topic}' does not exist and will be skipped.")
-    
-    summaries_str = '\n'.join(summaries)
-    topics = ', '.join(topic_list)
-    
-    return topics, summaries_str, total_articles, all_questions, len(user.topics)
-
-def format_content_variables_sms(topics, summaries, total_articles, all_questions, topic_count):
-    random_questions = "\n".join(random.sample(all_questions, min(3, len(all_questions)))) if topic_count > 1 else "Expand on the first story please.\nHow would this affect the global economy?\nWhat does this mean for the future?"
+def format_content_variables(topic, summary, articles, questions):
+    random_questions = "\n".join(random.sample(questions, min(3, len(questions)))) if questions else "Expand on the story please.\nHow would this affect the global economy?\nWhat does this mean for the future?"
     return {
-        "1": topics,
-        "2": summaries,
-        "3": str(total_articles),
+        "1": topic,
+        "2": repr(summary),
+        "3": str(articles),
         "4": random_questions,
     }
 
-def format_content_variables(topics, summaries, total_articles, all_questions, topic_count):
-    random_questions = "\n".join(random.sample(all_questions, min(3, len(all_questions)))) if topic_count > 1 else "Expand on the first story please.\nHow would this affect the global economy?\nWhat does this mean for the future?"
+def format_content_variables_sms(topic, summary, articles, questions):
+    random_questions = "\n".join(random.sample(questions, min(3, len(questions)))) if questions else "Expand on the story please.\nHow would this affect the global economy?\nWhat does this mean for the future?"
     return {
-        "1": topics,
-        "2": repr(summaries),
-        "3": str(total_articles),
+        "1": topic,
+        "2": summary,
+        "3": str(articles),
         "4": random_questions,
     }
 
@@ -91,14 +78,20 @@ def send_message(user, content_variables):
 
 def send_summaries():
     for user in User.objects.all():
-        topics, summaries, total_articles, all_questions, topic_count = get_user_topics_summary(user)
-        content_variables = format_content_variables(topics, summaries, total_articles, all_questions, topic_count)
-        sms_content_variables = format_content_variables_sms(topics, summaries, total_articles, all_questions, topic_count)
-        if user.messaging_app == "SMS":
-            success, result = send_message(user, sms_content_variables)
-        else:
-            success, result = send_message(user, content_variables)
-        if success:
-            print(f"Message sent to {user.email} via {user.messaging_app}. SID: {result}")
-        else:
-            print(f"Failed to send message to {user.email}. Error: {result}")
+        for topic in user.topics:
+            summary, articles, questions = get_topic_summary(user, topic)
+            if summary is None:
+                continue  # Skip this topic if it doesn't exist
+            
+            content_variables = format_content_variables(topic, summary, articles, questions)
+            sms_content_variables = format_content_variables_sms(topic, summary, articles, questions)
+            
+            if user.messaging_app == "SMS":
+                success, result = send_message(user, sms_content_variables)
+            else:
+                success, result = send_message(user, content_variables)
+            
+            if success:
+                print(f"Message sent to {user.email} for topic '{topic}' via {user.messaging_app}. SID: {result}")
+            else:
+                print(f"Failed to send message to {user.email} for topic '{topic}'. Error: {result}")
