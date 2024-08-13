@@ -15,18 +15,18 @@ def get_user_topics_summary(user):
     for topic in user.topics:
         try:
             topic_obj = Topic.objects.get(name=topic)
+            # make negative keywords into a list to iterate
             summary = topic_obj.summary
             negative = user.negative_keywords
             if negative:
                 negative_list = negative.split(",")
-                summary_paragraphs = summary.split('\n\n')
+                summary_paragraphs = topic_obj.summary.split('\n\n')
                 filtered_paragraphs = [
                     p for p in summary_paragraphs if not any(word.lower() in p.lower() for word in negative_list)
                 ]
                 summary = '\n\n'.join(filtered_paragraphs)     
-            if summary:  # Only append if summary is not empty
-                summaries.append(summary)
-                topic_list.append(topic_obj)
+            summaries.append(summary)
+            topic_list.append(topic_obj)
         except Topic.DoesNotExist:
             print(f"Topic '{topic}' does not exist and will be skipped.")
     
@@ -37,7 +37,7 @@ def format_content_variables(topic, summary):
         "1": topic.name,
         "2": summary,
         "3": str(topic.number_of_articles),
-        "4": topic.questions if topic.questions else "No questions available.",
+        "4": topic.questions,
     }
 
 def send_message(user, content_variables):
@@ -74,7 +74,11 @@ def send_summaries():
     for user in User.objects.all():
         topics, summaries = get_user_topics_summary(user)
         for topic, summary in zip(topics, summaries):
-            content_variables = format_content_variables(topic, summary)
+            if user.messaging_app == "SMS":
+                content_variables = format_content_variables(topic, summary)
+            else:
+                content_variables = format_content_variables(topic, summary)
+            
             success, result = send_message(user, content_variables)
             if success:
                 print(f"Message sent to {user.email} for topic {topic.name} via {user.messaging_app}. SID: {result}")
