@@ -31,10 +31,10 @@ def get_topic_summary(user, topic):
 def format_content_variables(topic, summary, articles, questions):
     random_questions = "\n".join(random.sample(questions, min(3, len(questions)))) if questions else "Expand on the story please.\nHow would this affect the global economy?\nWhat does this mean for the future?"
     return {
-        "1": topic,
-        "2": repr(summary),
-        "3": str(articles),
-        "4": random_questions,
+        "1": str(topic) if topic is not None else "",
+        "2": str(summary) if summary is not None else "",
+        "3": str(articles) if articles is not None else "0",
+        "4": str(random_questions) if random_questions is not None else "",
     }
 
 def format_content_variables_sms(topic, summary, articles, questions):
