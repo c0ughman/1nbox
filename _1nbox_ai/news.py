@@ -295,73 +295,102 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                   final_merge_percentage=0.5, sentences_final_summary=3):
 
     print(f"RUNNING PROCESS TOPIC FOR --- {topic.name}!!!!!")
-                      
-    all_articles = []
-    for url in topic.sources:
-        all_articles.extend(get_articles_from_rss(url, days_back))
 
-    # Count the number of articles
-    topic.number_of_articles = len(all_articles)
+    if topic.sources:                  
+        all_articles = []
+        for url in topic.sources:
+            all_articles.extend(get_articles_from_rss(url, days_back))
+    
+        # Count the number of articles
+        topic.number_of_articles = len(all_articles)
+    
+        # Extract and count significant words
+        word_counts = Counter()
+        for article in all_articles:
+            title_words = extract_significant_words(article['title'])
+            content_words = extract_significant_words(article['content'])
+            article['significant_words'] = title_words + [w for w in content_words if w not in title_words]
+            word_counts.update(article['significant_words'])
+    
+        # Sort words by rarity for each article
+        for article in all_articles:
+            article['significant_words'] = sort_words_by_rarity(article['significant_words'], word_counts)
+    
+        # Cluster articles
+        clusters = cluster_articles(all_articles, common_word_threshold, top_words_to_consider)
+    
+        # Merge clusters based on merge_threshold
+        merged_clusters = merge_clusters(clusters, merge_threshold)
+    
+        # Apply minimum articles per cluster and reassign miscellaneous articles
+        clusters_with_min_articles = apply_minimum_articles_and_reassign(merged_clusters, min_articles, join_percentage)
+    
+        # Merge clusters based on join_percentage
+        final_clusters = merge_clusters_by_percentage(clusters_with_min_articles, final_merge_percentage)
+    
+        # Print the clusters
+        print_clusters(final_clusters)
+    
+        # Get OpenAI summaries for each cluster
+        cluster_summaries = {}
+        for cluster in final_clusters:
+            key = ' '.join([word.capitalize() for word in cluster['common_words']])
+            summary = get_openai_response(cluster)
+            print(summary)
+            print("                       ")
+            print("                       ")
+            print("                       ")
+            cluster_summaries[key] = summary
+    
+        # Get the final summary
+        final_summary_json = get_final_summary(topic, list(cluster_summaries.values()), sentences_final_summary)
+        print(final_summary_json)
+        final_summary_json = extract_braces_content(final_summary_json)
+        print(final_summary_json)
+        summary, questions = parse_input(final_summary_json)
+        topic.summary = summary
+        topic.questions = '\n'.join(questions)             
+    
+        print(f"SUMMARY for {topic.name}")
+        print(topic.summary)
+        print(f"QUESTIONS for {topic.name}")
+        print(topic.questions)
+    
+        # Update the Topic instance
+        topic.cluster_summaries = cluster_summaries
+        if topic.children.exists():
+            
+            for child in topic.children.all():
+                
+                child.cluster_summaries = cluster_summaries
+                child.save()
+                
+        topic.save()
+        
+    else:
+        
+        if topic.cluster_summaries:
+            
+            final_summary_json = get_final_summary(topic, topic.cluster_summaries, sentences_final_summary)
 
-    # Extract and count significant words
-    word_counts = Counter()
-    for article in all_articles:
-        title_words = extract_significant_words(article['title'])
-        content_words = extract_significant_words(article['content'])
-        article['significant_words'] = title_words + [w for w in content_words if w not in title_words]
-        word_counts.update(article['significant_words'])
+            print(final_summary_json)
+            final_summary_json = extract_braces_content(final_summary_json)
+            print(final_summary_json)
+            summary, questions = parse_input(final_summary_json)
+            topic.summary = summary
+            topic.questions = '\n'.join(questions)             
+        
+            print(f"SUMMARY for {topic.name}")
+            print(topic.summary)
+            print(f"QUESTIONS for {topic.name}")
+            print(topic.questions)
 
-    # Sort words by rarity for each article
-    for article in all_articles:
-        article['significant_words'] = sort_words_by_rarity(article['significant_words'], word_counts)
+            # Update the Topic instance
+            topic.save()
 
-    # Cluster articles
-    clusters = cluster_articles(all_articles, common_word_threshold, top_words_to_consider)
-
-    # Merge clusters based on merge_threshold
-    merged_clusters = merge_clusters(clusters, merge_threshold)
-
-    # Apply minimum articles per cluster and reassign miscellaneous articles
-    clusters_with_min_articles = apply_minimum_articles_and_reassign(merged_clusters, min_articles, join_percentage)
-
-    # Merge clusters based on join_percentage
-    final_clusters = merge_clusters_by_percentage(clusters_with_min_articles, final_merge_percentage)
-
-    # Print the clusters
-    print_clusters(final_clusters)
-
-    # Get OpenAI summaries for each cluster
-    cluster_summaries = {}
-    for cluster in final_clusters:
-        key = ' '.join([word.capitalize() for word in cluster['common_words']])
-        summary = get_openai_response(cluster)
-        print(summary)
-        print("                       ")
-        print("                       ")
-        print("                       ")
-        cluster_summaries[key] = summary
-
-    # Get the final summary
-    final_summary_json = get_final_summary(topic, list(cluster_summaries.values()), sentences_final_summary)
-    print(final_summary_json)
-    final_summary_json = extract_braces_content(final_summary_json)
-    print(final_summary_json)
-    summary, questions = parse_input(final_summary_json)
-    topic.summary = summary
-    topic.questions = '\n'.join(questions)             
-
-    print(f"SUMMARY for {topic.name}")
-    print(topic.summary)
-    print(f"QUESTIONS for {topic.name}")
-    print(topic.questions)
-
-    # Update the Topic instance
-    topic.cluster_summaries = cluster_summaries
-    if topic.children.exists():
-        for child in topic.children.all():
-            child.cluster_summaries = cluster_summaries
-            child.save()
-    topic.save()
+            else:
+                
+                print("!!OJO!! - No sources and no cluster summaries")
 
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                        merge_threshold=2, min_articles=3, join_percentage=0.5,
