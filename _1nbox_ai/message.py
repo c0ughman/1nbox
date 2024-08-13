@@ -54,7 +54,7 @@ def format_content_variables(topics, summaries, total_articles, all_questions, t
     random_questions = "\n".join(random.sample(all_questions, min(3, len(all_questions)))) if topic_count > 1 else "Expand on the first story please.\nHow would this affect the global economy?\nWhat does this mean for the future?"
     return {
         "1": topics,
-        "2": repr(summaries),
+        "2": summaries,
         "3": str(total_articles),
         "4": random_questions,
     }
