@@ -39,9 +39,8 @@ def new_lead(request):
             print("Full request data:", request_data)
             phone_number = request_data.get('phone_number')
             messaging_app = request_data.get('messaging_app')
-            topics = request_data.get('topics')
-            for topic in topics:
-                topic.replace("\n", "")
+            topics = [topic.replace("\n", "") for topic in request_data.get('topics', [])]
+
             print(f"Extracted data: phone={phone_number}, app={messaging_app}, topics={topics}")
             
             try:
