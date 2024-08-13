@@ -35,17 +35,9 @@ def get_user_topics_summary(user):
 def format_content_variables(topic, summary):
     return {
         "1": topic.name,
-        "2": str(summary),
-        "3": str(topic.number_of_articles),
-        "4": str(topic.questions),
-    }
-
-def repr_content_variables(topic, summary):
-    return {
-        "1": topic.name,
-        "2": repr(summary),
+        "2": repr(summary).replace("\\\'","'").replace('"','').replace("/","").replace("\\r","").replace("\\n","\n").replace("*",""),
         "3": repr(topic.number_of_articles),
-        "4": repr(topic.questions),
+        "4": repr(topic.questions).replace("\\\'","'").replace('"','').replace("/","").replace("\\r","").replace("\\n","\n").replace("*",""),
     }
 
 def send_message(user, content_variables):
@@ -82,12 +74,8 @@ def send_summaries():
     for user in User.objects.all():
         topics, summaries = get_user_topics_summary(user)
         for topic, summary in zip(topics, summaries):
-            
             content_variables = format_content_variables(topic, summary)
-            
             print(content_variables)
-            print(repr_content_variables(topic, summary))
-            
             success, result = send_message(user, content_variables)
             if success:
                 print(f"Message sent to {user.email} for topic {topic.name} via {user.messaging_app}. SID: {result}")
