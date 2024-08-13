@@ -40,6 +40,14 @@ def format_content_variables(topic, summary):
         "4": str(topic.questions),
     }
 
+def repr_content_variables(topic, summary):
+    return {
+        "1": topic.name,
+        "2": repr(summary),
+        "3": repr(topic.number_of_articles),
+        "4": repr(topic.questions),
+    }
+
 def send_message(user, content_variables):
     try:
         if user.messaging_app == 'SMS' or user.messaging_app == 'iMessage':
@@ -74,10 +82,11 @@ def send_summaries():
     for user in User.objects.all():
         topics, summaries = get_user_topics_summary(user)
         for topic, summary in zip(topics, summaries):
-            if user.messaging_app == "SMS":
-                content_variables = format_content_variables(topic, summary)
-            else:
-                content_variables = format_content_variables(topic, summary)
+            
+            content_variables = format_content_variables(topic, summary)
+            
+            print(content_variables)
+            print(repr_content_variables(topic, summary))
             
             success, result = send_message(user, content_variables)
             if success:
