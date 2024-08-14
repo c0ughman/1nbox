@@ -41,8 +41,8 @@ def generate_answer(from_number, body):
             max_tokens=1000,
             temperature=0.125,
             messages=[
-            {"role": "system", "content": "You are a news assistant. Use the provided information to answer the question concisely."},
-            {"role": "user", "content": f"Information: {general_list}\nThis is what the user received: {summaries}\nQuestion: {body}\n\nProvide a short and concise answer. and refer to one article that has more information on the topic by refering a link"}
+            {"role": "system", "content": "You are a news assistant. Use the provided information to answer the question concisely. If you don't have the answer to the question in the provided information, say you cant answer the question."},
+            {"role": "user", "content": f"Information: {general_list}\nThis is what the user received: {summaries}\nQuestion: {body}\n\nProvide a short and concise answer. and refer to one article that has more information on the topic by refering a link, if there is no article that can help, dont provide a link."}
             ]
         )
     
