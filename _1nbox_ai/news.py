@@ -365,7 +365,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             for child in topic.children.all():
                 
                 child.cluster_summaries = cluster_summaries
-                child.number_of_articles = number_of_articles
+                child.number_of_articles = topic.number_of_articles
                 child.save()
                 
         topic.save()
