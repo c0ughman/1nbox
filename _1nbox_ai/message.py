@@ -41,12 +41,12 @@ def format_content_variables_sms(topic, summary):
     }
 
 def format_content_variables(topic, summary):
-    # Replace \r with nothing, and then remove any remaining backslashes except those followed by 'n'
-    clean_summary = repr(summary).replace("\\r", "").replace("\\\\", "\\")
+    # Replace \r with nothing, reduce double backslashes to single backslash, and fix escaped apostrophes
+    clean_summary = repr(summary).replace("\\r", "").replace("\\\\", "\\").replace("\\'", "'")
     clean_summary = clean_summary[1:-1]  # Remove the first and last character
     clean_summary = clean_summary.replace("{", "").replace("}", "").replace('"', '').replace("*", "")
     
-    clean_questions = repr(topic.questions).replace("\\r", "").replace("\\\\", "\\")
+    clean_questions = repr(topic.questions).replace("\\r", "").replace("\\\\", "\\").replace("\\'", "'")
     clean_questions = clean_questions.replace("{", "").replace("}", "").replace('"', '').replace("*", "")
     
     return {
