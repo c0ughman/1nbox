@@ -363,6 +363,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             for child in topic.children.all():
                 
                 child.cluster_summaries = cluster_summaries
+                child.number_of_articles = number_of_articles
                 child.save()
                 
         topic.save()
@@ -394,7 +395,15 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                        merge_threshold=2, min_articles=3, join_percentage=0.5,
                        final_merge_percentage=0.5, sentences_final_summary=3):
-    for topic in Topic.objects.all():
+    # Get topics with children first
+    topics_with_children = Topic.objects.filter(children__isnull=False).distinct()
+    # Get topics without children
+    topics_without_children = Topic.objects.filter(children__isnull=True)
+
+    # Combine the two querysets, topics with children first
+    all_topics = list(topics_with_children) + list(topics_without_children)
+
+    for topic in all_topics:
         if User.objects.filter(topics__contains=topic.name).exists():
             process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
                           merge_threshold, min_articles, join_percentage,
