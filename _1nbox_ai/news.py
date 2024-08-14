@@ -258,7 +258,7 @@ def get_final_summary(topic, cluster_summaries, sentences_final_summary):
               "Return your response as a JSON object with two fields: 'summary' and 'questions'. "
               "The structure should be like this {'summary':The full summary as a formatted text, not a dictionary but a text with titles and line breaks,'questions':['question 1', 'question 2', 'question 3']} "
               "The fields MUST be named 'summary' and 'questions' exactly variating from those names is prohibited. Variating from the structure is prohibited"
-              "The 'questions' field should be an array of three strings. Thanks a lot.")
+              "The 'questions' field should be an array of three strings. IMPORTANT: Be concise to fit within token limits. Thanks a lot.")
 
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
