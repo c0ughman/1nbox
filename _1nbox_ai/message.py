@@ -41,11 +41,19 @@ def format_content_variables_sms(topic, summary):
     }
 
 def format_content_variables(topic, summary):
+    # Remove any occurrences of backslashes followed by 'r' and then remove all other backslashes
+    clean_summary = repr(summary).replace(r"\\r", "").replace("\\", "")
+    clean_summary = clean_summary[1:-1]  # Remove the first and last character
+    clean_summary = clean_summary.replace("{","").replace("}","").replace('"','').replace("*","")
+    
+    clean_questions = repr(topic.questions).replace(r"\\r", "").replace("\\", "")
+    clean_questions = clean_questions.replace("{","").replace("}","").replace('"','').replace("*","")
+    
     return {
         "1": topic.name,
-        "2": repr(summary).replace("{","").replace("}","").replace('"','').replace("*","").replace("\r",""),
+        "2": clean_summary,
         "3": str(topic.number_of_articles),
-        "4": repr(topic.questions).replace("{","").replace("}","").replace('"','').replace("*","").replace("\r",""),
+        "4": clean_questions,
     }
 
 def send_message(user, content_variables):
@@ -86,6 +94,7 @@ def send_summaries():
                 content_variables = format_content_variables_sms(topic, summary)
             else:
                 content_variables = format_content_variables(topic, summary)
+                print(content_variables)
             
             success, result = send_message(user, content_variables)
             if success:
