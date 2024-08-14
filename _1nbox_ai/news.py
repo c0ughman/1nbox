@@ -388,9 +388,8 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             # Update the Topic instance
             topic.save()
 
-            else:
-                
-                print("!!OJO!! - No sources and no cluster summaries")
+        else: 
+            print("!!OJO!! - No sources and no cluster summaries")
 
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                        merge_threshold=2, min_articles=3, join_percentage=0.5,
