@@ -225,7 +225,9 @@ def get_openai_response(cluster, max_tokens=4000):
         prompt = ("You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
                   "all the facts from each of the articles in a small but fact-dense summary "
                   "including all the dates, names and key factors to provide full context on the events."
-                  "also, i want you to add the corresponding url next to every line you put in the summary in parentheses")
+                  "also, i want you to add the corresponding url next to every line you put in the summary in parentheses"
+                  "Finally, It is required to add a general summary of the cluster with 3-4 sentences about"
+                  "what is happening, the context and the overall big picture of the events in the articles. ")
 
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -254,7 +256,7 @@ def get_final_summary(topic, cluster_summaries, sentences_final_summary):
               f"Give me {sentences_final_summary} sentences per topic giving a full explanation of the situation. "
               "Additionally, provide three follow-up questions that could be answered with the provided information. "
               "Return your response as a JSON object with two fields: 'summary' and 'questions'. "
-              "The structure should be like this {{'summary':{{'the full summary as a formatted text, not a dictionary but a text with titles and line breaks'}}'questions':['question 1', 'question 2', 'question 3']}} "
+              "The structure should be like this {'summary':The full summary as a formatted text, not a dictionary but a text with titles and line breaks,'questions':['question 1', 'question 2', 'question 3']} "
               "The fields MUST be named 'summary' and 'questions' exactly variating from those names is prohibited. Variating from the structure is prohibited"
               "The 'questions' field should be an array of three strings. Thanks a lot.")
 
