@@ -42,7 +42,7 @@ def format_content_variables_sms(topic, summary):
 
 def format_content_variables(topic, summary):
     # Clean the summary and questions as before
-    clean_summary = repr(summary).replace("\\r", "").replace("\\\\", "\\").replace("\\'", "'")
+    clean_summary = repr(summary).replace("\\r", "").replace("\\\\", "\\").replace("\\'", "'").replace("#", "")
     clean_summary = clean_summary[1:-1]  # Remove the first and last character
     clean_summary = clean_summary.replace("{", "").replace("}", "").replace('"', '').replace("*", "")
     
@@ -121,9 +121,10 @@ def send_summaries():
             else:
                 content_variables_list = format_content_variables(topic, summary)
             
-            for content_variables in content_variables_list:
+            for i, content_variables in enumerate(content_variables_list):
                 success, result = send_message(user, content_variables)
                 if success:
-                    print(f"Message sent to {user.email} for topic {topic.name} via {user.messaging_app}. SID: {result}")
+                    part_info = f" (Part {i+1}/{len(content_variables_list)})" if len(content_variables_list) > 1 else ""
+                    print(f"Message sent to {user.email} for topic {topic.name}{part_info} via {user.messaging_app}. SID: {result}")
                 else:
                     print(f"Failed to send message to {user.email} for topic {topic.name}. Error: {result}")
