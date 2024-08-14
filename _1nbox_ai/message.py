@@ -41,7 +41,7 @@ def format_content_variables_sms(topic, summary):
     }
 
 def format_content_variables(topic, summary):
-    # Replace \r with nothing, reduce double backslashes to single backslash, and fix escaped apostrophes
+    # Clean the summary and questions as before
     clean_summary = repr(summary).replace("\\r", "").replace("\\\\", "\\").replace("\\'", "'")
     clean_summary = clean_summary[1:-1]  # Remove the first and last character
     clean_summary = clean_summary.replace("{", "").replace("}", "").replace('"', '').replace("*", "")
@@ -49,12 +49,38 @@ def format_content_variables(topic, summary):
     clean_questions = repr(topic.questions).replace("\\r", "").replace("\\\\", "\\").replace("\\'", "'")
     clean_questions = clean_questions.replace("{", "").replace("}", "").replace('"', '').replace("*", "")
     
-    return {
-        "1": topic.name,
-        "2": clean_summary,
-        "3": str(topic.number_of_articles),
-        "4": clean_questions,
-    }
+    # Split the summary if it exceeds 1200 characters
+    if len(clean_summary) > 1200:
+        split_index = clean_summary.rfind('\n\n', 0, 1200)
+        if split_index == -1:
+            split_index = clean_summary.rfind('\n', 0, 1200)
+        if split_index == -1:
+            split_index = 1200
+        
+        part1 = f"(1/2) {clean_summary[:split_index].strip()}"
+        part2 = f"(2/2) {clean_summary[split_index:].strip()}"
+        
+        return [
+            {
+                "1": topic.name,
+                "2": part1,
+                "3": str(topic.number_of_articles),
+                "4": clean_questions,
+            },
+            {
+                "1": topic.name,
+                "2": part2,
+                "3": str(topic.number_of_articles),
+                "4": clean_questions,
+            }
+        ]
+    else:
+        return [{
+            "1": topic.name,
+            "2": clean_summary,
+            "3": str(topic.number_of_articles),
+            "4": clean_questions,
+        }]
 
 def send_message(user, content_variables):
     try:
@@ -91,13 +117,13 @@ def send_summaries():
         topics, summaries = get_user_topics_summary(user)
         for topic, summary in zip(topics, summaries):
             if user.messaging_app == "SMS":
-                content_variables = format_content_variables_sms(topic, summary)
+                content_variables_list = format_content_variables_sms(topic, summary)
             else:
-                content_variables = format_content_variables(topic, summary)
-                print(content_variables)
+                content_variables_list = format_content_variables(topic, summary)
             
-            success, result = send_message(user, content_variables)
-            if success:
-                print(f"Message sent to {user.email} for topic {topic.name} via {user.messaging_app}. SID: {result}")
-            else:
-                print(f"Failed to send message to {user.email} for topic {topic.name}. Error: {result}")
+            for content_variables in content_variables_list:
+                success, result = send_message(user, content_variables)
+                if success:
+                    print(f"Message sent to {user.email} for topic {topic.name} via {user.messaging_app}. SID: {result}")
+                else:
+                    print(f"Failed to send message to {user.email} for topic {topic.name}. Error: {result}")
