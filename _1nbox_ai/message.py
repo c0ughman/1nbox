@@ -32,6 +32,14 @@ def get_user_topics_summary(user):
     
     return topic_list, summaries
 
+def format_content_variables_sms(topic, summary):
+    return {
+        "1": topic.name,
+        "2": summary,
+        "3": str(topic.number_of_articles),
+        "4": topic.questions,
+    }
+
 def format_content_variables(topic, summary):
     return {
         "1": topic.name,
@@ -74,8 +82,11 @@ def send_summaries():
     for user in User.objects.all():
         topics, summaries = get_user_topics_summary(user)
         for topic, summary in zip(topics, summaries):
-            content_variables = format_content_variables(topic, summary)
-            print(content_variables)
+            if user.messaging_app == "SMS":
+                content_variables = format_content_variables_sms(topic, summary)
+            else:
+                content_variables = format_content_variables(topic, summary)
+            
             success, result = send_message(user, content_variables)
             if success:
                 print(f"Message sent to {user.email} for topic {topic.name} via {user.messaging_app}. SID: {result}")
