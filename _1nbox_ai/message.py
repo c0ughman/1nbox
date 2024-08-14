@@ -43,9 +43,9 @@ def format_content_variables_sms(topic, summary):
 def format_content_variables(topic, summary):
     return {
         "1": topic.name,
-        "2": repr(summary),
+        "2": str(summary),
         "3": str(topic.number_of_articles),
-        "4": repr(topic.questions),
+        "4": str(topic.questions),
     }
 
 def send_message(user, content_variables):
