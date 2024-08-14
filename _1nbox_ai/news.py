@@ -262,7 +262,7 @@ def get_final_summary(topic, cluster_summaries, sentences_final_summary):
 
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
-        max_tokens=300,
+        max_tokens=900,
         temperature=0.125,
         messages=[
             {"role": "system", "content": prompt},
