@@ -374,7 +374,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         
         if topic.cluster_summaries:
             
-            final_summary_json = get_final_summary(topic, topic.cluster_summaries, sentences_final_summary)
+            final_summary_json = get_final_summary(topic, str(topic.cluster_summaries), sentences_final_summary)
 
             print(final_summary_json)
             final_summary_json = extract_braces_content(final_summary_json)
