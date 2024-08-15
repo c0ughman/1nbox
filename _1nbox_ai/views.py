@@ -15,6 +15,7 @@ from django.conf import settings
 import stripe
 import requests
 from supabase import create_client, Client
+import time
 
 
 
@@ -44,7 +45,7 @@ def new_lead(request):
             print(f"Extracted data: phone={phone_number}, app={messaging_app}, topics={topics}")
             
             try:
-                new_user = User.objects.create(phone_number=phone_number, topics=topics, messaging_app=messaging_app)
+                new_user = User.objects.create(phone_number=phone_number, topics=topics, messaging_app=messaging_app, days_since=int(time.time()))
                 print(f"User created: {new_user.id}")
                 return JsonResponse({'success': True, 'user_id': new_user.id}, status=200)
             except Exception as e:
@@ -208,6 +209,7 @@ def sign_up(request):
                 user.messaging_app = messaging_app
                 user.email = email
                 user.supabase_user_id = user_id
+                user.days_since = int(time.time())
                 user.save()
                 print(f"New user created: {user.id}")
                 return JsonResponse({'success': True, 'user_id': user.id, 'message': 'User created successfully'}, status=201)
