@@ -410,6 +410,13 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
             process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
                           merge_threshold, min_articles, join_percentage,
                           final_merge_percentage, sentences_final_summary)
+        else:
+            for child in topic.children.all():
+                if User.objects.filter(topics__contains=child.name).exists():
+                    process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
+                          merge_threshold, min_articles, join_percentage,
+                          final_merge_percentage, sentences_final_summary)
+                
 
 if __name__ == "__main__":
     # This block will not be executed when imported as a module
