@@ -454,21 +454,43 @@ def create_checkout_session(request):
             metadata={'user_id': user_id}
         )
 
-        checkout_session = stripe.checkout.Session.create(
-            customer=customer.id,
-            client_reference_id=user_id,
-            payment_method_types=['card'],
-            line_items=[{
-                'price': 'price_1PYv2KCHpOkAgMGGyv0S3LW8', #basic price ID
+        # Get the discount code from the request if available
+        discount_code = request.GET.get('discount_code')
+
+        # Initialize the discount ID to None
+        promotion_code = None
+
+        # Map the discount code to the promotion code ID
+        if discount_code == 'MISSME':
+            promotion_code = 'promo_1PoSDeCHpOkAgMGGDLEuvTM7'
+
+        # Create the checkout session, including the discount if available
+        checkout_session_params = {
+            'customer': customer.id,
+            'client_reference_id': user_id,
+            'payment_method_types': ['card'],
+            'line_items': [{
+                'price': 'price_1PYv2KCHpOkAgMGGyv0S3LW8',  # Basic price ID
                 'quantity': 1,
             }],
-            mode='subscription',
-            success_url='https://www.1nbox-ai.com/home?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url='https://www.1nbox-ai.com/pricing',
-        )
+            'mode': 'subscription',
+            'success_url': 'https://www.1nbox-ai.com/home?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url': 'https://www.1nbox-ai.com/pricing',
+        }
+
+        # Add the promotion code if it exists
+        if promotion_code:
+            checkout_session_params['discounts'] = [{
+                'promotion_code': promotion_code,
+            }]
+
+        # Create the checkout session with the parameters
+        checkout_session = stripe.checkout.Session.create(**checkout_session_params)
+
         return JsonResponse({'checkoutUrl': checkout_session.url})
     except Exception as e:
         return JsonResponse({'error': str(e)})
+
 
 @csrf_exempt
 def create_checkout_session_pro(request):
