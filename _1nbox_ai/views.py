@@ -462,7 +462,7 @@ def create_checkout_session(request):
 
         # Map the discount code to the promotion code ID
         if discount_code == 'MISSME':
-            promotion_code = 'promo_1PoSDeCHpOkAgMGGDLEuvTM7'
+            promotion_code = 'promo_1PoSWZCHpOkAgMGGYb4LJ8fm'
 
         # Create the checkout session, including the discount if available
         checkout_session_params = {
