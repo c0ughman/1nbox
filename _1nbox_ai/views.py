@@ -439,8 +439,13 @@ def create_checkout_session(request):
     try:
         data = json.loads(request.body)
         user_id = data.get('user_id')
-        user_email = data.get('user_email')  # Make sure to send this from the frontend
-
+        
+        if data.get('user_email'):
+            user_email = data.get('user_email')  
+        else:
+            user = User.objects.filter(supabase_user_id=user_id).first()
+            user_email = user.email  
+        
         stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
         # Create a new customer with metadata
