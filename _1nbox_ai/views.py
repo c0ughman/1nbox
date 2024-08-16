@@ -115,6 +115,38 @@ def get_user_data(request, supabase_user_id):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+def get_user_data_by_phone(request, phone_number):
+    try:
+        user = User.objects.get(phone_number=phone_number)
+
+        summaries_list = []
+        for topic in user.topics:
+            chosen_topic = Topic.objects.filter(name=topic).first()
+            if chosen_topic:
+                summaries_list.append(chosen_topic.summary)
+            else:
+                print("OJO!!! - Missing a Topic here")
+        
+        user_data = {
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'supabase_user_id': user.supabase_user_id,
+            'plan': user.plan,
+            'negative_keywords': user.negative_keywords,
+            'positive_keywords': user.positive_keywords,
+            'language': user.language,
+            'time_zone': user.time_zone,
+            'messaging_app': user.messaging_app,
+            'topics': user.topics,
+            'days_since': user.days_since,
+            'summaries_list': summaries_list,
+        }
+        return JsonResponse(user_data)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+
+@csrf_exempt
+@require_http_methods(["GET"])
 def get_summaries(request):
     try:
         # Get the 'topics' query parameter from the URL
