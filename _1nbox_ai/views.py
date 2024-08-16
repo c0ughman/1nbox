@@ -455,7 +455,7 @@ def create_checkout_session(request):
         )
 
         # Get the discount code from the request if available
-        discount_code = request.GET.get('discount_code')
+        discount_code = data.get('discount_code')
 
         # Initialize the discount ID to None
         promotion_code = None
