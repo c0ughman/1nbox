@@ -2,8 +2,8 @@ import os
 from django.conf import settings
 from twilio.rest import Client
 import json
-import time
 from .models import Topic, User
+from datetime import datetime, timedelta
 
 # Twilio client setup
 account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
