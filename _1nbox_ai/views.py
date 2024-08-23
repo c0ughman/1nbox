@@ -38,14 +38,14 @@ def new_lead(request):
         try:
             request_data = json.loads(request.body.decode('utf-8'))
             print("Full request data:", request_data)
-            phone_number = request_data.get('phone_number')
+            email = request_data.get('email')
             messaging_app = request_data.get('messaging_app')
             topics = [topic.replace("\n", "") for topic in request_data.get('topics', [])]
 
-            print(f"Extracted data: phone={phone_number}, app={messaging_app}, topics={topics}")
+            print(f"Extracted data: email={email}, app={messaging_app}, topics={topics}")
             
             try:
-                new_user = User.objects.create(phone_number=phone_number, topics=topics, messaging_app=messaging_app, days_since=int(time.time()))
+                new_user = User.objects.create(email=email, topics=topics, messaging_app=messaging_app, days_since=int(time.time()))
                 print(f"User created: {new_user.id}")
                 return JsonResponse({'success': True, 'user_id': new_user.id}, status=200)
             except Exception as e:
@@ -56,6 +56,7 @@ def new_lead(request):
             return JsonResponse({'error': str(e)}, status=500)
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
+
             
 @csrf_exempt
 def new_user(request):
@@ -63,24 +64,24 @@ def new_user(request):
         try:
             request_data = json.loads(request.body.decode('utf-8'))
             print(request_data)
-            phone_number = request_data.get('phone_number')
             email = request_data.get('email')
+            phone_number = request_data.get('phone_number')
             user_id = request_data.get('user_id')
             
-            user = User.objects.filter(phone_number=phone_number).first()
+            user = User.objects.filter(email=email).first()
             if user:
-                user.email = email
+                user.phone_number = phone_number
                 user.supabase_user_id = user_id
-                user.save()  # Don't forget to save the changes
+                user.save()
                 return JsonResponse({'good': "User updated successfully"}, status=200)
             else:
-                return JsonResponse({'error': "User does not exist with phone number"}, status=404)
+                return JsonResponse({'error': "User does not exist with this email"}, status=404)
         except Exception as e:
-            print(f"Error: {str(e)}")  # It's better to print the error before returning
+            print(f"Error: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
-        
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_user_data(request, supabase_user_id):
@@ -112,6 +113,39 @@ def get_user_data(request, supabase_user_id):
         return JsonResponse(user_data)
     except User.DoesNotExist:
         return JsonResponse({'error': 'User not found'}, status=404)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_user_data_by_email(request, email):
+    try:
+        user = User.objects.get(email=email)
+
+        summaries_list = []
+        for topic in user.topics:
+            chosen_topic = Topic.objects.filter(name=topic).first()
+            if chosen_topic:
+                summaries_list.append(chosen_topic.summary)
+            else:
+                print("OJO!!! - Missing a Topic here")
+        
+        user_data = {
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'supabase_user_id': user.supabase_user_id,
+            'plan': user.plan,
+            'negative_keywords': user.negative_keywords,
+            'positive_keywords': user.positive_keywords,
+            'language': user.language,
+            'time_zone': user.time_zone,
+            'messaging_app': user.messaging_app,
+            'topics': user.topics,
+            'days_since': user.days_since,
+            'summaries_list': summaries_list,
+        }
+        return JsonResponse(user_data)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+
 
 @csrf_exempt
 @require_http_methods(["GET"])
@@ -226,20 +260,20 @@ def sign_up(request):
             request_data = json.loads(request.body.decode('utf-8'))
             print("Full request data:", request_data)
             
-            phone_number = request_data.get('phone_number')
+            email = request_data.get('email')
             messaging_app = request_data.get('messaging_app')
             topics = request_data.get('topics')
-            email = request_data.get('email')
+            phone_number = request_data.get('phone_number')
             user_id = request_data.get('user_id')
             
-            print(f"Extracted data: phone={phone_number}, app={messaging_app}, topics={topics}, email={email}, user_id={user_id}")
+            print(f"Extracted data: email={email}, app={messaging_app}, topics={topics}, phone={phone_number}, user_id={user_id}")
             
-            user, created = User.objects.get_or_create(phone_number=phone_number)
+            user, created = User.objects.get_or_create(email=email)
             
             if created:
                 user.topics = topics
                 user.messaging_app = messaging_app
-                user.email = email
+                user.phone_number = phone_number
                 user.supabase_user_id = user_id
                 user.days_since = int(time.time())
                 user.save()
@@ -248,8 +282,8 @@ def sign_up(request):
             else:
                 user.messaging_app = messaging_app
                 user.topics = topics
-                if email:
-                    user.email = email
+                if phone_number:
+                    user.phone_number = phone_number
                 if user_id:
                     user.supabase_user_id = user_id
                 user.save()
