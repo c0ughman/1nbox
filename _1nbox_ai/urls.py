@@ -28,6 +28,7 @@ urlpatterns = [
     path('new_user/', views.new_user),
     path('lead/<str:phone_number>/', views.get_user_data_by_phone),
     path('user/<str:supabase_user_id>/', views.get_user_data),
+    path('user-data/<str:email>/', views.get_user_data_by_email),
     path('sign_up/', views.sign_up),
     path('message_received/', views.message_received),
     path('update_user_data/', views.update_user_data),
