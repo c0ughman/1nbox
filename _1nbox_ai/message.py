@@ -9,6 +9,30 @@ from datetime import datetime, timedelta
 sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
 sg = SendGridAPIClient(sendgrid_api_key)
 
+from django.template import Template, Context
+from django.conf import settings
+
+def render_email_template(user, topics, summaries):
+    # Load the HTML template
+    with open(os.path.join(settings.BASE_DIR, 'templates/email_template.html'), 'r') as file:
+        template_content = file.read()
+    
+    # Create a Django Template object
+    template = Template(template_content)
+    
+    # Calculate total number of articles
+    total_number_of_articles = sum(topic.number_of_articles for topic in topics)
+    
+    # Prepare the context
+    context = Context({
+        'user': user,
+        'topics': topics,
+        'total_number_of_articles': total_number_of_articles,
+    })
+    
+    # Render the template
+    return template.render(context)
+
 def get_user_topics_summary(user):
     summaries = []
     topic_list = []
@@ -30,15 +54,8 @@ def get_user_topics_summary(user):
     
     return topic_list, summaries
 
-def format_email_content(topics, summaries):
-    email_content = "<h1>Your News Summaries</h1>"
-    for topic, summary in zip(topics, summaries):
-        email_content += f"<h2>{topic.name}</h2>"
-        email_content += f"<p>{summary}</p>"
-        email_content += f"<p>Number of articles: {topic.number_of_articles}</p>"
-        email_content += f"<h3>Questions:</h3><p>{topic.questions}</p>"
-        email_content += "<hr>"
-    return email_content
+def format_email_content(user, topics, summaries):
+    return render_email_template(user, topics, summaries)
 
 def send_email(user, subject, content):
     message = Mail(
@@ -59,8 +76,8 @@ def send_summaries():
         days_since = (current_time - user.days_since) // (24 * 3600)
         
         topics, summaries = get_user_topics_summary(user)
-        email_content = format_email_content(topics, summaries)
-        success, result = send_email(user, "Your Daily News Summaries", email_content)
+        email_content = format_email_content(user, topics, summaries)
+        success, result = send_email(user, f"Your Daily News Summaries for {', '.join(user.topics)}", email_content)
         if success:
             print(f"Email sent to {user.email} with status code: {result}")
         else:
