@@ -69,7 +69,6 @@
         .news-detail {
             margin-bottom: 10px;
         }
-
     </style>
 </head>
 <body>
@@ -87,7 +86,9 @@
                     <tr>
                         <td class="news-list">
                             {% for topic in topics %}
-                            <div class="news-item">• {{ topic.summary.0.title }}</div>
+                                {% for item in topic.summary %}
+                                <div class="news-item">• {{ item.title }}</div>
+                                {% endfor %}
                             {% endfor %}
                         </td>
                     </tr>
@@ -110,3 +111,4 @@
     </table>
 </body>
 </html>
+
