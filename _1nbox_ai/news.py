@@ -231,7 +231,7 @@ def get_openai_response(cluster, max_tokens=4000):
 
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
-            max_tokens=1000,
+            max_tokens=5000,
             temperature=0.125,
             messages=[
                 {"role": "system", "content": prompt},
@@ -263,7 +263,7 @@ def get_final_summary(topic, cluster_summaries, sentences_final_summary):
 
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
-        max_tokens=900,
+        max_tokens=5000,
         temperature=0.125,
         messages=[
             {"role": "system", "content": prompt},
@@ -410,12 +410,6 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
     for topic in all_topics:
         if User.objects.filter(topics__contains=topic.name).exists():
             process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
-                          merge_threshold, min_articles, join_percentage,
-                          final_merge_percentage, sentences_final_summary)
-        else:
-            for child in topic.children.all():
-                if User.objects.filter(topics__contains=child.name).exists():
-                    process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
                           merge_threshold, min_articles, join_percentage,
                           final_merge_percentage, sentences_final_summary)
                 
