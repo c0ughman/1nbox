@@ -14,7 +14,7 @@ from django.conf import settings
 
 def render_email_template(user, topics, summaries):
     # Load the HTML template
-    with open(os.path.join(settings.BASE_DIR, 'templates/email_template.html'), 'r') as file:
+    with open(os.path.join(settings.BASE_DIR, '_1nbox_ai/templates/email_template.html'), 'r') as file:
         template_content = file.read()
     
     # Create a Django Template object
