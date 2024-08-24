@@ -251,9 +251,11 @@ def get_final_summary(topic, cluster_summaries, sentences_final_summary):
     prompt = (
         "You are a News Overview Summarizer. I will provide you with a collection of news summaries, "
         "and I want you to condense this into a JSON object containing a list of stories. "
+        "Limit it to 3-5 main stories and add a miscelaneous one in the end if applicable."
         "Each story should have a title and content. "
         "The title should be a concise and exciting headline that grabs the reader's attention and makes them want to read on. "
-        "It should partially explain the situation while leaving some curiosity. The content should be a brief but complete summary of the story. "
+        "It should partially explain the situation while leaving some curiosity. "
+        "The content should be a brief but complete summary of the story. Format it in a readable way with bullet points if necessary "
         f"{topic.prompt} "
         f"Generate the content using {sentences_final_summary} sentences per story to fully explain the situation. "
         "Return your response in the following JSON structure: "
