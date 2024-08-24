@@ -78,7 +78,7 @@ def send_summaries():
         email_content = format_email_content(user, topics)
         
         # Send the email
-        success, result = send_email(user, "Your Daily News Summaries", email_content)
+        success, result = send_email(user, f"Today in {','.join(user.topics)}", email_content)
         if success:
             print(f"Email sent to {user.email} with status code: {result}")
         else:
