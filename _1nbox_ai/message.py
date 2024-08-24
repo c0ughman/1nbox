@@ -12,45 +12,37 @@ sg = SendGridAPIClient(sendgrid_api_key)
 from django.template import Template, Context
 from django.conf import settings
 
+from django.template.loader import render_to_string
+
 def render_email_template(user, topics, summaries):
-    # Load the HTML template
-    with open(os.path.join(settings.BASE_DIR, '_1nbox_ai/templates/email_template.html'), 'r') as file:
-        template_content = file.read()
-    
-    # Create a Django Template object
-    template = Template(template_content)
-    
-    # Calculate total number of articles
     total_number_of_articles = sum(topic.number_of_articles for topic in topics)
     
-    # Prepare the context
-    context = Context({
+    context = {
         'user': user,
         'topics': topics,
         'total_number_of_articles': total_number_of_articles,
-    })
+    }
     
-    # Render the template
-    return template.render(context)
+    return render_to_string('email_template.html', context)
 
 def get_user_topics_summary(user):
     summaries = []
     topic_list = []
-    for topic in user.topics:
+    for topic_name in user.topics:
         try:
-            topic_obj = Topic.objects.get(name=topic)
-            summary = topic_obj.summary
+            topic_obj = Topic.objects.get(name=topic_name)
+            summary = json.loads(topic_obj.summary) if topic_obj.summary else []
             if user.negative_keywords:
                 negative_list = user.negative_keywords.split(",")
-                summary_paragraphs = summary.split('\n\n')
-                filtered_paragraphs = [
-                    p for p in summary_paragraphs if not any(word.lower() in p.lower() for word in negative_list)
+                summary = [
+                    item for item in summary 
+                    if not any(word.lower() in item['content'].lower() for word in negative_list)
                 ]
-                summary = '\n\n'.join(filtered_paragraphs)     
+            topic_obj.summary = summary  # Attach the processed summary to the topic object
             summaries.append(summary)
             topic_list.append(topic_obj)
         except Topic.DoesNotExist:
-            print(f"Topic '{topic}' does not exist and will be skipped.")
+            print(f"Topic '{topic_name}' does not exist and will be skipped.")
     
     return topic_list, summaries
 
@@ -77,7 +69,7 @@ def send_summaries():
         
         topics, summaries = get_user_topics_summary(user)
         email_content = format_email_content(user, topics, summaries)
-        success, result = send_email(user, f"Your Daily News Summaries for {', '.join(user.topics)}", email_content)
+        success, result = send_email(user, f"Your Daily News Summaries", email_content)
         if success:
             print(f"Email sent to {user.email} with status code: {result}")
         else:
