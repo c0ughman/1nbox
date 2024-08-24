@@ -65,8 +65,6 @@ ROOT_URLCONF = '_1nbox_ai.urls'
 
 TEMPLATES = [
     {
-
-
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [os.path.join(BASE_DIR, 'myapp/templates')],
         'APP_DIRS': True,
