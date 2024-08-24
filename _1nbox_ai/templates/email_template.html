@@ -5,7 +5,71 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today in {user.topics}</title>
     <style>
-        /* ... (keeping the same styles as in the original template) ... */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background-color: #2c5945;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header img {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 10px;
+        }
+        .header h1 {
+            font-size: 18px;
+            margin: 0;
+        }
+        .powered-by {
+            font-size: 12px;
+            color: #ccc;
+            margin-top: 10px;
+        }
+        .news-list {
+            background-color: #2c5945;
+            color: white;
+            padding: 20px;
+        }
+        .news-item {
+            margin-bottom: 15px;
+        }
+        .world-news {
+            padding: 20px;
+        }
+        .world-news h2 {
+            font-size: 24px;
+            margin: 0 0 10px 0;
+        }
+        .news-container {
+            background-color: #f7f7f7;
+            border-radius: 25px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .news-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .news-detail {
+            margin-bottom: 10px;
+        }
+
     </style>
 </head>
 <body>
