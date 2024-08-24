@@ -297,7 +297,6 @@ def parse_input(input_string):
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                   merge_threshold=2, min_articles=3, join_percentage=0.5,
                   final_merge_percentage=0.5, sentences_final_summary=3):
-
     print(f"RUNNING PROCESS TOPIC FOR --- {topic.name}!!!!!")
 
     if topic.sources:                  
@@ -363,21 +362,22 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         # Update the Topic instance
         topic.cluster_summaries = cluster_summaries
         if topic.children.exists():
-            
             for child in topic.children.all():
-                
                 child.cluster_summaries = cluster_summaries
                 child.number_of_articles = topic.number_of_articles
                 child.save()
-                
         topic.save()
         
     else:
+        # No sources and no cluster summaries, process child topics first
+        if topic.children.exists():
+            for child in topic.children.all():
+                process_topic(child, days_back, common_word_threshold, top_words_to_consider,
+                              merge_threshold, min_articles, join_percentage,
+                              final_merge_percentage, sentences_final_summary)
         
         if topic.cluster_summaries:
-            
             final_summary_json = get_final_summary(topic, str(topic.cluster_summaries), sentences_final_summary)
-
             print(final_summary_json)
             final_summary_json = extract_braces_content(final_summary_json)
             print(final_summary_json)
@@ -393,8 +393,14 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             # Update the Topic instance
             topic.save()
 
-        else: 
+        else:
             print("!!OJO!! - No sources and no cluster summaries")
+            # Reprocess the topic again if necessary
+            # This can be optional based on your specific logic
+            # process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
+            #               merge_threshold, min_articles, join_percentage,
+            #               final_merge_percentage, sentences_final_summary)
+
 
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                        merge_threshold=2, min_articles=3, join_percentage=0.5,
