@@ -248,17 +248,17 @@ def get_final_summary(topic, cluster_summaries, sentences_final_summary):
 
     all_summaries = "\n\n".join(cluster_summaries)
 
-    prompt = ("You are a News Overview Summarizer. I will give you "
-              "what happened in the news today and I want you to give a direct and simple summary "
-              "for each group of events portrayed. "
-              "You will mix up similar topics together to not repeat yourself. "
-              f"{topic.prompt}"
-              f"Give me {sentences_final_summary} sentences per topic giving a full explanation of the situation. "
-              "Additionally, provide three follow-up questions that could be answered with the provided information. "
-              "Return your response as a JSON object with two fields: 'summary' and 'questions'. "
-              "The structure should be like this {'summary':The full summary as a formatted text, not a dictionary but a text with titles and line breaks,'questions':['question 1', 'question 2', 'question 3']} "
-              "The fields MUST be named 'summary' and 'questions' exactly variating from those names is prohibited. Variating from the structure is prohibited"
-              "The 'questions' field should be an array of three strings. IMPORTANT: Be concise to fit within token limits. Thanks a lot.")
+    prompt = (
+        "You are a News Overview Summarizer. I will provide you with a collection of news summaries, "
+        "and I want you to condense this into a JSON object containing a list of stories. "
+        "Each story should have a title and content. "
+        "The title should be a concise headline, and the content should be a brief summary of the story. "
+        f"{topic.prompt} "
+        f"Generate the content using {sentences_final_summary} sentences per story to fully explain the situation. "
+        "Return your response in the following JSON structure: "
+        "{'summary': [{'title': 'Title 1', 'content': 'Content 1'}, {'title': 'Title 2', 'content': 'Content 2'}, ...]}. "
+        "Do not include any additional information outside this structure. Ensure the output is well-formatted JSON."
+    )
 
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -269,6 +269,7 @@ def get_final_summary(topic, cluster_summaries, sentences_final_summary):
             {"role": "user", "content": all_summaries}
         ]
     )
+    
     return completion.choices[0].message.content
 
 def extract_braces_content(s):
@@ -349,9 +350,9 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         print(final_summary_json)
         final_summary_json = extract_braces_content(final_summary_json)
         print(final_summary_json)
-        summary, questions = parse_input(final_summary_json)
-        topic.summary = summary
-        topic.questions = '\n'.join(questions)             
+        #summary, questions = parse_input(final_summary_json)
+        topic.summary = final_summary_json
+        #topic.questions = '\n'.join(questions)             
     
         print(f"SUMMARY for {topic.name}")
         print(topic.summary)
@@ -379,14 +380,14 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             print(final_summary_json)
             final_summary_json = extract_braces_content(final_summary_json)
             print(final_summary_json)
-            summary, questions = parse_input(final_summary_json)
-            topic.summary = summary
-            topic.questions = '\n'.join(questions)             
+            #summary, questions = parse_input(final_summary_json)
+            topic.summary = final_summary_json
+            #topic.questions = '\n'.join(questions)             
         
             print(f"SUMMARY for {topic.name}")
             print(topic.summary)
-            print(f"QUESTIONS for {topic.name}")
-            print(topic.questions)
+            #print(f"QUESTIONS for {topic.name}")
+            #print(topic.questions)
 
             # Update the Topic instance
             topic.save()
