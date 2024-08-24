@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Today in {user.topics}</title>
-    <style>
+    <title>Today in {{ user.topics|join:", " }}</title>
+<style>
         body {
             font-family: Arial, sans-serif;
             background-color: #f0f0f0;
@@ -80,30 +80,30 @@
                     <tr>
                         <td class="header">
                             <img src="news-icon.png" alt="News Icon">
-                            <h1>Today in {user.topics}</h1>
-                            <div class="powered-by">Summarized from {total_number_of_articles} articles</div>
+                            <h1>Today in {{ user.topics|join:", " }}</h1>
+                            <div class="powered-by">Summarized from {{ total_number_of_articles }} articles</div>
                         </td>
                     </tr>
                     <tr>
                         <td class="news-list">
-                            {for topic in topics}
-                            <div class="news-item">• {topic.summary[0].title}</div>
-                            {endfor}
+                            {% for topic in topics %}
+                            <div class="news-item">• {{ topic.summary.0.title }}</div>
+                            {% endfor %}
                         </td>
                     </tr>
-                    {for topic in topics}
+                    {% for topic in topics %}
                     <tr>
                         <td class="world-news">
-                            <h2>{topic.name}</h2>
-                            {for item in topic.summary}
+                            <h2>{{ topic.name }}</h2>
+                            {% for item in topic.summary %}
                             <div class="news-container">
-                                <div class="news-title">{item.title}</div>
-                                <div class="news-detail">{item.content}</div>
+                                <div class="news-title">{{ item.title }}</div>
+                                <div class="news-detail">{{ item.content }}</div>
                             </div>
-                            {endfor}
+                            {% endfor %}
                         </td>
                     </tr>
-                    {endfor}
+                    {% endfor %}
                 </table>
             </td>
         </tr>
