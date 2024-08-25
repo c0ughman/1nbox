@@ -10,6 +10,54 @@ from .models import Topic, User
 sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
 sg = SendGridAPIClient(sendgrid_api_key)
 
+import re
+from collections import Counter
+
+def extract_capitalized_words(title, content):
+    # Exclude one-letter words, months, and days of the week
+    exclude_words = set(['A', 'I'] + [month.upper() for month in ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']] + [day.upper() for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']])
+    
+    # Extract capitalized words from title
+    title_words = re.findall(r'\b[A-Z][a-zA-Z]*\b', title)
+    
+    # Extract capitalized words from content (excluding those starting a sentence)
+    content_words = re.findall(r'(?<=[.!?]\s)\b[A-Z][a-zA-Z]*\b|\s\b[A-Z][a-zA-Z]*\b', content)
+    
+    # Combine and filter words
+    all_words = [word for word in title_words + content_words if word not in exclude_words and len(word) > 1]
+    
+    return all_words
+
+def get_top_three_words(words):
+    word_counts = Counter(words)
+    top_three = word_counts.most_common(3)
+    return ', '.join([word for word, _ in top_three])
+
+import requests
+
+def get_wikimedia_image(search_terms):
+    base_url = "https://commons.wikimedia.org/w/api.php"
+    params = {
+        "action": "query",
+        "format": "json",
+        "list": "search",
+        "srsearch": search_terms,
+        "srnamespace": "6",  # File namespace
+        "srlimit": "1",
+        "srwhat": "text",
+        "srprop": "url",
+    }
+    
+    response = requests.get(base_url, params=params)
+    data = response.json()
+    
+    if 'query' in data and 'search' in data['query'] and len(data['query']['search']) > 0:
+        file_name = data['query']['search'][0]['title']
+        file_url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{file_name}"
+        return file_url
+    
+    return None
+
 def render_email_template(user, topics):
     total_number_of_articles = sum(topic.number_of_articles for topic in topics)
     
@@ -28,13 +76,11 @@ def get_user_topics_summary(user):
         try:
             topic_obj = Topic.objects.get(name=topic_name)
             
-            # Parse summary field which is a JSON string
             if topic_obj.summary:
                 summary = json.loads(topic_obj.summary).get('summary', [])
             else:
                 summary = []
             
-            # Filter out summaries containing negative keywords if specified
             if user.negative_keywords:
                 negative_list = user.negative_keywords.split(",")
                 summary = [
@@ -42,8 +88,14 @@ def get_user_topics_summary(user):
                     if not any(word.lower() in item['content'].lower() for word in negative_list)
                 ]
             
-            # Attach the processed summary to the topic object
-            topic_obj.summary = summary  
+            # Process each item in the summary
+            for item in summary:
+                capitalized_words = extract_capitalized_words(item['title'], item['content'])
+                search_terms = get_top_three_words(capitalized_words)
+                image_url = get_wikimedia_image(search_terms)
+                item['image_url'] = image_url
+            
+            topic_obj.summary = summary
             topic_list.append(topic_obj)
         except Topic.DoesNotExist:
             print(f"Topic '{topic_name}' does not exist and will be skipped.")
