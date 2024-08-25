@@ -34,6 +34,7 @@ def get_top_three_words(words):
     return ', '.join([word for word, _ in top_three])
 
 import requests
+import base64
 
 def get_wikimedia_image(search_terms):
     print(f"Searching Wikimedia for images with terms: {search_terms}")
@@ -58,11 +59,17 @@ def get_wikimedia_image(search_terms):
         file_name = data['query']['search'][0]['title']
         file_url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{file_name}"
         print(f"Image found: {file_url}")
-        return file_url
+        
+        # Download the image
+        img_response = requests.get(file_url)
+        if img_response.status_code == 200:
+            # Encode the image data to base64
+            img_data = base64.b64encode(img_response.content).decode('utf-8')
+            return f"data:image/jpeg;base64,{img_data}"
     
     print("No image found on Wikimedia")
     return None
-
+    
 def render_email_template(user, topics):
     total_number_of_articles = sum(topic.number_of_articles for topic in topics)
     
@@ -110,6 +117,8 @@ def get_user_topics_summary(user):
 def format_email_content(user, topics):
     return render_email_template(user, topics)
 
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+
 def send_email(user, subject, content):
     message = Mail(
         from_email='news@1nbox-ai.com',
@@ -117,12 +126,16 @@ def send_email(user, subject, content):
         subject=subject,
         html_content=content
     )
+    
+    # Set the MIME type to support embedded images
+    message.content_type = 'text/html'
+
     try:
         response = sg.send(message)
         return True, response.status_code
     except Exception as e:
         return False, str(e)
-
+        
 def send_summaries():
     current_time = datetime.now().timestamp()
     
