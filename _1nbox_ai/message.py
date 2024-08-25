@@ -36,6 +36,9 @@ def get_top_three_words(words):
 import requests
 import base64
 
+import requests
+import base64
+
 def get_wikimedia_image(search_terms):
     print(f"Searching Wikimedia for images with terms: {search_terms}")
     base_url = "https://commons.wikimedia.org/w/api.php"
@@ -116,6 +119,8 @@ def get_user_topics_summary(user):
 
 def format_email_content(user, topics):
     return render_email_template(user, topics)
+
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
