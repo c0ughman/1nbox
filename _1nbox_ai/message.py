@@ -36,6 +36,7 @@ def get_top_three_words(words):
 import requests
 
 def get_wikimedia_image(search_terms):
+    print(f"Searching Wikimedia for images with terms: {search_terms}")
     base_url = "https://commons.wikimedia.org/w/api.php"
     params = {
         "action": "query",
@@ -51,11 +52,15 @@ def get_wikimedia_image(search_terms):
     response = requests.get(base_url, params=params)
     data = response.json()
     
+    print(f"Wikimedia API response: {data}")
+    
     if 'query' in data and 'search' in data['query'] and len(data['query']['search']) > 0:
         file_name = data['query']['search'][0]['title']
         file_url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{file_name}"
+        print(f"Image found: {file_url}")
         return file_url
     
+    print("No image found on Wikimedia")
     return None
 
 def render_email_template(user, topics):
