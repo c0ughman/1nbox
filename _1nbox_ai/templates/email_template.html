@@ -98,6 +98,9 @@
                             <h2>{{ topic.name }}</h2>
                             {% for item in topic.summary %}
                             <div class="news-container">
+                                {% if item.image_url %}
+                                <img src="{{ item.image_url }}" alt="Article image" style="max-width: 100%; height: auto; margin-bottom: 10px;">
+                                {% endif %}
                                 <div class="news-title">{{ item.title }}</div>
                                 <div class="news-detail">{{ item.content }}</div>
                             </div>
