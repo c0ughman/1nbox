@@ -39,6 +39,9 @@ import base64
 import requests
 import base64
 
+import requests
+import base64
+
 def get_wikimedia_image(search_terms):
     print(f"Searching Wikimedia for images with terms: {search_terms}")
     base_url = "https://commons.wikimedia.org/w/api.php"
@@ -46,11 +49,10 @@ def get_wikimedia_image(search_terms):
         "action": "query",
         "format": "json",
         "list": "search",
-        "srsearch": search_terms,
+        "srsearch": f"{search_terms} filetype:bitmap|drawing",  # Add file type filter
         "srnamespace": "6",  # File namespace
-        "srlimit": "1",
+        "srlimit": "10",  # Increase limit to find more potential matches
         "srwhat": "text",
-        "srprop": "url",
     }
     
     response = requests.get(base_url, params=params)
@@ -58,19 +60,21 @@ def get_wikimedia_image(search_terms):
     
     print(f"Wikimedia API response: {data}")
     
-    if 'query' in data and 'search' in data['query'] and len(data['query']['search']) > 0:
-        file_name = data['query']['search'][0]['title']
-        file_url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{file_name}"
-        print(f"Image found: {file_url}")
-        
-        # Download the image
-        img_response = requests.get(file_url)
-        if img_response.status_code == 200:
-            # Encode the image data to base64
-            img_data = base64.b64encode(img_response.content).decode('utf-8')
-            return f"data:image/jpeg;base64,{img_data}"
+    if 'query' in data and 'search' in data['query']:
+        for item in data['query']['search']:
+            file_name = item['title']
+            if file_name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                file_url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{file_name}"
+                print(f"Image found: {file_url}")
+                
+                # Download the image
+                img_response = requests.get(file_url)
+                if img_response.status_code == 200:
+                    # Encode the image data to base64
+                    img_data = base64.b64encode(img_response.content).decode('utf-8')
+                    return f"data:image/jpeg;base64,{img_data}"
     
-    print("No image found on Wikimedia")
+    print("No suitable image found on Wikimedia")
     return None
     
 def render_email_template(user, topics):
@@ -108,7 +112,10 @@ def get_user_topics_summary(user):
                 capitalized_words = extract_capitalized_words(item['title'], item['content'])
                 search_terms = get_top_three_words(capitalized_words)
                 image_url = get_wikimedia_image(search_terms)
-                item['image_url'] = image_url
+                if image_url:
+                    item['image_url'] = image_url
+                else:
+                    item['image_url'] = None
             
             topic_obj.summary = summary
             topic_list.append(topic_obj)
