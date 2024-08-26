@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today in {{ user.topics|join:", " }}</title>
-    <style>
+<style>
         body {
             font-family: Arial, sans-serif;
             background-color: #f0f0f0;
@@ -78,7 +78,7 @@
                 <table role="presentation" class="container" width="500" cellpadding="0" cellspacing="0">
                     <tr>
                         <td class="header">
-                            <img src="cid:image_0" alt="News Icon">
+                            <img src="logo-white.png" alt="News Icon">
                             <h1>Today in {{ user.topics|join:", " }}</h1>
                             <div class="powered-by">Summarized from {{ total_number_of_articles }} articles</div>
                         </td>
@@ -98,9 +98,6 @@
                             <h2>{{ topic.name }}</h2>
                             {% for item in topic.summary %}
                             <div class="news-container">
-                                {% if item.image_url %}
-                                <img src="cid:image_{{ forloop.counter }}" alt="Article image" style="max-width: 100%; height: auto; margin-bottom: 10px;">
-                                {% endif %}
                                 <div class="news-title">{{ item.title }}</div>
                                 <div class="news-detail">{{ item.content }}</div>
                             </div>
