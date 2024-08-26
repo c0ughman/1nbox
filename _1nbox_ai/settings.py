@@ -81,6 +81,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = '_1nbox_ai.wsgi.application'
 
+CORS_ALLOW_ALL_ORIGINS = True
+
 CORS_ALLOWED_ORIGINS = [
     "https://www.1nbox-ai.com",
     "https://editor.weweb.io",
