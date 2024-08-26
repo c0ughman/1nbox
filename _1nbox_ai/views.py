@@ -25,10 +25,14 @@ supabase_key = os.environ.get('SUPABASE_KEY')
 @csrf_exempt
 def message_received(request):
     if request.method == 'POST':
-        from_number = request.POST.get('From', '')
-        body = request.POST.get('Body', '')
-        generate_answer(from_number, body)
-        return HttpResponse("All good here", status=200)
+        topic = request.POST.get('topic', '')
+        body = request.POST.get('body', '')
+        try:
+            answer = generate_answer(topic, body)
+            return HttpResponse(answer, status=200)
+        except Exception as e:
+            print(f"A problem ocurred motherfucker: {e}")
+            return HttpResponse(f"A problem ocurred motherfucker: {e}", status=405)
     else:
         return HttpResponse("Only POST requests are allowed.", status=405)
 
