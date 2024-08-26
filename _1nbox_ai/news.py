@@ -255,7 +255,7 @@ def get_final_summary(topic, cluster_summaries, sentences_final_summary):
         "Each story should have a title and content. "
         "The title should be a concise and exciting headline that grabs the reader's attention and makes them want to read on. "
         "It should partially explain the situation while leaving some curiosity. "
-        "The content should be a brief but complete summary of the story. Format it in a readable way with bullet points if necessary "
+        "The content must be a brief but complete summary of the story in bulletpoints. Format it in a readable way."
         f"{topic.prompt} "
         f"Generate the content using {sentences_final_summary} sentences per story to fully explain the situation. "
         "Return your response in the following JSON structure: "
