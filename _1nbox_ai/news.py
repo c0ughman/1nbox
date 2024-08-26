@@ -260,8 +260,8 @@ def get_final_summary(topic, cluster_summaries, sentences_final_summary):
         "Each bulletpoint should be a key aspect of the story, and all bulletpoints should be part of a single text string. "
         f"Generate the content using {sentences_final_summary} sentences per story to fully explain the situation. "
         "Return your response in the following JSON structure: "
-        "{'summary': [{'title': 'Title 1', 'content': '• Bulletpoint 1. • Bulletpoint 2. • Bulletpoint 3.'}, "
-        "{'title': 'Title 2', 'content': '• Bulletpoint 1. • Bulletpoint 2. • Bulletpoint 3.'}, ...]}."
+        "{'summary': [{'title': 'Title 1', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, "
+        "{'title': 'Title 2', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, ...]}."
         "Ensure each story's content is a single text string with bulletpoints separated by spaces or new lines."
     )
 
