@@ -125,13 +125,23 @@ def get_user_topics_summary(user):
     return topic_list
 
 def format_email_content(user, topics):
-    return render_email_template(user, topics)
+    images = []
+    
+    # Collect image data
+    for topic in topics:
+        for item in topic.summary:
+            if item.get('image_url'):
+                images.append(item['image_url'])
+    
+    # Render template
+    content = render_email_template(user, topics)
+    
+    return content, images
 
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+from sendgrid.helpers.mail import (Mail, Attachment, FileContent, FileName, FileType, Disposition, ContentId)
+import base64
 
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-
-def send_email(user, subject, content):
+def send_email(user, subject, content, images):
     message = Mail(
         from_email='news@1nbox-ai.com',
         to_emails=user.email,
@@ -139,8 +149,19 @@ def send_email(user, subject, content):
         html_content=content
     )
     
-    # Set the MIME type to support embedded images
-    message.content_type = 'text/html'
+    # Attach images
+    for i, image_data in enumerate(images):
+        if image_data.startswith('data:image'):
+            # Extract base64 data
+            image_data = image_data.split(',')[1]
+        
+        attachment = Attachment()
+        attachment.file_content = FileContent(image_data)
+        attachment.file_type = FileType('image/jpeg')
+        attachment.file_name = FileName(f'image_{i}.jpg')
+        attachment.disposition = Disposition('inline')
+        attachment.content_id = ContentId(f'image_{i}')
+        message.attachment = attachment
 
     try:
         response = sg.send(message)
@@ -157,10 +178,10 @@ def send_summaries():
         
         # Get summaries for the user
         topics = get_user_topics_summary(user)
-        email_content = format_email_content(user, topics)
+        email_content, images = format_email_content(user, topics)
         
         # Send the email
-        success, result = send_email(user, f"Today in {','.join(user.topics)}", email_content)
+        success, result = send_email(user, f"Today in {','.join(user.topics)}", email_content, images)
         if success:
             print(f"Email sent to {user.email} with status code: {result}")
         else:
