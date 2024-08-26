@@ -251,17 +251,20 @@ def get_final_summary(topic, cluster_summaries, sentences_final_summary):
     prompt = (
         "You are a News Overview Summarizer. I will provide you with a collection of news summaries, "
         "and I want you to condense this into a JSON object containing a list of stories. "
-        "Limit it to 3-5 main stories and add a miscelaneous one in the end if applicable."
+        "Limit it to 2-4 main stories, and add a miscellaneous one at the end if applicable. "
         "Each story should have a title and content. "
         "The title should be a concise and exciting headline that grabs the reader's attention and makes them want to read on. "
         "It should partially explain the situation while leaving some curiosity. "
-        "The content must be a brief but complete summary of the story in bulletpoints. Format it in a readable way."
-        f"{topic.prompt} "
+        "The content must be a brief but complete summary of the story in text, "
+        "formatted with bulletpoints. "
+        "Each bulletpoint should be a key aspect of the story, and all bulletpoints should be part of a single text string. "
         f"Generate the content using {sentences_final_summary} sentences per story to fully explain the situation. "
         "Return your response in the following JSON structure: "
-        "{'summary': [{'title': 'Title 1', 'content': 'Content 1'}, {'title': 'Title 2', 'content': 'Content 2'}, ...]}. "
-        "Do not include any additional information outside this structure. Ensure the output is well-formatted JSON."
+        "{'summary': [{'title': 'Title 1', 'content': '• Bulletpoint 1. • Bulletpoint 2. • Bulletpoint 3.'}, "
+        "{'title': 'Title 2', 'content': '• Bulletpoint 1. • Bulletpoint 2. • Bulletpoint 3.'}, ...]}."
+        "Ensure each story's content is a single text string with bulletpoints separated by spaces or new lines."
     )
+
 
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
