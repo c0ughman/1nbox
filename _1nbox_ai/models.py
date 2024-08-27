@@ -11,6 +11,8 @@ class Topic(models.Model):
     questions = models.TextField(blank=True, null=True)
     number_of_articles = models.IntegerField(default=0,blank=True, null=True)
     children = models.ManyToManyField('self', blank=True, related_name='parents')
+    custom = models.BooleanField(default=False,blank=True)
+    created_by = models.CharField(max_length=255, blank=True, null=True)
 
     
     def __str__(self):
