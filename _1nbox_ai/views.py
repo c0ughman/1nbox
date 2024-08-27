@@ -36,9 +36,18 @@ def create_topic(request):
         print(4)
         prompt = data.get('customPrompt')
         print(5)
-        custom_rss = data.get('customRSS')
+        custom_rss = data.get('customRSS', [])
         print(6)
-
+    
+        # Ensure sources and custom_rss are lists
+        if isinstance(sources, str):
+            print("a")
+            sources = sources.split(',')
+            print("b")
+        if not isinstance(custom_rss, list):
+            print("c")
+            custom_rss = []
+    
         all_sources = sources + custom_rss
         print(7)
 
