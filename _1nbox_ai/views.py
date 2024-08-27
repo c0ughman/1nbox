@@ -25,10 +25,7 @@ supabase_key = os.environ.get('SUPABASE_KEY')
 @csrf_exempt
 @require_http_methods(["POST"])
 def create_topic(request):
-    print(request.text)
-    print(request.data)
-    print(request.body)
-    
+    print(request.body) 
     try:
         data = json.loads(request.body)
         name = data.get('name')
@@ -38,12 +35,6 @@ def create_topic(request):
 
         all_sources = sources + custom_rss
 
-        print(request.text)
-        print(request.data)
-        print(request.body)
-        print("OJOOOO")
-        print(request.custom_rss)
-        
         if not name:
             return JsonResponse({'success': False, 'error': 'Topic name is required.'}, status=400)
 
