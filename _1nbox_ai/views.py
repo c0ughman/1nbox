@@ -25,6 +25,7 @@ supabase_key = os.environ.get('SUPABASE_KEY')
 @csrf_exempt
 @require_http_methods(["POST"])
 def create_topic(request):
+    print(request.body)
     try:
         data = json.loads(request.body)
         name = data.get('name')
