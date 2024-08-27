@@ -36,6 +36,18 @@ def create_topic(request):
     
         all_sources = sources + custom_rss
 
+        try:
+            user = User.objects.get(supabase_user_id=user_id)
+            if user.topics:
+                open_topics = user.topics[:-1]
+                result_string = open_topics + f', "{name}"'
+                user.topics = result_string
+            else:
+                user.topics = f'["{name}"]'
+            user.save()
+        except Exception as e:
+            print(f"OJO - Counldn't save the topic for the user: {e}")
+
         if not name:
             return JsonResponse({'success': False, 'error': 'Topic name is required.'}, status=400)
         topic = Topic.objects.create(name=name, sources=all_sources, prompt=prompt, created_by=user_id, custom=True)
