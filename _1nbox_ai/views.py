@@ -30,7 +30,7 @@ def create_topic(request):
         name = data.get('name')
         sources = data.get('sources', '').split(',')
         prompt = data.get('customPrompt')
-        custom_rss = ",".join(data.get('customRSS'))
+        custom_rss = data.get('customRSS')
 
         all_sources = sources + custom_rss
         
