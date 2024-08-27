@@ -41,11 +41,11 @@ def create_topic(request):
             user = User.objects.get(supabase_user_id=user_id)
             print(2)
             if user.topics:
-                print(3)
-                open_topics = user.topics[:-1]
-                print(4)
+                print(user.topics)
+                open_topics = str(user.topics)[:-1]
+                print(open_topics)
                 result_string = open_topics + f', "{name}"'
-                print(5)
+                print(result_string)
                 user.topics = result_string
                 print(6)
             else:
