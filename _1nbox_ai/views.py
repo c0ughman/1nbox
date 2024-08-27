@@ -22,6 +22,24 @@ import time
 supabase_url = os.environ.get('SUPABASE_URL')
 supabase_key = os.environ.get('SUPABASE_KEY')
 
+@csrf_exempt
+@require_http_methods(["POST"])
+def create_topic(request):
+    try:
+        data = json.loads(request.body)
+        name = data.get('name')
+        sources = data.get('sources', '').split(',')
+
+        if not name:
+            return JsonResponse({'success': False, 'error': 'Topic name is required.'}, status=400)
+
+        topic = Topic.objects.create(name=name, sources=sources)
+        return JsonResponse({'success': True, 'id': topic.id})
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
 # Update the view function
 @csrf_exempt
 def message_received(request):
