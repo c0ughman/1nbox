@@ -35,16 +35,25 @@ def create_topic(request):
         user_id = data.get('user_id')
     
         all_sources = sources + custom_rss
-
+        print(0)
         try:
+            print(1)
             user = User.objects.get(supabase_user_id=user_id)
+            print(2)
             if user.topics:
+                print(3)
                 open_topics = user.topics[:-1]
+                print(4)
                 result_string = open_topics + f', "{name}"'
+                print(5)
                 user.topics = result_string
+                print(6)
             else:
+                print(7)
                 user.topics = f'["{name}"]'
+                print(8)
             user.save()
+            print(9)
         except Exception as e:
             print(f"OJO - Counldn't save the topic for the user: {e}")
 
