@@ -29,11 +29,15 @@ def create_topic(request):
         data = json.loads(request.body)
         name = data.get('name')
         sources = data.get('sources', '').split(',')
+        prompt = data.get('customPrompt')
+        custom_rss = ",".join(data.get('customRSS'))
 
+        all_sources = sources + custom_rss
+        
         if not name:
             return JsonResponse({'success': False, 'error': 'Topic name is required.'}, status=400)
 
-        topic = Topic.objects.create(name=name, sources=sources)
+        topic = Topic.objects.create(name=name, sources=all_sources, prompt=prompt)
         return JsonResponse({'success': True, 'id': topic.id})
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
