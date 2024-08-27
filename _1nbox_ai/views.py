@@ -38,7 +38,7 @@ def create_topic(request):
 
         if not name:
             return JsonResponse({'success': False, 'error': 'Topic name is required.'}, status=400)
-        topic = Topic.objects.create(name=name, sources=all_sources, prompt=prompt, user_id=user_id, custom=True)
+        topic = Topic.objects.create(name=name, sources=all_sources, prompt=prompt, created_by=user_id, custom=True)
         return JsonResponse({'success': True, 'id': topic.id})
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
