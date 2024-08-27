@@ -23,7 +23,7 @@ def generate_answer(topic, body, context):
 
     # Make the OpenAI API request
     response = client.chat.completions.create(
-        model="gpt-4",  # Make sure to use a valid model name
+        model="gpt-4o-mini", 
         max_tokens=1000,
         temperature=0.125,
         messages=[
