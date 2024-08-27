@@ -27,18 +27,26 @@ supabase_key = os.environ.get('SUPABASE_KEY')
 def create_topic(request):
     print(request.body) 
     try:
+        print(1)
         data = json.loads(request.body)
+        print(2)
         name = data.get('name')
+        print(3)
         sources = data.get('sources', '').split(',')
+        print(4)
         prompt = data.get('customPrompt')
+        print(5)
         custom_rss = data.get('customRSS')
+        print(6)
 
         all_sources = sources + custom_rss
+        print(7)
 
         if not name:
             return JsonResponse({'success': False, 'error': 'Topic name is required.'}, status=400)
-
+        print(8)
         topic = Topic.objects.create(name=name, sources=all_sources, prompt=prompt)
+        print(9)
         return JsonResponse({'success': True, 'id': topic.id})
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
