@@ -1,4 +1,4 @@
-from *1nbox*ai.models import User, Topic  # Adjust the import to your actual module path
+from _1nbox_ai.models import User, Topic  # Adjust the import to your actual module path
 from openai import OpenAI
 import os
 import json
