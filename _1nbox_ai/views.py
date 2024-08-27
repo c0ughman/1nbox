@@ -22,17 +22,19 @@ import time
 supabase_url = os.environ.get('SUPABASE_URL')
 supabase_key = os.environ.get('SUPABASE_KEY')
 
+# Update the view function
 @csrf_exempt
 def message_received(request):
     if request.method == 'POST':
         topic = request.POST.get('topic', '')
         body = request.POST.get('body', '')
+        context = json.loads(request.POST.get('context', '[]'))
         try:
-            answer = generate_answer(topic, body)
+            answer = generate_answer(topic, body, context)
             return HttpResponse(answer, status=200)
         except Exception as e:
-            print(f"A problem ocurred motherfucker: {e}")
-            return HttpResponse(f"A problem ocurred motherfucker: {e}", status=405)
+            print(f"A problem occurred: {e}")
+            return HttpResponse(f"A problem occurred: {e}", status=500)
     else:
         return HttpResponse("Only POST requests are allowed.", status=405)
 
