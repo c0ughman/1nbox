@@ -33,6 +33,8 @@ urlpatterns = [
     path('message_received/', views.message_received),
     path('update_user_data/', views.update_user_data),
     path('get_summaries/', views.get_summaries),
+    path('create_topic/', views.create_topic, name='create_topic')
+
 
     path('new_settings/', views.new_settings),
     path('new_keywords/', views.new_keywords),
