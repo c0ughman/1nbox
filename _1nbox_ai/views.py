@@ -35,7 +35,7 @@ def create_topic(request):
 
         all_sources = sources + custom_rss
 
-        print (request)
+        print(request.text)
         
         if not name:
             return JsonResponse({'success': False, 'error': 'Topic name is required.'}, status=400)
