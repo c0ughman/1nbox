@@ -1,3 +1,42 @@
+import os
+import json
+from datetime import datetime
+from django.template.loader import render_to_string
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+from .models import Topic, User
+
+# SendGrid setup
+sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+sg = SendGridAPIClient(sendgrid_api_key)
+
+def render_email_template(user, topics):
+    total_number_of_articles = sum(topic.number_of_articles for topic in topics)
+    
+    context = {
+        'user': user,
+        'topics': topics,
+        'total_number_of_articles': total_number_of_articles,
+    }
+    
+    return render_to_string('email_template.html', context)
+
+def format_email_content(user, topics):
+    return render_email_template(user, topics)
+
+def send_email(user, subject, content):
+    message = Mail(
+        from_email='news@1nbox-ai.com',
+        to_emails=user.email,
+        subject=subject,
+        html_content=content
+    )
+    try:
+        response = sg.send(message)
+        return True, response.status_code
+    except Exception as e:
+        return False, str(e)
+
 import logging
 import json
 from .models import Topic, User
