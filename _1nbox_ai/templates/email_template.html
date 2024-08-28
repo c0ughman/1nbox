@@ -92,6 +92,31 @@
         .footer .column {
             width: 30%;
         }
+
+        .custom-message {
+            background-color: #f9f9f9;
+            border-radius: 20px;
+            padding: 20px;
+            margin: 20px;
+        }
+        .custom-message h2 {
+            color: #2c5945;
+            margin-top: 0;
+        }
+        .custom-message-button {
+            display: inline-block;
+            background-color: #2c5945;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .custom-message-image {
+            max-width: 100%;
+            height: auto;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -101,6 +126,7 @@
             <h1>Today in {{ user.topics|join:", " }}</h1>
             <div class="powered-by">Summarized from {{ total_number_of_articles }} articles</div>
         </div>
+
         <div class="news-list">
             {% for topic in topics %}
                 {% for item in topic.summary %}
@@ -108,7 +134,33 @@
                 {% endfor %}
             {% endfor %}
         </div>
-        {% for topic in topics %}
+
+               <!-- First Topic and its contents -->
+        <div class="world-news">
+            <h2>{{ topics[0].name }}</h2>
+            <a href="https://www.1nbox-ai.com/chat?topic={{ topics[0].name }}&user_id={{ user.supabase_user_id }}" class="ask-ai-link">Ask AI</a>
+            {% for item in topics[0].summary %}
+            <div>
+                <div class="news-title">{{ item.title }}</div>
+                <div class="news-detail">{{ item.content }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Optional Custom Message -->
+        {% if custom_message %}
+        <div class="custom-message">
+            {% if custom_message.image %}
+            <img src="{{ custom_message.image }}" alt="Custom message image" class="custom-message-image">
+            {% endif %}
+            <h2>{{ custom_message.title }}</h2>
+            <p>{{ custom_message.content }}</p>
+            <a href="#" class="custom-message-button">{{ custom_message.buttontext }}</a>
+        </div>
+        {% endif %}
+
+        <!-- Remaining Topics and their contents -->
+        {% for topic in topics[1:] %}
         <div class="world-news">
             <h2>{{ topic.name }}</h2>
             <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&user_id={{ user.supabase_user_id }}" class="ask-ai-link">Ask AI</a>
@@ -120,6 +172,7 @@
             {% endfor %}
         </div>
         {% endfor %}
+
         <div class="footer">
             <div class="column">
                 <a href="https://www.1nbox-ai.com">1nbox AI News</a><br>
