@@ -277,8 +277,14 @@ def update_user_data(request):
             user.time_zone = data['time_zone']
         if 'messaging_app' in data:
             user.messaging_app = data['messaging_app']
+            
         if 'topics' in data:
-            user.topics = data['topics']
+            topics = data['topics']
+            for item in topics:
+                if !item:
+                    topics.remove(item)
+            user.topics = topics
+            
         if 'days_since' in data:
             user.days_since = data['days_since']
         
