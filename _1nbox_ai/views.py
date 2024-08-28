@@ -280,9 +280,7 @@ def update_user_data(request):
             
         if 'topics' in data:
             topics = data['topics']
-            for item in topics:
-                if !item:
-                    topics.remove(item)
+            topics = [item for item in topics if item]
             user.topics = topics
             
         if 'days_since' in data:
