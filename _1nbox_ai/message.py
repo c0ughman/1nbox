@@ -66,16 +66,59 @@ def send_email(user, subject, content):
     except Exception as e:
         return False, str(e)
 
+def get_custom_message(days_since):
+    messages = {
+        3: {
+            "title": "How's it going?",
+            "content": "We hope you're enjoying your news summaries. Any feedback?",
+            "buttontext": "Give Feedback",
+            "image": "https://example.com/feedback_image.jpg"
+        },
+        7: {
+            "title": "Loving the news?",
+            "content": "We'd love to hear your thoughts on our service so far!",
+            "buttontext": "Share Your Experience"
+        },
+        10: {
+            "title": "Quick check-in",
+            "content": "Is there anything we can improve? Let us know!",
+            "buttontext": "Suggest Improvements"
+        },
+        14: {
+            "title": "Two weeks of news!",
+            "content": "You've been with us for two weeks now. How are we doing?",
+            "buttontext": "Rate Us"
+        },
+        20: {
+            "title": "You're a news pro!",
+            "content": "Thanks for being with us for 20 days. Any topics you'd like to add?",
+            "buttontext": "Customize Topics"
+        }
+    }
+    return messages.get(days_since, None)
+
 def send_summaries():
     current_time = datetime.now().timestamp()
     
     for user in User.objects.exclude(plan="over"):
         # Calculate days since last update
-        days_since = (current_time - user.days_since) // (24 * 3600)
+        days_since = int((current_time - user.days_since) // (24 * 3600))
+        
+        # Get custom message based on days_since
+        custom_message = get_custom_message(days_since)
         
         # Get summaries for the user
         topics = get_user_topics_summary(user)
-        email_content = format_email_content(user, topics)
+        
+        # Include custom_message in the context
+        context = {
+            'user': user,
+            'topics': topics,
+            'total_number_of_articles': sum(topic.number_of_articles for topic in topics),
+            'custom_message': custom_message
+        }
+        
+        email_content = render_to_string('email_template.html', context)
         
         # Send the email
         success, result = send_email(user, f"Today in {','.join(user.topics)}", email_content)
