@@ -74,6 +74,24 @@
             border-radius: 5px;
             display: inline-block;
         }
+        .footer {
+            background-color: #FAFAFA;
+            color: gray;
+            padding: 20px;
+            text-align: left;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            line-height:1.5;
+        }
+        .footer a {
+            color: gray;
+            text-decoration: underline;
+        }
+        .footer .column {
+            width: 30%;
+        }
     </style>
 </head>
 <body>
@@ -102,6 +120,21 @@
             {% endfor %}
         </div>
         {% endfor %}
+        <div class="footer">
+            <div class="column">
+                <a href="https://www.1nbox-ai.com">1nbox AI News</a><br>
+                ©2024 1nbox AI<br>
+                Spain, Barcelona, 08034
+            </div>
+            <div class="column">
+                <a href="mailto:feedback@1nbox-ai.com">Feedback</a><br>
+                <a href="https://www.1nbox-ai.com">Website</a>
+            </div>
+            <div class="column">
+                You're subscribed to 1nbox AI.<br>
+                <a href="#">Unsubscribe</a>
+            </div>
+        </div>
     </div>
 </body>
 </html>
