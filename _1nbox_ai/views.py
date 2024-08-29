@@ -17,11 +17,6 @@ import requests
 from supabase import create_client, Client
 import time
 
-
-
-supabase_url = os.environ.get('SUPABASE_URL')
-supabase_key = os.environ.get('SUPABASE_KEY')
-
 @csrf_exempt
 @require_http_methods(["POST"])
 def create_topic(request):
@@ -73,56 +68,6 @@ def message_received(request):
         return HttpResponse("Only POST requests are allowed.", status=405)
 
 @csrf_exempt
-def new_lead(request):
-    if request.method == 'POST':
-        try:
-            request_data = json.loads(request.body.decode('utf-8'))
-            print("Full request data:", request_data)
-            email = request_data.get('email')
-            messaging_app = request_data.get('messaging_app')
-            topics = [topic.replace("\n", "") for topic in request_data.get('topics', [])]
-
-            print(f"Extracted data: email={email}, app={messaging_app}, topics={topics}")
-            
-            try:
-                new_user = User.objects.create(email=email, topics=topics, messaging_app=messaging_app, days_since=int(time.time()))
-                print(f"User created: {new_user.id}")
-                return JsonResponse({'success': True, 'user_id': new_user.id}, status=200)
-            except Exception as e:
-                print(f"Error creating user: {str(e)}")
-                return JsonResponse({'error': str(e)}, status=500)
-        except Exception as e:
-            print(f"Error processing request: {str(e)}")
-            return JsonResponse({'error': str(e)}, status=500)
-    else:
-        return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
-
-            
-@csrf_exempt
-def new_user(request):
-    if request.method == 'POST':
-        try:
-            request_data = json.loads(request.body.decode('utf-8'))
-            print(request_data)
-            email = request_data.get('email')
-            phone_number = request_data.get('phone_number')
-            user_id = request_data.get('user_id')
-            
-            user = User.objects.filter(email=email).first()
-            if user:
-                user.phone_number = phone_number
-                user.supabase_user_id = user_id
-                user.save()
-                return JsonResponse({'good': "User updated successfully"}, status=200)
-            else:
-                return JsonResponse({'error': "User does not exist with this email"}, status=404)
-        except Exception as e:
-            print(f"Error: {str(e)}")
-            return JsonResponse({'error': str(e)}, status=500)
-    else:
-        return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
-
-@csrf_exempt
 @require_http_methods(["GET"])
 def get_user_data(request, supabase_user_id):
     try:
@@ -133,71 +78,6 @@ def get_user_data(request, supabase_user_id):
             chosenTopic = Topic.objects.filter(name=topic).first()
             if chosenTopic:
                 summaries_list.append(chosenTopic.summary)
-            else:
-                print("OJO!!! - Missing a Topic here")
-        
-        user_data = {
-            'email': user.email,
-            'phone_number': user.phone_number,
-            'supabase_user_id': user.supabase_user_id,
-            'plan': user.plan,
-            'negative_keywords': user.negative_keywords,
-            'positive_keywords': user.positive_keywords,
-            'language': user.language,
-            'time_zone': user.time_zone,
-            'messaging_app': user.messaging_app,
-            'topics': user.topics,
-            'days_since': user.days_since,
-            'summaries_list': summaries_list,
-        }
-        return JsonResponse(user_data)
-    except User.DoesNotExist:
-        return JsonResponse({'error': 'User not found'}, status=404)
-
-@csrf_exempt
-@require_http_methods(["GET"])
-def get_user_data_by_email(request, email):
-    try:
-        user = User.objects.get(email=email)
-
-        summaries_list = []
-        for topic in user.topics:
-            chosen_topic = Topic.objects.filter(name=topic).first()
-            if chosen_topic:
-                summaries_list.append(chosen_topic.summary)
-            else:
-                print("OJO!!! - Missing a Topic here")
-        
-        user_data = {
-            'email': user.email,
-            'phone_number': user.phone_number,
-            'supabase_user_id': user.supabase_user_id,
-            'plan': user.plan,
-            'negative_keywords': user.negative_keywords,
-            'positive_keywords': user.positive_keywords,
-            'language': user.language,
-            'time_zone': user.time_zone,
-            'messaging_app': user.messaging_app,
-            'topics': user.topics,
-            'days_since': user.days_since,
-            'summaries_list': summaries_list,
-        }
-        return JsonResponse(user_data)
-    except User.DoesNotExist:
-        return JsonResponse({'error': 'User not found'}, status=404)
-
-
-@csrf_exempt
-@require_http_methods(["GET"])
-def get_user_data_by_phone(request, phone_number):
-    try:
-        user = User.objects.get(phone_number=phone_number)
-
-        summaries_list = []
-        for topic in user.topics:
-            chosen_topic = Topic.objects.filter(name=topic).first()
-            if chosen_topic:
-                summaries_list.append(chosen_topic.summary)
             else:
                 print("OJO!!! - Missing a Topic here")
         
@@ -243,8 +123,6 @@ def get_summaries(request):
     except json.JSONDecodeError:
         # Handle JSON decoding errors
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
-
-
 
 @csrf_exempt
 def update_user_data(request):
@@ -339,179 +217,7 @@ def sign_up(request):
             return JsonResponse({'error': str(e)}, status=500)
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
-
-# OLD 1NBOX TERRTORY
-    
-@csrf_exempt
-def new_settings(request):
-    if request.method == 'POST':
-        try:
-            request_data = json.loads(request.body.decode('utf-8'))
-            print(request_data)
-            user_id = request_data.get('record', {}).get('user_id')
-            print(user_id)
-            phone_number = request_data.get('record', {}).get('phone_number')
-            frequency = request_data.get('record', {}).get('frequency')
-            weekday = request_data.get('record', {}).get('weekday')
-            plan = request_data.get('record', {}).get('plan')
-            t = request_data.get('record', {}).get('time')
-            t2 = request_data.get('record', {}).get('time2')
-            t3 = request_data.get('record', {}).get('time3')
-            t4 = request_data.get('record', {}).get('time4')
-            t5 = request_data.get('record', {}).get('time5')
-            style = request_data.get('record', {}).get('style')
-            time_zone = request_data.get('record', {}).get('time_zone')
-            language = request_data.get('record', {}).get('language')
-            # Try to get the user with the given ID
-            user = User.objects.filter(supabase_user_id=user_id).first()
-            if user:
-                # Update the fields
-                user.phone_number = phone_number
-                user.style = style
-                user.frequency = frequency
-                user.language = language
-                user.time_zone = time_zone
-                user.plan = plan
-
-                # MAKE WEEKDAY USABLE
-                weekdays_list = weekday.split(',') if weekday else ['Friday']
-                
-                # Define the mapping of weekdays to numbers
-                weekdays_mapping = {
-                    'monday': 0,
-                    'tuesday': 1,
-                    'wednesday': 2,
-                    'thursday': 3,
-                    'friday': 4,
-                    'saturday': 5,
-                    'sunday': 6
-                }
-                                
-                # Convert the list of weekday names to their corresponding numbers
-                numbers_list = [weekdays_mapping.get(day.strip().lower(), 4) for day in weekdays_list if day.strip()]
-
-                user.weekday = str(numbers_list)
-                user.t = t
-                user.t2 = t2
-                user.t3 = t3
-                user.t4 = t4
-                user.t5 = t5
-                user.save()
-                print("exists new_settings")
-            else:
-                # Create a new user
-                new_user = User.objects.create(supabase_user_id=user_id, phone_number=phone_number, style=style, frequency=frequency, t=t)
-                print("does not exist new_settings")
-                
-            return JsonResponse({'good': "Everything's good"}, status=200)
-
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-            print(str(e))
-            sys.stdout.flush()
-
-    else:
-        return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
-
-@csrf_exempt
-def new_keywords(request):
-    if request.method == 'POST':
-        request_data = json.loads(request.body.decode('utf-8'))
-        print(request_data)
-        user_id = request_data.get('record', {}).get('user_id')
-        print(user_id)
-        positive = request_data.get('record', {}).get('positive')
-        negative = request_data.get('record', {}).get('negative')
-
-        # Try to get the user with the given ID
-        user = User.objects.filter(supabase_user_id=user_id).first()
-
-        if user:
-            # Update the fields
-            user.positive_keywords = positive
-            user.negative_keywords = negative
-            user.save()
-            print("exists new_keywords")
-        else:
-            # Create a new user
-            User.objects.create(supabase_user_id=user_id, positive_keywords=positive, negative_keywords=negative)
-            print("does not exist new_keywords")
-
-        return JsonResponse({'good': "Everything's good"}, status=200)
-
-    else:
-        return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
-
-@csrf_exempt
-def process_tokens(request):
-    if request.method == 'POST':
-        try:
-            # Assuming the request body contains JSON data
-            data = json.loads(request.body.decode('utf-8'))
-
-            # Accessing JSON parameters
-            access_token = data.get('access_token')
-            provider_token = data.get('provider_token')
-            refresh_token = data.get('refresh_token')
-            provider_refresh_token = data.get('provider_refresh_token')
-
-            # Process the tokens as needed (store in the database, etc.)
-            # You may want to add more validation and error handling here
-
-            print(access_token)
-            print(refresh_token)
-            print(provider_token)
-            print(provider_refresh_token)
-
-            # Work here refers to whiteboard
-            new_tokens(access_token, provider_token, refresh_token, provider_refresh_token)
-
-            return JsonResponse({'status': 'Tokens processed successfully'})
-
-        except json.JSONDecodeError as e:
-            # Handle JSON decoding error
-            return JsonResponse({'status': 'Error decoding JSON', 'error': str(e)}, status=400)
-
-    return JsonResponse({'status': 'Invalid request'})
-
-def new_tokens(access_token, provider_token, refresh_token, provider_refresh_token):
-
-    decoded = jwt.decode(access_token, options={"verify_signature": False})
-    email = decoded['email']
-    user_id = decoded['sub']
-
-    user = User.objects.filter(supabase_user_id=user_id).first()
-
-    if user:
-        # Update the fields
-        user.supabase_user_id = user_id
-        user.email = email
-        user.access_token = access_token
-        user.provider_token = provider_token
-        user.refresh_token = refresh_token
-        user.provider_refresh_token = provider_refresh_token
-        user.save()
-        print("exists new_tokens")
-
-    else:
-        # Create a new user
-        User.objects.create(email = email, supabase_user_id = user_id, access_token=access_token, provider_token=provider_token, refresh_token=refresh_token, provider_refresh_token = provider_refresh_token)
-        print("does not exist new_tokens")
-
-    print("User created or updated with tokens")
-
-def oauth_redirect(request):
-    return render(request, 'redirect.html') 
-
-def workflow(request):
-
-    user = User.objects.get(supabase_user_id="39de099d-3064-4b34-926b-12324eebcd97")
-
-    return HttpResponse (main(user))
-
-
-    # TOKEN REFRESHING !!!
-
+        
 @csrf_exempt
 def create_checkout_session(request):
     try:
@@ -565,38 +271,6 @@ def create_checkout_session(request):
         # Create the checkout session with the parameters
         checkout_session = stripe.checkout.Session.create(**checkout_session_params)
 
-        return JsonResponse({'checkoutUrl': checkout_session.url})
-    except Exception as e:
-        return JsonResponse({'error': str(e)})
-
-
-@csrf_exempt
-def create_checkout_session_pro(request):
-    try:
-        data = json.loads(request.body)
-        user_id = data.get('user_id')
-        user_email = data.get('user_email')  # Make sure to send this from the frontend
-
-        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
-
-        # Create a new customer with metadata
-        customer = stripe.Customer.create(
-            email=user_email,
-            metadata={'user_id': user_id}
-        )
-
-        checkout_session = stripe.checkout.Session.create(
-            customer=customer.id,
-            client_reference_id=user_id,
-            payment_method_types=['card'],
-            line_items=[{
-                'price': 'price_1PYv2VCHpOkAgMGGwiAyZpN3', #pro price ID
-                'quantity': 1,
-            }],
-            mode='subscription',
-            success_url='https://www.1nbox-ai.com/home?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url='https://www.1nbox-ai.com/pricing',
-        )
         return JsonResponse({'checkoutUrl': checkout_session.url})
     except Exception as e:
         return JsonResponse({'error': str(e)})
@@ -672,50 +346,11 @@ def handle_subscription_event(subscription, deleted):
     except stripe.error.StripeError as e:
         print(f"Error retrieving customer: {str(e)}")
 
-def update_supabase_plan(user):
 
-    user_id = user.supabase_user_id
-    access_token = user.access_token
-    refresh_token = user.refresh_token
+# OLD 1NBOX RIP
 
-    supabase_url = os.environ.get('SUPABASE_URL')
-    supabase_key = os.environ.get('SUPABASE_KEY')
-    
-    supabase: Client = create_client(supabase_url, supabase_key)
 
-    try:
-        # Attempt to set the session with the current tokens
-        supabase.auth.set_session(access_token=access_token, refresh_token=refresh_token)
-    except Exception as e:
-        print(f"Error setting session: {e}")
-        # Attempt to refresh the tokens if the session setting fails
-        try:
-            response = requests.post(
-                f"{supabase_url}/auth/v1/token?grant_type=refresh_token",
-                headers={"apikey": supabase_key, "Content-Type": "application/json"},
-                json={"refresh_token": refresh_token}
-            )
-            response_data = response.json()
-            if response.status_code == 200:
-                # Update the user's tokens
-                access_token = response_data['access_token']
-                refresh_token = response_data['refresh_token']
-                user.access_token = access_token
-                user.refresh_token = refresh_token
-                user.save()  # Save the updated tokens to the database
-                # Set the session with the new tokens
-                supabase.auth.set_session(access_token=access_token, refresh_token=refresh_token)
-            else:
-                print(f"Error refreshing token: {response_data}")
-                return
-        except Exception as refresh_error:
-            print(f"Error refreshing token: {refresh_error}")
-            return
 
-    # Insert the plan into the Settings table
-    try:
-        data, count = supabase.table('Settings').update({"plan": user.plan}).eq("user_id", user_id).execute()
-        print(data)
-        print(count)
-    except Exception as insert_error:
-        print(f"Error inserting summary: {insert_error}")
+
+
+
