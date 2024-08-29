@@ -136,7 +136,7 @@
             {% endfor %}
         </div>
 
-               <!-- First Topic and its contents -->
+        <!-- First Topic and its contents -->
         {% if topics %}
             {% with first_topic=topics.0 %}
             <div class="world-news">
@@ -145,7 +145,7 @@
                 {% for item in first_topic.summary %}
                 <div>
                     <div class="news-title">{{ item.title }}</div>
-                    <div class="news-detail">{{ item.content }}</div>
+                    <div class="news-detail">{{ item.content|replace:"\n", "<br>"|safe }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -173,7 +173,7 @@
                     {% for item in topic.summary %}
                     <div>
                         <div class="news-title">{{ item.title }}</div>
-                        <div class="news-detail">{{ item.content }}</div>
+                        <div class="news-detail">{{ item.content|replace:"\n", "<br>"|safe }}</div>
                     </div>
                     {% endfor %}
                 </div>
