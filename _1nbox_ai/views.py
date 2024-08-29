@@ -344,6 +344,58 @@ def handle_subscription_event(subscription, deleted):
         print(f"Error retrieving customer: {str(e)}")
 
 
+import stripe
+import json
+import os
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from .models import User  # Adjust this import based on your project structure
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def cancel_subscription(request):
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+
+        # Retrieve the user
+        user = User.objects.filter(supabase_user_id=user_id).first()
+        if not user:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        # Set up Stripe API key
+        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+
+        # Find the Stripe customer using the user's email
+        customers = stripe.Customer.list(email=user.email)
+        if not customers.data:
+            return JsonResponse({'error': 'No Stripe customer found for this user'}, status=404)
+        
+        customer = customers.data[0]
+
+        # Retrieve the customer's subscriptions
+        subscriptions = stripe.Subscription.list(customer=customer.id)
+
+        if not subscriptions.data:
+            return JsonResponse({'error': 'No active subscription found'}, status=400)
+
+        # Cancel the subscription
+        for subscription in subscriptions.data:
+            canceled_subscription = stripe.Subscription.delete(subscription.id)
+
+        # Update user's plan in your database
+        user.plan = "inactive"
+        user.save()
+
+        return JsonResponse({'message': 'Subscription canceled successfully'})
+
+    except stripe.error.StripeError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 # OLD 1NBOX RIP
 
 
