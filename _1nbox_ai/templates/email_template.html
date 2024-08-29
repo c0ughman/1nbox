@@ -136,16 +136,20 @@
         </div>
 
                <!-- First Topic and its contents -->
-        <div class="world-news">
-            <h2>{{ topics[0].name }}</h2>
-            <a href="https://www.1nbox-ai.com/chat?topic={{ topics[0].name }}&user_id={{ user.supabase_user_id }}" class="ask-ai-link">Ask AI</a>
-            {% for item in topics[0].summary %}
-            <div>
-                <div class="news-title">{{ item.title }}</div>
-                <div class="news-detail">{{ item.content }}</div>
+        {% if topics %}
+            {% with first_topic=topics.0 %}
+            <div class="world-news">
+                <h2>{{ first_topic.name }}</h2>
+                <a href="https://www.1nbox-ai.com/chat?topic={{ first_topic.name }}&user_id={{ user.supabase_user_id }}" class="ask-ai-link">Ask AI</a>
+                {% for item in first_topic.summary %}
+                <div>
+                    <div class="news-title">{{ item.title }}</div>
+                    <div class="news-detail">{{ item.content }}</div>
+                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
-        </div>
+            {% endwith %}
+        {% endif %}
 
         <!-- Optional Custom Message -->
         {% if custom_message %}
