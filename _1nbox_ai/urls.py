@@ -29,6 +29,8 @@ urlpatterns = [
     path('get_summaries/', views.get_summaries),
     path('create_topic/', views.create_topic, name='create_topic'),
 
+    
+    path('cancel_subscription/', views.cancel_subscription, name='cancel_subscription'),
     path('stripe_webhook/', views.stripe_webhook, name='stripe_webhook'),
     path('create_checkout_session/', views.create_checkout_session, name='create_checkout_session'),
 
