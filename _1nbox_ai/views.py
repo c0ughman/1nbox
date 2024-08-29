@@ -4,7 +4,6 @@ from django.views.decorators.csrf import csrf_exempt
 from _1nbox_ai.models import User, Topic
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
-from _1nbox_ai.workflow import main
 from _1nbox_ai.answer import generate_answer
 from django.views.decorators.http import require_POST, require_http_methods
 import jwt
@@ -14,7 +13,6 @@ from django.http import JsonResponse
 from django.conf import settings
 import stripe
 import requests
-from supabase import create_client, Client
 import time
 
 @csrf_exempt
