@@ -18,8 +18,6 @@ from django.contrib import admin
 from django.urls import path
 from _1nbox_ai import views
 from django.contrib import admin
-from _1nbox_ai import workflow
-from _1nbox_ai import schedulers
 from django.db import connection
 
 urlpatterns = [
