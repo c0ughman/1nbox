@@ -151,6 +151,22 @@
             {% endwith %}
         {% endif %}
 
+        <!-- Remaining Topics and their contents -->
+        {% for topic in topics %}
+            {% if not forloop.first %}
+                <div class="world-news">
+                    <h2>{{ topic.name }}</h2>
+                    <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&user_id={{ user.supabase_user_id }}" class="ask-ai-link">Ask AI</a>
+                    {% for item in topic.summary %}
+                    <div>
+                        <div class="news-title">{{ item.title }}</div>
+                        <div class="news-detail">{{ item.content }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endfor %}
+
         <!-- Optional Custom Message -->
         {% if custom_message %}
         <div class="custom-message">
@@ -162,20 +178,6 @@
             <a href="#" class="custom-message-button">{{ custom_message.buttontext }}</a>
         </div>
         {% endif %}
-
-        <!-- Remaining Topics and their contents -->
-        {% for topic in topics[1:] %}
-        <div class="world-news">
-            <h2>{{ topic.name }}</h2>
-            <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&user_id={{ user.supabase_user_id }}" class="ask-ai-link">Ask AI</a>
-            {% for item in topic.summary %}
-            <div>
-                <div class="news-title">{{ item.title }}</div>
-                <div class="news-detail">{{ item.content }}</div>
-            </div>
-            {% endfor %}
-        </div>
-        {% endfor %}
 
         <div class="footer">
             <div class="column">
@@ -195,3 +197,4 @@
     </div>
 </body>
 </html>
+
