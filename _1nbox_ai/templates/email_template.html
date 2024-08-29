@@ -145,7 +145,11 @@
                 {% for item in first_topic.summary %}
                 <div>
                     <div class="news-title">{{ item.title }}</div>
-                    <div class="news-detail">{{ item.content }}</div>
+                    <div class="news-detail">
+                        {% for paragraph in item.content.split('\n\n') %}
+                            <p>{{ paragraph }}</p>
+                        {% endfor %}
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -171,7 +175,11 @@
                     {% for item in topic.summary %}
                     <div>
                         <div class="news-title">{{ item.title }}</div>
-                        <div class="news-detail">{{ item.content }}</div>
+                        <div class="news-detail">
+                            {% for paragraph in item.content.split('\n\n') %}
+                                <p>{{ paragraph }}</p>
+                            {% endfor %}
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
