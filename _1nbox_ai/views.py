@@ -81,14 +81,10 @@ def get_user_data(request, supabase_user_id):
         
         user_data = {
             'email': user.email,
-            'phone_number': user.phone_number,
             'supabase_user_id': user.supabase_user_id,
             'plan': user.plan,
             'negative_keywords': user.negative_keywords,
             'positive_keywords': user.positive_keywords,
-            'language': user.language,
-            'time_zone': user.time_zone,
-            'messaging_app': user.messaging_app,
             'topics': user.topics,
             'days_since': user.days_since,
             'summaries_list': summaries_list,
@@ -139,20 +135,12 @@ def update_user_data(request):
         # Update user fields if present in the request data
         if 'email' in data:
             user.email = data['email']
-        if 'phone_number' in data:
-            user.phone_number = data['phone_number']
         if 'plan' in data:
             user.plan = data['plan']
         if 'negative_keywords' in data:
             user.negative_keywords = data['negative_keywords']
         if 'positive_keywords' in data:
             user.positive_keywords = data['positive_keywords']
-        if 'language' in data:
-            user.language = data['language']
-        if 'time_zone' in data:
-            user.time_zone = data['time_zone']
-        if 'messaging_app' in data:
-            user.messaging_app = data['messaging_app']
             
         if 'topics' in data:
             topics = data['topics']
@@ -181,29 +169,22 @@ def sign_up(request):
             print("Full request data:", request_data)
             
             email = request_data.get('email')
-            messaging_app = request_data.get('messaging_app')
             topics = request_data.get('topics')
-            phone_number = request_data.get('phone_number')
             user_id = request_data.get('user_id')
             
-            print(f"Extracted data: email={email}, app={messaging_app}, topics={topics}, phone={phone_number}, user_id={user_id}")
+            print(f"Extracted data: email={email}, topics={topics}, user_id={user_id}")
             
             user, created = User.objects.get_or_create(email=email)
             
             if created:
                 user.topics = topics
-                user.messaging_app = messaging_app
-                user.phone_number = phone_number
                 user.supabase_user_id = user_id
                 user.days_since = int(time.time())
                 user.save()
                 print(f"New user created: {user.id}")
                 return JsonResponse({'success': True, 'user_id': user.id, 'message': 'User created successfully'}, status=201)
             else:
-                user.messaging_app = messaging_app
                 user.topics = topics
-                if phone_number:
-                    user.phone_number = phone_number
                 if user_id:
                     user.supabase_user_id = user_id
                 user.save()
