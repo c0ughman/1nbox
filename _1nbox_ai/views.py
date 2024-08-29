@@ -301,15 +301,15 @@ def handle_subscription_event(subscription, deleted):
 
                     if deleted == True:
                         user.plan = "inactive"  # Set the plan to "no plan"
-                        print("UPDATED TO: no plan")
+                        print("UPDATED TO: inactive")
 
                     else:
                         if subscription['items']['data'][0]['price']['id'] == 'price_1PYv2KCHpOkAgMGGyv0S3LW8':
                             user.plan = "paid"  # Set the plan to "basic"
-                            print("UPDATED TO: basic")
+                            print("UPDATED TO: paid")
                         elif subscription['items']['data'][0]['price']['id'] == 'price_1PYv2VCHpOkAgMGGwiAyZpN3':
                             user.plan = "paid"  # Set the plan to "pro"
-                            print("UPDATED TO: pro")
+                            print("UPDATED TO: paid")
 
                         else:
                             print("SOMETHING WRONG WITH PLAN PRICE ID BROTHER")
