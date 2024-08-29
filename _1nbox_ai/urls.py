@@ -24,11 +24,7 @@ from django.db import connection
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('new_lead/', views.new_lead),
-    path('new_user/', views.new_user),
-    path('lead/<str:phone_number>/', views.get_user_data_by_phone),
     path('user/<str:supabase_user_id>/', views.get_user_data),
-    path('user-data/<str:email>/', views.get_user_data_by_email),
     path('sign_up/', views.sign_up),
     path('message_received/', views.message_received),
     path('update_user_data/', views.update_user_data),
@@ -37,6 +33,5 @@ urlpatterns = [
 
     path('stripe_webhook/', views.stripe_webhook, name='stripe_webhook'),
     path('create_checkout_session/', views.create_checkout_session, name='create_checkout_session'),
-    path('create_checkout_session_pro/', views.create_checkout_session_pro, name='create_checkout_session_pro')
 
 ]
