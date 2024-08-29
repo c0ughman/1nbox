@@ -319,22 +319,21 @@ def handle_subscription_event(subscription, deleted):
                 for user in matching_users:
 
                     if deleted == True:
-                        user.plan = "no plan"  # Set the plan to "no plan"
+                        user.plan = "inactive"  # Set the plan to "no plan"
                         print("UPDATED TO: no plan")
 
                     else:
                         if subscription['items']['data'][0]['price']['id'] == 'price_1PYv2KCHpOkAgMGGyv0S3LW8':
-                            user.plan = "basic"  # Set the plan to "basic"
+                            user.plan = "paid"  # Set the plan to "basic"
                             print("UPDATED TO: basic")
                         elif subscription['items']['data'][0]['price']['id'] == 'price_1PYv2VCHpOkAgMGGwiAyZpN3':
-                            user.plan = "pro"  # Set the plan to "pro"
+                            user.plan = "paid"  # Set the plan to "pro"
                             print("UPDATED TO: pro")
 
                         else:
                             print("SOMETHING WRONG WITH PLAN PRICE ID BROTHER")
 
                     user.save()
-                    update_supabase_plan(user)
 
                     print(f"Updated subscription for user {user.email}")
             else:
