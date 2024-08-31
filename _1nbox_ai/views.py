@@ -21,7 +21,7 @@ def get_clusters(request, name):
     try:
         topic = Topic.objects.get(name=name).first()
         return JsonResponse(topic.clusters)
-     except Topic.DoesNotExist:
+    except Topic.DoesNotExist:
         return JsonResponse({'error': 'Topic not found'}, status=404)
 
 @csrf_exempt
