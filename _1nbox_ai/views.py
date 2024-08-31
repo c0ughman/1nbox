@@ -16,6 +16,15 @@ import requests
 import time
 
 @csrf_exempt
+@require_http_methods(["GET"])
+def get_clusters(request, name):
+    try:
+        topic = Topic.objects.get(name=name).first()
+        return JsonResponse(topic.clusters)
+     except Topic.DoesNotExist:
+        return JsonResponse({'error': 'Topic not found'}, status=404)
+
+@csrf_exempt
 @require_http_methods(["POST"])
 def create_topic(request):
     print(request.body)
