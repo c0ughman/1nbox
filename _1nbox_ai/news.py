@@ -55,7 +55,7 @@ def get_articles_from_rss(rss_url, days_back=1):
             articles.append({
                 'title': entry.title,
                 'link': entry.link,
-                'published': pub_date,
+                'published': str(pub_date),
                 'summary': entry.summary if 'summary' in entry else '',
                 'content': entry.content[0].value if 'content' in entry else entry.get('summary', '')
             })
