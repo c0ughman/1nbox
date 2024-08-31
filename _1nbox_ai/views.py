@@ -20,7 +20,10 @@ import time
 def get_clusters(request, name):
     try:
         topic = Topic.objects.filter(name=name).first()
-        return JsonResponse(topic.clusters)
+        if topic:
+            return JsonResponse(topic.clusters, safe=False)
+        else:
+            return JsonResponse({'error': 'Topic not found'}, status=404)
     except Topic.DoesNotExist:
         return JsonResponse({'error': 'Topic not found'}, status=404)
 
