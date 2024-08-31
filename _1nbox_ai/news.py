@@ -338,7 +338,9 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
     
         # Print the clusters
         print_clusters(final_clusters)
-    
+
+        topic.clusters = final_clusters    # for the bubbles
+        
         # Get OpenAI summaries for each cluster
         cluster_summaries = {}
         for cluster in final_clusters:
@@ -370,6 +372,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             for child in topic.children.all():
                 child.cluster_summaries = cluster_summaries
                 child.number_of_articles = topic.number_of_articles
+                child.clusters = final_clusters    # for the bubbles
                 child.save()
         topic.save()
         
