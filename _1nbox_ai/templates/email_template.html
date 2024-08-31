@@ -77,6 +77,16 @@
             display: inline-block;
             float: right;
         }
+        .view-sources-link {
+            font-size: 14px;
+            font-weight: bold;
+            text-decoration: none;
+            color: #2c5945;
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: inline-block;
+            float: right;
+        }
         .footer {
             background-color: #FAFAFA;
             color: gray;
@@ -143,6 +153,7 @@
             <div class="world-news">
                 <h2>{{ first_topic.name }}</h2>
                 <a href="https://www.1nbox-ai.com/chat?topic={{ first_topic.name }}&user_id={{ user.supabase_user_id }}" class="ask-ai-link">Ask AI</a>
+                <a href="https://www.1nbox-ai.com/sources?topic={{ first_topic.name }}&user_id={{ user.supabase_user_id }}" class="view-sources-link">View Sources</a>
                 {% for item in first_topic.summary %}
                 <div>
                     <div class="news-title">{{ item.title }}</div>
@@ -169,6 +180,7 @@
                 <div class="world-news">
                     <h2>{{ topic.name }}</h2>
                     <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&user_id={{ user.supabase_user_id }}" class="ask-ai-link">Ask AI</a>
+                    <a href="https://www.1nbox-ai.com/sources?topic={{ topic.name }}&user_id={{ user.supabase_user_id }}" class="view-sources-link">View Sources</a>
                     {% for item in topic.summary %}
                     <div>
                         <div class="news-title">{{ item.title }}</div>
