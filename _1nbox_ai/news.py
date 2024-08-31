@@ -52,12 +52,14 @@ def get_articles_from_rss(rss_url, days_back=1):
     for entry in feed.entries:
         pub_date = get_publication_date(entry)
         if pub_date and pub_date >= cutoff_date:
+            favicon_url = f"https://www.google.com/s2/favicons?domain={rss_url}"
             articles.append({
                 'title': entry.title,
                 'link': entry.link,
                 'published': str(pub_date),
                 'summary': entry.summary if 'summary' in entry else '',
-                'content': entry.content[0].value if 'content' in entry else entry.get('summary', '')
+                'content': entry.content[0].value if 'content' in entry else entry.get('summary', ''),
+                'favicon': favicon_url
             })
         elif not pub_date:
             print(f"Warning: Missing date for entry '{entry.title}'")
