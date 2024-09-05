@@ -413,38 +413,38 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             print("                       ")
             cluster_summaries[key] = summary
     
-    # Get the final summary
-    final_summary_json = get_final_summary(topic, list(cluster_summaries.values()), sentences_final_summary)
-    print(final_summary_json)
-    final_summary_json = extract_braces_content(final_summary_json)
-    print(final_summary_json)
-    
-    # Parse the JSON
-    final_summary_data = json.loads(final_summary_json)
-    
-    # Process each item in the summary
-    for item in final_summary_data['summary']:
-        image_url = get_image_for_item(item, INSIGNIFICANT_WORDS)
-        if image_url:
-            item['image'] = image_url
-    
-    # Convert back to JSON
-    updated_final_summary_json = json.dumps(final_summary_data)
-    
-    topic.summary = updated_final_summary_json
-    
-    print(f"SUMMARY for {topic.name}")
-    print(topic.summary)
-    
-    # Update the Topic instance
-    topic.cluster_summaries = cluster_summaries
-    if topic.children.exists():
-        for child in topic.children.all():
-            child.cluster_summaries = cluster_summaries
-            child.number_of_articles = topic.number_of_articles
-            child.clusters = final_clusters    # for the bubbles
-            child.save()
-    topic.save()
+        # Get the final summary
+        final_summary_json = get_final_summary(topic, list(cluster_summaries.values()), sentences_final_summary)
+        print(final_summary_json)
+        final_summary_json = extract_braces_content(final_summary_json)
+        print(final_summary_json)
+        
+        # Parse the JSON
+        final_summary_data = json.loads(final_summary_json)
+        
+        # Process each item in the summary
+        for item in final_summary_data['summary']:
+            image_url = get_image_for_item(item, INSIGNIFICANT_WORDS)
+            if image_url:
+                item['image'] = image_url
+        
+        # Convert back to JSON
+        updated_final_summary_json = json.dumps(final_summary_data)
+        
+        topic.summary = updated_final_summary_json
+        
+        print(f"SUMMARY for {topic.name}")
+        print(topic.summary)
+        
+        # Update the Topic instance
+        topic.cluster_summaries = cluster_summaries
+        if topic.children.exists():
+            for child in topic.children.all():
+                child.cluster_summaries = cluster_summaries
+                child.number_of_articles = topic.number_of_articles
+                child.clusters = final_clusters    # for the bubbles
+                child.save()
+        topic.save()
         
     else:
         # No sources and no cluster summaries, process child topics first
