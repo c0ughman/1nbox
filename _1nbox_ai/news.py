@@ -28,6 +28,7 @@ INSIGNIFICANT_WORDS = set([
     'Science', 'Sciences', 'Volume', 'Academy', 'University', 'Images', 'Infobox', 'Read',
     'Pin', 'Post', 'Like', 'Subscribe', 'Stumble', 'Add', 'Brief', 'View', 'While', 'However', 'Country',
     'Even', 'Still', 'Monthly', 'Jan', 'Feb', 'Apr', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Miscellaneous',
 
 
 ])
@@ -360,7 +361,7 @@ def get_image_for_item(item, insignificant_words):
         if image_url:
             # Check if at least two of the top 5 words are present in the file name
             matching_words = [word for word in top_5_words if word.lower() in image_url.lower()]
-            if len(matching_words) >= 2:
+            if len(matching_words) >= 3:
                 print(f"Found image for terms: {' '.join(search_terms)}")
                 print(f"Image URL: {image_url}")
                 print(f"Matching words in filename: {', '.join(matching_words)}")
