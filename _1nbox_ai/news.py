@@ -9,6 +9,7 @@ from collections import Counter
 from .models import Topic, User
 import json
 import ast
+import requests
 
 
 # List of insignificant words to exclude
@@ -301,6 +302,64 @@ def parse_input(input_string):
     
     return summary, questions
 
+
+# WIKIMEDIA STUFF HERE
+
+def extract_capitalized_words(text, insignificant_words):
+    words = re.findall(r'\b[A-Z][a-z]+\b', text)
+    return [word for word in words if word not in insignificant_words and len(word) > 1]
+
+def get_sorted_unique_words(words):
+    word_counts = Counter(words)
+    return sorted(word_counts, key=word_counts.get, reverse=True)
+
+def get_wikimedia_image(search_terms):
+    base_url = "https://commons.wikimedia.org/w/api.php"
+    params = {
+        "action": "query",
+        "format": "json",
+        "list": "search",
+        "srsearch": f"{' '.join(search_terms)} filetype:bitmap",
+        "srnamespace": "6",
+        "srlimit": "1"
+    }
+    
+    response = requests.get(base_url, params=params)
+    data = response.json()
+    
+    if data["query"]["search"]:
+        file_name = data["query"]["search"][0]["title"]
+        image_info_params = {
+            "action": "query",
+            "format": "json",
+            "prop": "imageinfo",
+            "iiprop": "url",
+            "titles": file_name
+        }
+        image_info_response = requests.get(base_url, params=image_info_params)
+        image_data = image_info_response.json()
+        
+        pages = image_data["query"]["pages"]
+        for page in pages.values():
+            if "imageinfo" in page:
+                return page["imageinfo"][0]["url"]
+    
+    return None
+
+def get_image_for_item(item, insignificant_words):
+    words = extract_capitalized_words(item['title'] + ' ' + item['content'], insignificant_words)
+    sorted_words = get_sorted_unique_words(words)
+    
+    for i in range(min(3, len(sorted_words)), 0, -1):
+        search_terms = sorted_words[:i]
+        image_url = get_wikimedia_image(search_terms)
+        if image_url:
+            print(f"Found image for terms: {' '.join(search_terms)}")
+            print(f"Image URL: {image_url}")
+            return image_url
+    
+    return None
+    
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                   merge_threshold=2, min_articles=3, join_percentage=0.5,
                   final_merge_percentage=0.5, sentences_final_summary=3):
@@ -354,29 +413,38 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             print("                       ")
             cluster_summaries[key] = summary
     
-        # Get the final summary
-        final_summary_json = get_final_summary(topic, list(cluster_summaries.values()), sentences_final_summary)
-        print(final_summary_json)
-        final_summary_json = extract_braces_content(final_summary_json)
-        print(final_summary_json)
-        #summary, questions = parse_input(final_summary_json)
-        topic.summary = final_summary_json
-        #topic.questions = '\n'.join(questions)             
+    # Get the final summary
+    final_summary_json = get_final_summary(topic, list(cluster_summaries.values()), sentences_final_summary)
+    print(final_summary_json)
+    final_summary_json = extract_braces_content(final_summary_json)
+    print(final_summary_json)
     
-        print(f"SUMMARY for {topic.name}")
-        print(topic.summary)
-        print(f"QUESTIONS for {topic.name}")
-        print(topic.questions)
+    # Parse the JSON
+    final_summary_data = json.loads(final_summary_json)
     
-        # Update the Topic instance
-        topic.cluster_summaries = cluster_summaries
-        if topic.children.exists():
-            for child in topic.children.all():
-                child.cluster_summaries = cluster_summaries
-                child.number_of_articles = topic.number_of_articles
-                child.clusters = final_clusters    # for the bubbles
-                child.save()
-        topic.save()
+    # Process each item in the summary
+    for item in final_summary_data['summary']:
+        image_url = get_image_for_item(item, INSIGNIFICANT_WORDS)
+        if image_url:
+            item['image'] = image_url
+    
+    # Convert back to JSON
+    updated_final_summary_json = json.dumps(final_summary_data)
+    
+    topic.summary = updated_final_summary_json
+    
+    print(f"SUMMARY for {topic.name}")
+    print(topic.summary)
+    
+    # Update the Topic instance
+    topic.cluster_summaries = cluster_summaries
+    if topic.children.exists():
+        for child in topic.children.all():
+            child.cluster_summaries = cluster_summaries
+            child.number_of_articles = topic.number_of_articles
+            child.clusters = final_clusters    # for the bubbles
+            child.save()
+    topic.save()
         
     else:
         # No sources and no cluster summaries, process child topics first
