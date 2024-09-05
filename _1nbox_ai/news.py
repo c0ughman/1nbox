@@ -350,19 +350,20 @@ def get_image_for_item(item, insignificant_words):
     words = extract_capitalized_words(item['title'] + ' ' + item['content'], insignificant_words)
     sorted_words = get_sorted_unique_words(words)
     
-    # Skip the most common word
-    if len(sorted_words) > 1:
-        sorted_words = sorted_words[1:]
+    # Get top 5 common words
+    top_5_words = sorted_words[:5]
     
     # Search for 4 most common, then 3, then 2
     for i in range(min(4, len(sorted_words)), 1, -1):
         search_terms = sorted_words[:i]
         image_url = get_wikimedia_image(search_terms)
         if image_url:
-            # Check if at least one of the words is present in the file name
-            if any(word.lower() in image_url.lower() for word in search_terms):
+            # Check if at least two of the top 5 words are present in the file name
+            matching_words = [word for word in top_5_words if word.lower() in image_url.lower()]
+            if len(matching_words) >= 2:
                 print(f"Found image for terms: {' '.join(search_terms)}")
                 print(f"Image URL: {image_url}")
+                print(f"Matching words in filename: {', '.join(matching_words)}")
                 return image_url
     
     return None
