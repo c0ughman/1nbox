@@ -501,7 +501,7 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
     all_topics = list(topics_with_children) + list(topics_without_children)
 
     for topic in all_topics:
-        if User.objects.filter(topics__contains=topic.name).exists():
+        if User.objects.filter(topics__contains=topic.name).exclude(plan='inactive').exists():
             process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
                           merge_threshold, min_articles, join_percentage,
                           final_merge_percentage, sentences_final_summary)
