@@ -116,7 +116,7 @@ def get_custom_message(days_since):
 def send_summaries():
     current_time = datetime.now().timestamp()
 
-    for user in User.objects.exclude(plan="over"):
+    for user in User.objects.exclude(plan="inactive"):
         # Calculate days since last update
         days_since = int((current_time - user.days_since) // (24 * 3600))
 
