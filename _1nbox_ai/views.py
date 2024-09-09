@@ -56,7 +56,7 @@ def apply_referral_discount(request):
     except stripe.error.StripeError as e:
         return JsonResponse({
             'success': False,
-            'message': str(e)
+            'message': f"Stripe error: {str(e)}"
         }, status=400)
 
 
