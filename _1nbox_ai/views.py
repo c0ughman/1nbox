@@ -19,7 +19,10 @@ import time
 @require_POST
 def apply_referral_discount(request):
     # Get the customer ID and coupon code from the request
-    referred_by = request.POST.get('referred_by')
+    referred_by = request.POST['referred_by']
+    print(request.POST['referred_by'])
+    print(request.POST)
+    print(request.body)
     print(referred_by)
 
     # Get user from referred by id
