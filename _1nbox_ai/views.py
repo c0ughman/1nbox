@@ -42,7 +42,7 @@ def apply_referral_discount(request):
         return JsonResponse({'error': 'No Stripe customer found for this user'}, status=404)
         
     customer = customers.data[0]
-    coupon_code = "ZjlOV5hG"
+    coupon_code = "rd1bRzza"
 
     try:    
         # Apply the coupon to the customer
