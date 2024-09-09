@@ -16,6 +16,37 @@ import requests
 import time
 
 @csrf_exempt
+@require_POST
+def apply_referral_discount(request):
+    try:
+
+        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+        
+        # Get the customer ID and coupon code from the request
+        customer_id = request.POST.get('referred_by')
+        # Retrieve the customer
+        customer = stripe.Customer.retrieve(customer_id)
+        coupon_code = "ZjlOV5hG"
+
+        # Apply the coupon to the customer
+        customer = stripe.Customer.modify(
+            customer.id,
+            coupon=coupon_code
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Discount applied successfully to customer {customer.id}'
+        })
+    except stripe.error.StripeError as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=400)
+
+
+
+@csrf_exempt
 @require_http_methods(["GET"])
 def get_clusters(request, name):
     try:
