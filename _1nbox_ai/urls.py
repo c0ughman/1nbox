@@ -27,8 +27,11 @@ urlpatterns = [
     path('message_received/', views.message_received),
     path('update_user_data/', views.update_user_data),
     path('get_summaries/', views.get_summaries),
-    path('create_topic/', views.create_topic, name='create_topic'),
+    path('create_topic/', views.create_topic),
     path('topic/clusters/<str:name>/', views.get_clusters),
+    path('apply_referral_discount/', views.apply_referral_discount),
+
+    
     
 
     
