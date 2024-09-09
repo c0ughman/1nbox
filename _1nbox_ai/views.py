@@ -20,6 +20,7 @@ import time
 def apply_referral_discount(request):
     # Get the customer ID and coupon code from the request
     referred_by = request.POST.get('referred_by')
+    print(referred_by)
 
     # Get user from referred by id
     user = User.objects.filter(supabase_user_id=referred_by).first()
