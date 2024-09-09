@@ -18,16 +18,31 @@ import time
 @csrf_exempt
 @require_POST
 def apply_referral_discount(request):
-    try:
+    # Get the customer ID and coupon code from the request
+    referred_by = request.POST.get('referred_by')
 
-        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+    # Get user from referred by id
+    user = User.objects.filter(supabase_user_id=referred_by).first()
+    if not user:
+        return JsonResponse({'error': 'User not found'}, status=404)
+
+    # Get email from user
+    user_email = user.email
+    if not user_email:
+        return JsonResponse({'error': 'Email fo user not found'}, status=404)
+
+    # Initialize stripe
+    stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+
+    # Get customer by email
+    customers = stripe.Customer.list(email=user.email)
+    if not customers.data:
+        return JsonResponse({'error': 'No Stripe customer found for this user'}, status=404)
         
-        # Get the customer ID and coupon code from the request
-        customer_id = request.POST.get('referred_by')
-        # Retrieve the customer
-        customer = stripe.Customer.retrieve(customer_id)
-        coupon_code = "ZjlOV5hG"
+    customer = customers.data[0]
+    coupon_code = "ZjlOV5hG"
 
+    try:    
         # Apply the coupon to the customer
         customer = stripe.Customer.modify(
             customer.id,
