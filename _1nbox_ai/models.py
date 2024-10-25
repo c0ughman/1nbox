@@ -19,7 +19,7 @@ class Organization(models.Model):
     )
     stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
     stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     
     def __str__(self):
         return f"{self.name} ({self.plan})"
@@ -31,7 +31,7 @@ class Organization(models.Model):
 class User(models.Model):
     # AutoField id is automatically added by Django
     email = models.CharField(max_length=255, unique=True)
-    joined_at = models.DateTimeField(auto_now_add=True)
+    joined_at = models.DateTimeField(default=timezone.now)
     role = models.CharField(
         max_length=50,
         choices=[
@@ -69,7 +69,7 @@ class Topic(models.Model):
         on_delete=models.CASCADE,
         related_name='topics'
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     
     def __str__(self):
         return self.name
@@ -90,7 +90,7 @@ class Summary(models.Model):
     final_summary = models.JSONField(default=dict, blank=True, null=True)
     questions = models.TextField(blank=True, null=True)
     number_of_articles = models.IntegerField(default=0, blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     
     def __str__(self):
         return f"Summary for {self.topic.name} ({self.created_at.date()})"
