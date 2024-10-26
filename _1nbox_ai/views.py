@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 import json
 from django.views.decorators.csrf import csrf_exempt
-from _1nbox_ai.models import User, Topic
+from _1nbox_ai.models import User, Topic, Organization, Summary
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from _1nbox_ai.answer import generate_answer
@@ -16,58 +16,10 @@ import requests
 import time
 
 @csrf_exempt
-@require_POST
-def apply_referral_discount(request):
-    # Get the customer ID and coupon code from the request
-    data = json.loads(request.body)
-    referred_by = data.get('referred_by')
-    print(referred_by)
-
-    # Get user from referred by id
-    user = User.objects.filter(supabase_user_id=referred_by).first()
-    if not user:
-        return JsonResponse({'error': 'User not found'}, status=404)
-
-    # Get email from user
-    user_email = user.email
-    if not user_email:
-        return JsonResponse({'error': 'Email fo user not found'}, status=404)
-
-    # Initialize stripe
-    stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
-
-    # Get customer by email
-    customers = stripe.Customer.list(email=user.email)
-    if not customers.data:
-        return JsonResponse({'error': 'No Stripe customer found for this user'}, status=404)
-        
-    customer = customers.data[0]
-    coupon_code = "rd1bRzza"
-
-    try:    
-        # Apply the coupon to the customer
-        customer = stripe.Customer.modify(
-            customer.id,
-            coupon=coupon_code
-        )
-
-        return JsonResponse({
-            'success': True,
-            'message': f'Discount applied successfully to customer {customer.id}'
-        })
-    except stripe.error.StripeError as e:
-        return JsonResponse({
-            'success': False,
-            'message': f"Stripe error: {str(e)}"
-        }, status=400)
-
-
-
-@csrf_exempt
 @require_http_methods(["GET"])
-def get_clusters(request, name):
+def get_clusters(request, id):
     try:
-        topic = Topic.objects.filter(name=name).first()
+        topic = Topic.objects.filter(id=id).first()
         if topic:
             return JsonResponse(topic.clusters, safe=False)
         else:
@@ -85,25 +37,24 @@ def create_topic(request):
         sources = data.get('sources')
         prompt = data.get('customPrompt')
         custom_rss = data.get('customRss')
-        user_id = data.get('user_id')
+        organization_id = data.get('organization_id')
+        negative_keywords = data.get('negative_keywords')
+        positive_keywords = data.get('positive_keywords')
     
         all_sources = sources + custom_rss
-        try:
-            user = User.objects.get(supabase_user_id=user_id)
-            
-            # Ensure user.topics is a list
-            if not isinstance(user.topics, list):
-                user.topics = []
-            
-            user.topics.append(name)
-            user.save()
-        except Exception as e:
-            print(f"OJO - Counldn't save the topic for the user: {e}")
 
         if not name:
             return JsonResponse({'success': False, 'error': 'Topic name is required.'}, status=400)
-        topic = Topic.objects.create(name=name, sources=all_sources, prompt=prompt, created_by=user_id, custom=True)
+    
+        try:
+            organization = Organization.objects.get(id=organization_id)
+            topic = Topic.objects.create(name=name, sources=all_sources, prompt=prompt, organization=organization, positive_keywords=positive_keywords, negative_keywords=negative_keywords)
+            
+        except Exception as e:
+            print(f"OJO - Counldn't create Topic: {e}")
+            
         return JsonResponse({'success': True, 'id': topic.id})
+        
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
     except Exception as e:
@@ -129,96 +80,25 @@ def message_received(request):
 @require_http_methods(["GET"])
 def get_user_data(request, supabase_user_id):
     try:
-        user = User.objects.get(supabase_user_id=supabase_user_id)
+        user = User.objects.get(id=id)
 
         summaries_list = []
-        for topic in user.topics:
-            chosenTopic = Topic.objects.filter(name=topic).first()
-            if chosenTopic:
-                summaries_list.append(chosenTopic.summary)
+        for topic in user.organization.topics.all():
+            if topic:
+                summaries_list.append(topic.summaries.first().final_summary)
             else:
-                print("OJO!!! - Missing a Topic here")
+                print("OJO - Missing a Topic here")
         
         user_data = {
             'email': user.email,
-            'supabase_user_id': user.supabase_user_id,
-            'plan': user.plan,
-            'negative_keywords': user.negative_keywords,
-            'positive_keywords': user.positive_keywords,
-            'topics': user.topics,
-            'days_since': user.days_since,
+            'supabase_user_id': user.id,
+            'plan': user.organization.plan,
+            'topics': user.organization.topics.values_list('name', flat=True)
             'summaries_list': summaries_list,
         }
         return JsonResponse(user_data)
     except User.DoesNotExist:
         return JsonResponse({'error': 'User not found'}, status=404)
-
-@csrf_exempt
-@require_http_methods(["GET"])
-def get_summaries(request):
-    try:
-        # Get the 'topics' query parameter from the URL
-        topics = request.GET.get('topics', '')
-        
-        # Split the topics string into a list
-        topic_names = topics.split(',')
-    
-        # Initialize an empty dictionary to store summaries
-        summaries_dict = {}
-    
-        # Iterate through all Topic objects and check if they match any of the requested topics
-        for topic in Topic.objects.all():
-            if topic.name in topic_names:
-                summaries_dict[topic.name] = topic.summary
-    
-        # Return the summaries as a JSON response
-        return JsonResponse(summaries_dict)
-
-    except json.JSONDecodeError:
-        # Handle JSON decoding errors
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
-
-@csrf_exempt
-def update_user_data(request):
-    try:
-        # Parse the JSON data from the request body
-        data = json.loads(request.body.decode('utf-8'))
-        
-        # Get the user ID from the request data
-        supabase_user_id = data.get('supabase_user_id')
-        if not supabase_user_id:
-            return JsonResponse({'error': 'supabase_user_id is required'}, status=400)
-        
-        # Retrieve the user instance by user ID
-        user = User.objects.get(supabase_user_id=supabase_user_id)
-        
-        # Update user fields if present in the request data
-        if 'email' in data:
-            user.email = data['email']
-        if 'plan' in data:
-            user.plan = data['plan']
-        if 'negative_keywords' in data:
-            user.negative_keywords = data['negative_keywords']
-        if 'positive_keywords' in data:
-            user.positive_keywords = data['positive_keywords']
-            
-        if 'topics' in data:
-            topics = data['topics']
-            topics = [item for item in topics if item]
-            user.topics = topics
-            
-        if 'days_since' in data:
-            user.days_since = data['days_since']
-        
-        # Save the updated user instance
-        user.save()
-        
-        # Return a success message
-        return JsonResponse({'message': 'User data updated successfully'})
-    except User.DoesNotExist:
-        return JsonResponse({'error': 'User not found'}, status=404)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
 
 @csrf_exempt
@@ -229,24 +109,19 @@ def sign_up(request):
             print("Full request data:", request_data)
             
             email = request_data.get('email')
-            topics = request_data.get('topics')
-            user_id = request_data.get('user_id')
             
-            print(f"Extracted data: email={email}, topics={topics}, user_id={user_id}")
+            print(f"Extracted data: email={email}, user_id={user_id}")
             
             user, created = User.objects.get_or_create(email=email)
             
             if created:
-                user.topics = topics
-                user.supabase_user_id = user_id
-                user.days_since = int(time.time())
+                user.email = email
                 user.save()
                 print(f"New user created: {user.id}")
                 return JsonResponse({'success': True, 'user_id': user.id, 'message': 'User created successfully'}, status=201)
             else:
-                user.topics = topics
                 if user_id:
-                    user.supabase_user_id = user_id
+                    user.email = email
                 user.save()
                 print(f"Existing user updated: {user.id}")
                 return JsonResponse({'success': True, 'user_id': user.id, 'message': 'User updated successfully'}, status=200)
