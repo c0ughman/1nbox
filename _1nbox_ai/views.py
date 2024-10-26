@@ -93,7 +93,7 @@ def get_user_data(request, supabase_user_id):
             'email': user.email,
             'supabase_user_id': user.id,
             'plan': user.organization.plan,
-            'topics': user.organization.topics.values_list('name', flat=True)
+            'topics': user.organization.topics.values_list('name', flat=True),
             'summaries_list': summaries_list,
         }
         return JsonResponse(user_data)
