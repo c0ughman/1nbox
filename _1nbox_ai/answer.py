@@ -10,8 +10,8 @@ def generate_answer(topic, body, context):
     print("Context:", context)
 
     chosen_topic = Topic.objects.get(name=topic)  # Assuming you have a Topic model
-    summary = repr(chosen_topic.summary)
-    cluster_summaries = repr(chosen_topic.cluster_summaries)
+    summary = repr(chosen_topic.summaries.first().final_summary)
+    cluster_summaries = repr(chosen_topic.summaries.first().cluster_summaries)
 
     client = OpenAI(api_key=os.environ.get('OPENAI_KEY'))
 
