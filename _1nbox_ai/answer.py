@@ -9,7 +9,7 @@ def generate_answer(topic, body, context):
     print(body)
     print("Context:", context)
 
-    chosen_topic = Topic.objects.get(name=topic)  # Assuming you have a Topic model
+    chosen_topic = Topic.objects.get(id=topic)  # Checks for the topic id
     summary = repr(chosen_topic.summaries.first().final_summary)
     cluster_summaries = repr(chosen_topic.summaries.first().cluster_summaries)
 
