@@ -6,7 +6,7 @@ import re
 import os
 from openai import OpenAI
 from collections import Counter
-from .models import Topic, User
+from .models import Topic, Organization, Summary
 import json
 import ast
 import requests
@@ -246,7 +246,7 @@ def get_openai_response(cluster, max_tokens=4000):
 
     return ' '.join(summaries)
 
-def get_final_summary(topic, cluster_summaries, sentences_final_summary):
+def get_final_summary(cluster_summaries, sentences_final_summary):
     openai_key = os.environ.get('OPENAI_KEY')
     client = OpenAI(api_key=openai_key)
 
@@ -374,7 +374,8 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                   final_merge_percentage=0.5, sentences_final_summary=3):
     print(f"RUNNING PROCESS TOPIC FOR --- {topic.name}!!!!!")
 
-    if topic.sources:                  
+    if topic.sources:
+        
         all_articles = []
         for url in topic.sources:
             all_articles.extend(get_articles_from_rss(url, days_back))
@@ -408,8 +409,6 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
     
         # Print the clusters
         print_clusters(final_clusters)
-
-        topic.clusters = final_clusters    # for the bubbles
         
         # Get OpenAI summaries for each cluster
         cluster_summaries = {}
@@ -423,7 +422,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             cluster_summaries[key] = summary
     
         # Get the final summary
-        final_summary_json = get_final_summary(topic, list(cluster_summaries.values()), sentences_final_summary)
+        final_summary_json = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
         print(final_summary_json)
         final_summary_json = extract_braces_content(final_summary_json)
         print(final_summary_json)
@@ -440,73 +439,33 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         # Convert back to JSON
         updated_final_summary_json = json.dumps(final_summary_data)
         
-        topic.summary = updated_final_summary_json
-        
-        print(f"SUMMARY for {topic.name}")
-        print(topic.summary)
-        
-        # Update the Topic instance
-        topic.cluster_summaries = cluster_summaries
-        if topic.children.exists():
-            for child in topic.children.all():
-                child.cluster_summaries = cluster_summaries
-                child.number_of_articles = topic.number_of_articles
-                child.clusters = final_clusters    # for the bubbles
-                child.save()
-        topic.save()
-        
+        new_summary = Summary.objects.create(
+            topic=topic,
+            final_summary=updated_final_summary_json,
+            clusters=final_clusters,
+            cluster_summaries=cluster_summaries,
+        )
+
+        print(f"SUMMARY for {topic.name} created:")
+        print(updated_final_summary_json)
+
     else:
-        # No sources and no cluster summaries, process child topics first
-        if topic.children.exists():
-            for child in topic.children.all():
-                process_topic(child, days_back, common_word_threshold, top_words_to_consider,
-                              merge_threshold, min_articles, join_percentage,
-                              final_merge_percentage, sentences_final_summary)
-        
-        if topic.cluster_summaries:
-            final_summary_json = get_final_summary(topic, str(topic.cluster_summaries), sentences_final_summary)
-            print(final_summary_json)
-            final_summary_json = extract_braces_content(final_summary_json)
-            print(final_summary_json)
-            #summary, questions = parse_input(final_summary_json)
-            topic.summary = final_summary_json
-            #topic.questions = '\n'.join(questions)             
-        
-            print(f"SUMMARY for {topic.name}")
-            print(topic.summary)
-            #print(f"QUESTIONS for {topic.name}")
-            #print(topic.questions)
-
-            # Update the Topic instance
-            topic.save()
-
-        else:
-            print("!!OJO!! - No sources and no cluster summaries")
-            # Reprocess the topic again if necessary
-            # This can be optional based on your specific logic
-            # process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
-            #               merge_threshold, min_articles, join_percentage,
-            #               final_merge_percentage, sentences_final_summary)
-
+        print("OJO - Topic has no sources")
 
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                        merge_threshold=2, min_articles=3, join_percentage=0.5,
                        final_merge_percentage=0.5, sentences_final_summary=3):
-    # Get topics with children first
-    topics_with_children = Topic.objects.filter(children__isnull=False).distinct()
-    # Get topics without children
-    topics_without_children = Topic.objects.filter(children__isnull=True)
-
-    # Combine the two querysets, topics with children first
-    all_topics = list(topics_with_children) + list(topics_without_children)
-
-    for topic in all_topics:
-        if User.objects.filter(topics__contains=topic.name).exclude(plan='inactive').exists():
+                           
+       # Get all organizations that are not inactive
+    active_organizations = Organization.objects.exclude(plan='inactive')       # Check for how we will handle inactive later
+    
+    # Process topics for all active organizations
+    for organization in active_organizations:
+        for topic in organization.topics.all():
             process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
-                          merge_threshold, min_articles, join_percentage,
-                          final_merge_percentage, sentences_final_summary)
+                         merge_threshold, min_articles, join_percentage,
+                         final_merge_percentage, sentences_final_summary)
                 
-
 if __name__ == "__main__":
     # This block will not be executed when imported as a module
     process_all_topics()
