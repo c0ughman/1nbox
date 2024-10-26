@@ -5,7 +5,7 @@ from datetime import datetime
 from django.template.loader import render_to_string
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-from .models import Topic, User
+from .models import Topic, User, Summary, Organization
 
 # Set up logging
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
