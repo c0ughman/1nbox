@@ -22,13 +22,11 @@ from django.db import connection
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('user/<str:supabase_user_id>/', views.get_user_data),
+    path('user/<str:id>/', views.get_user_data),
     path('sign_up/', views.sign_up),
     path('message_received/', views.message_received),
-    path('update_user_data/', views.update_user_data),
-    path('get_summaries/', views.get_summaries),
     path('create_topic/', views.create_topic),
-    path('topic/clusters/<str:name>/', views.get_clusters),
+    path('topic/clusters/<str:id>/', views.get_clusters),
     path('apply_referral_discount/', views.apply_referral_discount),
 
     
