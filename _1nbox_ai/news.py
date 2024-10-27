@@ -381,7 +381,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             all_articles.extend(get_articles_from_rss(url, days_back))
     
         # Count the number of articles
-        topic.number_of_articles = len(all_articles)
+        number_of_articles = len(all_articles)
     
         # Extract and count significant words
         word_counts = Counter()
@@ -444,6 +444,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             final_summary=updated_final_summary_json,
             clusters=final_clusters,
             cluster_summaries=cluster_summaries,
+            number_of_articles=number_of_articles,
         )
 
         print(f"SUMMARY for {topic.name} created:")
