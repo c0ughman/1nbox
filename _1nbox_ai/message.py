@@ -21,24 +21,8 @@ def get_user_topics_summary(organization):
         try:
             latest_summary = topic.summaries.first()
             if latest_summary and latest_summary.final_summary:
-                try:
-                    # If final_summary is a string, parse it
-                    if isinstance(latest_summary.final_summary, str):
-                        summary_data = json.loads(latest_summary.final_summary)
-                        latest_summary.final_summary = summary_data.get('summary', [])
-                    
-                    # Filter negative keywords
-                    if topic.negative_keywords:
-                        negative_list = topic.negative_keywords.split(",")
-                        latest_summary.final_summary = [
-                            item for item in latest_summary.final_summary 
-                            if not any(word.lower() in item['content'].lower() for word in negative_list)
-                        ]
-                    
-                    topic_list.append(topic)
-                except json.JSONDecodeError as e:
-                    logging.error(f"Invalid JSON for topic '{topic.name}': {e}")
-                    logging.error(f"Raw summary data: {latest_summary.final_summary}")
+                # No need to parse JSON here, we'll do it in the template
+                topic_list.append(topic)
         except Exception as e:
             logging.error(f"Error processing topic '{topic.name}': {str(e)}")
             
