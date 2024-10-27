@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today in {% for topic in topics %}{{ topic.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</title>
     <style>
-        /* Previous styles remain unchanged */
         body {
             font-family: Arial, sans-serif;
             background-color: #f0f0f0;
@@ -120,34 +119,32 @@
             {% for topic in topics %}
                 {% with latest_summary=topic.summaries.first %}
                     {% if latest_summary and latest_summary.final_summary %}
-                        {% for item in latest_summary.final_summary %}
-                            <div class="news-item">• {{ item.title }}</div>
+                        {% for summary_item in latest_summary.final_summary %}
+                            <div class="news-item">• {{ summary_item.title }}</div>
                         {% endfor %}
                     {% endif %}
                 {% endwith %}
             {% endfor %}
         </div>
 
-        {% if topics %}
-            {% for topic in topics %}
-                <div class="world-news">
-                    <h2>{{ topic.name }}</h2>
-                    <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="ask-ai-link">Ask AI</a>
-                    <a href="https://www.1nbox-ai.com/sources?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="view-sources-link">View Sources</a>
-                    
-                    {% with latest_summary=topic.summaries.first %}
-                        {% if latest_summary and latest_summary.final_summary %}
-                            {% for item in latest_summary.final_summary %}
-                                <div>
-                                    <div class="news-title">{{ item.title }}</div>
-                                    <div class="news-detail">{{ item.content | safe | linebreaksbr }}</div>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
-                </div>
-            {% endfor %}
-        {% endif %}
+        {% for topic in topics %}
+            <div class="world-news">
+                <h2>{{ topic.name }}</h2>
+                <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="ask-ai-link">Ask AI</a>
+                <a href="https://www.1nbox-ai.com/sources?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="view-sources-link">View Sources</a>
+                
+                {% with latest_summary=topic.summaries.first %}
+                    {% if latest_summary and latest_summary.final_summary %}
+                        {% for summary_item in latest_summary.final_summary %}
+                            <div>
+                                <div class="news-title">{{ summary_item.title }}</div>
+                                <div class="news-detail">{{ summary_item.content|safe|linebreaksbr }}</div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+        {% endfor %}
 
         <div class="footer">
             <div class="column">
@@ -165,14 +162,5 @@
             </div>
         </div>
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var newsDetails = document.querySelectorAll('.news-detail');
-            newsDetails.forEach(function(detail) {
-                detail.innerHTML = detail.innerHTML.replace(/\n\n/g, '<br><br>');
-            });
-        });
-    </script>
 </body>
 </html>
