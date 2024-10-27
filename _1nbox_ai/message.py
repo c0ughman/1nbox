@@ -99,7 +99,8 @@ def send_summaries():
             email_content = render_to_string('email_template.html', context)
     
             # Send the email
-            success, result = send_email(user, f"Today in {','.join(topics)}", email_content)
+            topic_names = ", ".join([topic.name for topic in topics])
+            success, result = send_email(user, f"Today in {topic_names}", email_content)
             if success:
                 print(f"Email sent to {user.email} with status code: {result}")
             else:
