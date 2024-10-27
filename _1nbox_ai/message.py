@@ -16,16 +16,46 @@ sg = SendGridAPIClient(sendgrid_api_key)
 
 def get_user_topics_summary(organization):
     topic_list = []
+
+    topic_names = ", ".join(organization.topics.all().values_list('name', flat=True))
+    print(f"Topics for organization {organization.name} ({organization.id}): {topic_names}")
     
+    if not organization.topics:
+        print(f"Organization {organization.name} ({organization.id}) has no topics.")
+        return []
+
     for topic in organization.topics.all():
         try:
+
             latest_summary = topic.summaries.first()
-            if latest_summary and latest_summary.final_summary:
-                # No need to parse JSON here, we'll do it in the template
-                topic_list.append(topic)
-        except Exception as e:
-            logging.error(f"Error processing topic '{topic.name}': {str(e)}")
+            final_summary = latest_summary.final_summary
             
+            # Parse summary field which is a JSON string
+            if final_summary and final_summary.strip():
+                try:
+                    summary_data = json.loads(final_summary)
+                    summary = summary_data.get('summary', [])
+                except json.JSONDecodeError as e:
+                    logging.error(f"Invalid JSON for topic '{topic.name}': {e}")
+                    logging.error(f"Raw summary data: {final_summary}")
+                    summary = []
+            else:
+                summary = []
+
+            # Filter out summaries containing negative keywords if specified
+            if topic.negative_keywords:
+                negative_list = topic.negative_keywords.split(",")
+                summary = [
+                    item for item in summary 
+                    if not any(word.lower() in item['content'].lower() for word in negative_list)
+                ]
+
+            # Attach the processed summary to the topic object
+            latest_summary.final_summary = summary  
+            topic_list.append(topic)
+        except Topic.DoesNotExist:
+            print(f"Topic '{topic.name}' does not exist and will be skipped.")
+
     return topic_list
 
 def send_email(user, subject, content):
