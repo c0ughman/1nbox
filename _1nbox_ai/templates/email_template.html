@@ -1,5 +1,3 @@
-{% load json_filters %}
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today in {% for topic in topics %}{{ topic.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</title>
     <style>
+        /* Previous styles remain unchanged */
         body {
             font-family: Arial, sans-serif;
             background-color: #f0f0f0;
@@ -121,40 +120,34 @@
             {% for topic in topics %}
                 {% with latest_summary=topic.summaries.first %}
                     {% if latest_summary and latest_summary.final_summary %}
-                        {% with summary_data=latest_summary.final_summary|safe|json_script:"summary-data"|cut:"<script id='summary-data' type='application/json'>"|cut:"</script>" %}
-                            {% with parsed_summary=summary_data|json_parse %}
-                                {% for item in parsed_summary.summary %}
-                                    <div class="news-item">• {{ item.title }}</div>
-                                {% endfor %}
-                            {% endwith %}
-                        {% endwith %}
+                        {% for item in latest_summary.final_summary %}
+                            <div class="news-item">• {{ item.title }}</div>
+                        {% endfor %}
                     {% endif %}
                 {% endwith %}
             {% endfor %}
         </div>
 
-        {% for topic in topics %}
-            <div class="world-news">
-                <h2>{{ topic.name }}</h2>
-                <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="ask-ai-link">Ask AI</a>
-                <a href="https://www.1nbox-ai.com/sources?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="view-sources-link">View Sources</a>
-                
-                {% with latest_summary=topic.summaries.first %}
-                    {% if latest_summary and latest_summary.final_summary %}
-                        {% with summary_data=latest_summary.final_summary|safe|json_script:"summary-data"|cut:"<script id='summary-data' type='application/json'>"|cut:"</script>" %}
-                            {% with parsed_summary=summary_data|json_parse %}
-                                {% for item in parsed_summary.summary %}
-                                    <div>
-                                        <div class="news-title">{{ item.title }}</div>
-                                        <div class="news-detail">{{ item.content|safe|linebreaksbr }}</div>
-                                    </div>
-                                {% endfor %}
-                            {% endwith %}
-                        {% endwith %}
-                    {% endif %}
-                {% endwith %}
-            </div>
-        {% endfor %}
+        {% if topics %}
+            {% for topic in topics %}
+                <div class="world-news">
+                    <h2>{{ topic.name }}</h2>
+                    <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="ask-ai-link">Ask AI</a>
+                    <a href="https://www.1nbox-ai.com/sources?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="view-sources-link">View Sources</a>
+                    
+                    {% with latest_summary=topic.summaries.first %}
+                        {% if latest_summary and latest_summary.final_summary %}
+                            {% for item in latest_summary.final_summary %}
+                                <div>
+                                    <div class="news-title">{{ item.title }}</div>
+                                    <div class="news-detail">{{ item.content | safe | linebreaksbr }}</div>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                </div>
+            {% endfor %}
+        {% endif %}
 
         <div class="footer">
             <div class="column">
@@ -172,5 +165,14 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var newsDetails = document.querySelectorAll('.news-detail');
+            newsDetails.forEach(function(detail) {
+                detail.innerHTML = detail.innerHTML.replace(/\n\n/g, '<br><br>');
+            });
+        });
+    </script>
 </body>
 </html>
