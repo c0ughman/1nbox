@@ -1,3 +1,5 @@
+{% load json_filters %}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -119,9 +121,13 @@
             {% for topic in topics %}
                 {% with latest_summary=topic.summaries.first %}
                     {% if latest_summary and latest_summary.final_summary %}
-                        {% for summary_item in latest_summary.final_summary %}
-                            <div class="news-item">• {{ summary_item.title }}</div>
-                        {% endfor %}
+                        {% with summary_data=latest_summary.final_summary|safe|json_script:"summary-data"|cut:"<script id='summary-data' type='application/json'>"|cut:"</script>" %}
+                            {% with parsed_summary=summary_data|json_parse %}
+                                {% for item in parsed_summary.summary %}
+                                    <div class="news-item">• {{ item.title }}</div>
+                                {% endfor %}
+                            {% endwith %}
+                        {% endwith %}
                     {% endif %}
                 {% endwith %}
             {% endfor %}
@@ -135,12 +141,16 @@
                 
                 {% with latest_summary=topic.summaries.first %}
                     {% if latest_summary and latest_summary.final_summary %}
-                        {% for summary_item in latest_summary.final_summary %}
-                            <div>
-                                <div class="news-title">{{ summary_item.title }}</div>
-                                <div class="news-detail">{{ summary_item.content|safe|linebreaksbr }}</div>
-                            </div>
-                        {% endfor %}
+                        {% with summary_data=latest_summary.final_summary|safe|json_script:"summary-data"|cut:"<script id='summary-data' type='application/json'>"|cut:"</script>" %}
+                            {% with parsed_summary=summary_data|json_parse %}
+                                {% for item in parsed_summary.summary %}
+                                    <div>
+                                        <div class="news-title">{{ item.title }}</div>
+                                        <div class="news-detail">{{ item.content|safe|linebreaksbr }}</div>
+                                    </div>
+                                {% endfor %}
+                            {% endwith %}
+                        {% endwith %}
                     {% endif %}
                 {% endwith %}
             </div>
