@@ -41,6 +41,48 @@ def firebase_auth_required(view_func):
     return wrapped_view
 
 @csrf_exempt
+@firebase_auth_required
+def initial_signup(request):
+    try:
+        data = json.loads(request.body)
+        firebase_user = request.firebase_user  # This comes from the decorator
+        
+        # First, create an organization with default free plan
+        organization = Organization.objects.create(
+            name=data.get('organization_name', f"{firebase_user['email']}'s Organization"),
+            plan='free',
+            status='active'
+        )
+        
+        # Then create the user
+        user = User.objects.create(
+            email=firebase_user['email'],
+            role='admin',  # First user is admin
+            organization=organization  # Link to the organization
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'role': user.role,
+                'organization': {
+                    'id': organization.id,
+                    'name': organization.name,
+                    'plan': organization.plan
+                }
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
 @require_http_methods(["GET"])
 def get_clusters(request, id):
     try:
