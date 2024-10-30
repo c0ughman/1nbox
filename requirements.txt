@@ -18,3 +18,4 @@ numpy
 thinc
 hdbscan
 sendgrid
+firebase-admin
