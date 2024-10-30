@@ -27,6 +27,7 @@ urlpatterns = [
     path('message_received/', views.message_received),
     path('create_topic/', views.create_topic),
     path('topic/clusters/<str:id>/', views.get_clusters),
+    path('initial_signup/', views.initial_signup),
 
     
     
