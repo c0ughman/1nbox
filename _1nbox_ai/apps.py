@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+import firebase_admin
 
 class MyAppConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
