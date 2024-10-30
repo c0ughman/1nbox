@@ -6,6 +6,7 @@ class MyAppConfig(AppConfig):
 
 
     def ready(self):
-        # Your code to run when the server starts
-        pass
-        
+        # Initialize Firebase if not already initialized
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
+            firebase_admin.initialize_app(cred)
