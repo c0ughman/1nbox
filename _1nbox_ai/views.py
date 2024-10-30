@@ -15,6 +15,31 @@ import stripe
 import requests
 import time
 
+from firebase_admin import auth
+from functools import wraps
+from django.http import JsonResponse
+
+def firebase_auth_required(view_func):
+    @wraps(view_func)
+    def wrapped_view(request, *args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return JsonResponse({'error': 'No token provided'}, status=401)
+        
+        token = auth_header.split(' ')[1]
+        try:
+            decoded_token = auth.verify_id_token(token)
+            request.firebase_user = decoded_token
+            return view_func(request, *args, **kwargs)
+        except auth.ExpiredIdTokenError:
+            return JsonResponse({'error': 'Token expired'}, status=401)
+        except auth.RevokedIdTokenError:
+            return JsonResponse({'error': 'Token revoked'}, status=401)
+        except Exception as e:
+            return JsonResponse({'error': 'Invalid token'}, status=401)
+            
+    return wrapped_view
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_clusters(request, id):
