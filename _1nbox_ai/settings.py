@@ -35,6 +35,20 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com/', '127.0.0.1']
 
+# FIREBASE
+FIREBASE_CREDENTIALS = {
+    "type": "service_account",
+    "project_id": os.environ.get("FIREBASE_PROJECT_ID"),
+    "private_key_id": "434a44d010f92ce38f9a88a91288dbf67bae6331",
+    "private_key": os.environ.get("FIREBASE_PRIVATE_KEY"),
+    "client_email": os.environ.get("FIREBASE_CLIENT_EMAIL"),
+    "client_id": os.environ.get("FIREBASE_CLIENT_ID"),
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": os.environ.get("FIREBASE_CLIENT_CERT_URL"),
+    "universe_domain": "googleapis.com",
+}
 
 # Application definition
 
