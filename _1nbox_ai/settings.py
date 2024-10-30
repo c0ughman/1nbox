@@ -40,7 +40,7 @@ FIREBASE_CREDENTIALS = {
     "type": "service_account",
     "project_id": os.environ.get("FIREBASE_PROJECT_ID"),
     "private_key_id": "434a44d010f92ce38f9a88a91288dbf67bae6331",
-    "private_key": os.environ.get("FIREBASE_PRIVATE_KEY"),
+    "private_key": os.environ.get("FIREBASE_PRIVATE_KEY").replace('\\n', '\n') if os.environ.get("FIREBASE_PRIVATE_KEY") else None,
     "client_email": os.environ.get("FIREBASE_CLIENT_EMAIL"),
     "client_id": os.environ.get("FIREBASE_CLIENT_ID"),
     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
