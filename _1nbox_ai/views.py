@@ -81,8 +81,6 @@ def initial_signup(request):
             'error': str(e)
         }, status=500)
 
-# views.py
-
 @firebase_auth_required
 def get_user_data(request):
     try:
@@ -108,10 +106,6 @@ def get_user_data(request):
         return JsonResponse({
             'error': str(e)
         }, status=500)
-
-# Add to urls.py
-path('api/user-data/', views.get_user_data, name='user_data'),
-
 
 @csrf_exempt
 @require_http_methods(["GET"])
