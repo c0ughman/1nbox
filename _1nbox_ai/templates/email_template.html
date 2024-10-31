@@ -131,27 +131,38 @@
             <div class="powered-by">Summarized from {{ total_number_of_articles }} articles</div>
         </div>
 
-        <div class="news-list">
-            {% for topic in topics %}
-                {% with latest_summary=topic.summaries.first %}
-                    {% if latest_summary and latest_summary.final_summary %}
-                        {% for item in latest_summary.final_summary %}
-                            <div class="news-item">• {{ item.title|safe }}</div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-            {% endfor %}
-        </div>
+   <div class="news-list">
+    {% for topic in topics %}
+        {% with latest_summary=topic.summaries.first %}
+            {% if latest_summary and latest_summary.final_summary %}
+                {% for item in latest_summary.final_summary %}
+                    <div class="news-item">• {{ item.title }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    {% endfor %}
+</div>
 
-        {% for topic in topics %}
-            <div class="world-news">
-                <div class="topic-header">
-                    <h2>{{ topic.name }}</h2>
-                    <div class="topic-header-buttons">
-                        <a href="https://www.1nbox-ai.com/sources?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="view-sources-link">View Sources</a>
-                        <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="ask-ai-link">Ask AI</a>
-                    </div>
-                </div>
+{% for topic in topics %}
+    <div class="world-news">
+        <div class="topic-header">
+            <h2>{{ topic.name }}</h2>
+            <div class="topic-header-buttons">
+                <a href="https://www.1nbox-ai.com/sources?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="view-sources-link">View Sources</a>
+                <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="ask-ai-link">Ask AI</a>
+            </div>
+        </div>
+        
+        {% with latest_summary=topic.summaries.first %}
+            {% if latest_summary and latest_summary.final_summary %}
+                {% for item in latest_summary.final_summary %}
+                    <div class="news-title">{{ item.title }}</div>
+                    <div class="news-detail">{{ item.content }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+{% endfor %}
                 
                 {% with latest_summary=topic.summaries.first %}
                     {% if latest_summary and latest_summary.final_summary %}
