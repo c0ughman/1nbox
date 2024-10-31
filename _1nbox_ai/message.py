@@ -59,7 +59,7 @@ def get_user_topics_summary(organization):
                 ]
 
             # Attach the processed summary to the topic object
-            latest_summary.final_summary = summary  
+            #latest_summary.final_summary = summary  
             topic_list.append(topic)
 
         except Topic.DoesNotExist:
