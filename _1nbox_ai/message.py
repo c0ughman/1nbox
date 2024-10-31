@@ -8,151 +8,102 @@ from sendgrid.helpers.mail import Mail
 from .models import Topic, User, Summary, Organization
 
 # Set up logging
-logging.basicConfig(
-    level=logging.ERROR,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # SendGrid setup
 sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
 sg = SendGridAPIClient(sendgrid_api_key)
 
-def parse_summary_json(summary_string):
-    """Helper function to parse JSON summary and handle common errors"""
-    try:
-        # Remove any extra escaping that might be present
-        summary_string = summary_string.replace('\\"', '"').replace('\\\\', '\\')
-        # Parse the JSON
-        summary_data = json.loads(summary_string)
-        return summary_data.get('summary', [])
-    except json.JSONDecodeError as e:
-        logging.error(f"Failed to parse JSON summary: {e}")
-        logging.error(f"Raw summary string: {summary_string}")
-        return []
-    except Exception as e:
-        logging.error(f"Unexpected error parsing summary: {e}")
-        return []
-
 def get_user_topics_summary(organization):
-    """Get processed summaries for all topics in an organization"""
     topic_list = []
+
+    topic_names = ", ".join(organization.topics.all().values_list('name', flat=True))
+    print(f"Topics for organization {organization.name} ({organization.id}): {topic_names}")
     
-    if not organization.topics.exists():
-        logging.warning(f"Organization {organization.id} has no topics")
+    if not organization.topics:
+        print(f"Organization {organization.name} ({organization.id}) has no topics.")
         return []
 
     for topic in organization.topics.all():
         try:
-            latest_summary = topic.summaries.first()
-            if not latest_summary:
-                logging.warning(f"No summaries found for topic {topic.name}")
-                continue
 
-            if latest_summary.final_summary:
+            latest_summary = topic.summaries.first()
+            final_summary = latest_summary.final_summary
+            
+            # Parse summary field which is a JSON string
+            if final_summary and final_summary.strip():
                 try:
-                    # Parse and store the summary
-                    summary_list = parse_summary_json(latest_summary.final_summary)
-                    
-                    # Filter negative keywords if needed
-                    if topic.negative_keywords:
-                        negative_list = [kw.strip().lower() for kw in topic.negative_keywords.split(",")]
-                        summary_list = [
-                            item for item in summary_list 
-                            if not any(word in item['content'].lower() for word in negative_list)
-                        ]
-                    
-                    # Add processed summary as a property
-                    setattr(latest_summary, 'processed_summary', summary_list)
-                    topic_list.append(topic)
+                    summary_data = json.loads(final_summary)
+                    summary = summary_data.get('summary', [])
                 except json.JSONDecodeError as e:
-                    logging.error(f"Failed to parse JSON for topic {topic.name}: {e}")
-                    continue
+                    logging.error(f"Invalid JSON for topic '{topic.name}': {e}")
+                    logging.error(f"Raw summary data: {final_summary}")
+                    summary = []
             else:
-                logging.warning(f"Empty summary for topic {topic.name}")
-                
-        except Exception as e:
-            logging.error(f"Error processing topic {topic.name}: {e}")
-            continue
+                summary = []
+
+            # Filter out summaries containing negative keywords if specified
+            if topic.negative_keywords:
+                negative_list = topic.negative_keywords.split(",")
+                summary = [
+                    item for item in summary 
+                    if not any(word.lower() in item['content'].lower() for word in negative_list)
+                ]
+
+            # Attach the processed summary to the topic object
+            latest_summary.final_summary = summary  
+            topic_list.append(topic)
+        except Topic.DoesNotExist:
+            print(f"Topic '{topic.name}' does not exist and will be skipped.")
 
     return topic_list
 
 def send_email(user, subject, content):
-    """Send email using SendGrid"""
     message = Mail(
         from_email='news@1nbox-ai.com',
         to_emails=user.email,
         subject=subject,
         html_content=content
     )
-    
     try:
         response = sg.send(message)
-        logging.info(f"Email sent successfully to {user.email}")
         return True, response.status_code
     except Exception as e:
-        logging.error(f"Failed to send email to {user.email}: {e}")
         return False, str(e)
 
 def send_summaries():
-    """Main function to send summary emails to all users"""
-    try:
-        # Get all active organizations
-        organizations = Organization.objects.exclude(plan="inactive")
-        
-        for organization in organizations:
-            try:
-                # Get processed topics and summaries
-                topics = get_user_topics_summary(organization)
-                
-                if not topics:
-                    logging.warning(f"No valid topics found for organization {organization.id}")
-                    continue
-                
-                # Calculate total number of articles
-                total_number_of_articles = sum(
-                    topic.summaries.first().number_of_articles 
-                    for topic in topics 
-                    if topic.summaries.exists()
-                )
+    current_time = datetime.now().timestamp()
 
-                # Get all users in the organization
-                users = organization.users.all()
-                
-                for user in users:
-                    try:
-                        # Prepare email context
-                        context = {
-                            'user': user,
-                            'topics': topics,
-                            'total_number_of_articles': total_number_of_articles,
-                        }
-                        
-                        # Render email template
-                        email_content = render_to_string('email_template.html', context)
-                        
-                        # Create subject line with topic names
-                        topic_names = ", ".join(topic.name for topic in topics)
-                        subject = f"Today in {topic_names}"
-                        
-                        # Send email
-                        success, result = send_email(user, subject, email_content)
-                        
-                        if success:
-                            logging.info(f"Email sent to {user.email} with status {result}")
-                        else:
-                            logging.error(f"Failed to send email to {user.email}: {result}")
-                            
-                    except Exception as e:
-                        logging.error(f"Error processing user {user.email}: {e}")
-                        continue
-                        
-            except Exception as e:
-                logging.error(f"Error processing organization {organization.id}: {e}")
-                continue
-                
-    except Exception as e:
-        logging.error(f"Fatal error in send_summaries: {e}")
-        raise
+    # for all organizations that are paying 
+    for organization in Organization.objects.exclude(plan="inactive"):
+
+        # get the topics for the organization
+        topics = get_user_topics_summary(organization) 
+
+        total_number_of_articles = 0
+        for topic in topics:
+            latest_summary = topic.summaries.first()
+            total_number_of_articles += latest_summary.number_of_articles
+
+        # for all users in that organization
+        users = organization.users.all()
+        for user in users:
+        
+            # Include custom_message in the context
+            context = {
+                'user': user,
+                'topics': topics,
+                'total_number_of_articles': total_number_of_articles,
+            }
+    
+            email_content = render_to_string('email_template.html', context)
+    
+            # Send the email
+            success, result = send_email(user, f"Today in {','.join(topics)}", email_content)
+            if success:
+                print(f"Email sent to {user.email} with status code: {result}")
+            else:
+                print(f"Failed to send email to {user.email}. Error: {result}")
 
 if __name__ == "__main__":
     send_summaries()
