@@ -50,13 +50,8 @@ def get_user_topics_summary(organization):
 
             if latest_summary.final_summary:
                 try:
-                    # Parse the JSON string to a Python dictionary
-                    summary_dict = json.loads(latest_summary.final_summary)
-                    # Extract the summary list from the dictionary
-                    summary_list = summary_dict.get('summary', [])
-                    
-                    # Store the parsed list directly
-                    latest_summary.final_summary = summary_list
+                    # Parse and store the summary
+                    summary_list = parse_summary_json(latest_summary.final_summary)
                     
                     # Filter negative keywords if needed
                     if topic.negative_keywords:
@@ -66,7 +61,8 @@ def get_user_topics_summary(organization):
                             if not any(word in item['content'].lower() for word in negative_list)
                         ]
                     
-                    latest_summary.final_summary = summary_list
+                    # Add processed summary as a property
+                    setattr(latest_summary, 'processed_summary', summary_list)
                     topic_list.append(topic)
                 except json.JSONDecodeError as e:
                     logging.error(f"Failed to parse JSON for topic {topic.name}: {e}")
