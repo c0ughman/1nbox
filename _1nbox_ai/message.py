@@ -49,20 +49,28 @@ def get_user_topics_summary(organization):
                 continue
 
             if latest_summary.final_summary:
-                # Parse the JSON summary
-                summary = parse_summary_json(latest_summary.final_summary)
-                
-                # Filter out summaries with negative keywords if specified
-                if topic.negative_keywords:
-                    negative_list = [kw.strip().lower() for kw in topic.negative_keywords.split(",")]
-                    summary = [
-                        item for item in summary 
-                        if not any(word in item['content'].lower() for word in negative_list)
-                    ]
-                
-                # Update the final_summary with the processed data
-                latest_summary.final_summary = summary
-                topic_list.append(topic)
+                try:
+                    # Parse the JSON string to a Python dictionary
+                    summary_dict = json.loads(latest_summary.final_summary)
+                    # Extract the summary list from the dictionary
+                    summary_list = summary_dict.get('summary', [])
+                    
+                    # Store the parsed list directly
+                    latest_summary.final_summary = summary_list
+                    
+                    # Filter negative keywords if needed
+                    if topic.negative_keywords:
+                        negative_list = [kw.strip().lower() for kw in topic.negative_keywords.split(",")]
+                        summary_list = [
+                            item for item in summary_list 
+                            if not any(word in item['content'].lower() for word in negative_list)
+                        ]
+                    
+                    latest_summary.final_summary = summary_list
+                    topic_list.append(topic)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Failed to parse JSON for topic {topic.name}: {e}")
+                    continue
             else:
                 logging.warning(f"Empty summary for topic {topic.name}")
                 
