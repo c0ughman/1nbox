@@ -194,51 +194,78 @@ def calculate_cluster_tokens(cluster):
         total_tokens += estimate_tokens(article['content'])
     return total_tokens
 
+def limit_cluster_content(cluster, max_tokens=124000):
+    """
+    Limits cluster content to stay within token limits while preserving the most recent articles.
+    
+    Args:
+        cluster (dict): The cluster containing articles
+        max_tokens (int): Maximum number of tokens allowed (default 124000)
+    
+    Returns:
+        dict: A new cluster with articles limited to fit within token limit
+    """
+    cluster_headers = f"Common words: {', '.join(cluster['common_words'])}\n\n"
+    header_tokens = estimate_tokens(cluster_headers)
+    available_tokens = max_tokens - header_tokens
+    
+    # Sort articles by publication date (newest first)
+    sorted_articles = sorted(cluster['articles'], 
+                           key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')),
+                           reverse=True)
+    
+    limited_articles = []
+    current_tokens = 0
+    
+    for article in sorted_articles:
+        article_content = f"Title: {article['title']}\n"
+        article_content += f"URL: {article['link']}\n"
+        article_content += f"Summary: {article['summary']}\n"
+        article_content += f"Content: {article['content']}\n\n"
+        
+        article_tokens = estimate_tokens(article_content)
+        
+        if current_tokens + article_tokens <= available_tokens:
+            limited_articles.append(article)
+            current_tokens += article_tokens
+        else:
+            break
+    
+    return {
+        'common_words': cluster['common_words'],
+        'articles': limited_articles
+    }
+
 def get_openai_response(cluster, max_tokens=4000):
     openai_key = os.environ.get('OPENAI_KEY')
     client = OpenAI(api_key=openai_key)
 
-    cluster_content = f"Common words: {', '.join(cluster['common_words'])}\n\n"
+    # Limit cluster content to 124000 tokens before processing
+    limited_cluster = limit_cluster_content(cluster, max_tokens=124000)
+    
+    cluster_content = f"Common words: {', '.join(limited_cluster['common_words'])}\n\n"
     current_tokens = 0
     sub_clusters = []
     current_sub_cluster = []
 
-    # Check if this is a miscellaneous cluster
-    is_miscellaneous = 'Miscellaneous' in cluster['common_words']
-    
-    # Calculate split point for miscellaneous clusters
-    if is_miscellaneous:
-        split_point = len(cluster['articles']) // 2
-        first_half = cluster['articles'][:split_point]
-        second_half = cluster['articles'][split_point:]
-        article_groups = [first_half, second_half]
-    else:
-        article_groups = [cluster['articles']]
-
-    # Process each group of articles
-    for group in article_groups:
-        current_sub_cluster = []
-        current_tokens = 0
+    for article in limited_cluster['articles']:
+        article_content = f"Title: {article['title']}\n"
+        article_content += f"URL: {article['link']}\n"
+        article_content += f"Summary: {article['summary']}\n"
+        article_content += f"Content: {article['content']}\n\n"
         
-        for article in group:
-            article_content = f"Title: {article['title']}\n"
-            article_content += f"URL: {article['link']}\n"
-            article_content += f"Summary: {article['summary']}\n"
-            article_content += f"Content: {article['content']}\n\n"
-            
-            article_tokens = estimate_tokens(article_content)
-            
-            if current_tokens + article_tokens > max_tokens:
-                if current_sub_cluster:  # Only append if there are articles
-                    sub_clusters.append(current_sub_cluster)
-                current_sub_cluster = []
-                current_tokens = 0
-            
-            current_sub_cluster.append(article_content)
-            current_tokens += article_tokens
-
-        if current_sub_cluster:  # Append any remaining articles
+        article_tokens = estimate_tokens(article_content)
+        
+        if current_tokens + article_tokens > max_tokens:
             sub_clusters.append(current_sub_cluster)
+            current_sub_cluster = []
+            current_tokens = 0
+        
+        current_sub_cluster.append(article_content)
+        current_tokens += article_tokens
+
+    if current_sub_cluster:
+        sub_clusters.append(current_sub_cluster)
 
     summaries = []
     for sub_cluster in sub_clusters:
@@ -250,9 +277,6 @@ def get_openai_response(cluster, max_tokens=4000):
                   "also, i want you to add the corresponding url next to every line you put in the summary in parentheses"
                   "Finally, It is required to add a general summary of the cluster with 3-4 sentences about"
                   "what is happening, the context and the overall big picture of the events in the articles. ")
-
-        if is_miscellaneous:
-            prompt += " Note that these articles are part of a miscellaneous collection and might not be closely related."
 
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
