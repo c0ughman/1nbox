@@ -81,6 +81,37 @@ def initial_signup(request):
             'error': str(e)
         }, status=500)
 
+# views.py
+
+@firebase_auth_required
+def get_user_data(request):
+    try:
+        # Get Firebase user email from the token
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Fetch user and related organization from your database
+        user = User.objects.select_related('organization').get(email=email)
+        
+        return JsonResponse({
+            'email': user.email,
+            'organization': {
+                'name': user.organization.name,
+                'plan': user.organization.plan
+            }
+        })
+    except User.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found in database'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+# Add to urls.py
+path('api/user-data/', views.get_user_data, name='user_data'),
+
 
 @csrf_exempt
 @require_http_methods(["GET"])
