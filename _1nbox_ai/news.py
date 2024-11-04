@@ -194,7 +194,7 @@ def calculate_cluster_tokens(cluster):
         total_tokens += estimate_tokens(article['content'])
     return total_tokens
 
-def limit_cluster_content(cluster, max_tokens=124000):
+def limit_cluster_content(cluster, max_tokens=120000):
     """
     Limits cluster content to stay within token limits while preserving the most recent articles.
     
@@ -241,7 +241,7 @@ def get_openai_response(cluster, max_tokens=4000):
     client = OpenAI(api_key=openai_key)
 
     # Limit cluster content to 124000 tokens before processing
-    limited_cluster = limit_cluster_content(cluster, max_tokens=124000)
+    limited_cluster = limit_cluster_content(cluster, max_tokens=120000)
     
     cluster_content = f"Common words: {', '.join(limited_cluster['common_words'])}\n\n"
     current_tokens = 0
