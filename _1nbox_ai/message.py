@@ -36,30 +36,27 @@ def get_user_topics_summary(organization):
             if not latest_summary:
                 continue
 
-            final_summary = latest_summary.final_summary
-            
-            # Parse summary field which is a JSON string
-            if final_summary and final_summary.strip():
+            # Parse the JSON string into a Python dictionary
+            if latest_summary.final_summary and latest_summary.final_summary.strip():
                 try:
-                    summary_data = json.loads(final_summary)
-                    summary = summary_data.get('summary', [])
+                    summary_data = json.loads(latest_summary.final_summary)
+                    # Extract the summary array from the parsed JSON
+                    latest_summary.final_summary = summary_data.get('summary', [])
                 except json.JSONDecodeError as e:
                     logging.error(f"Invalid JSON for topic '{topic.name}': {e}")
-                    logging.error(f"Raw summary data: {final_summary}")
-                    summary = []
+                    logging.error(f"Raw summary data: {latest_summary.final_summary}")
+                    latest_summary.final_summary = []
             else:
-                summary = []
+                latest_summary.final_summary = []
 
             # Filter out summaries containing negative keywords if specified
             if topic.negative_keywords:
                 negative_list = topic.negative_keywords.split(",")
-                summary = [
-                    item for item in summary 
+                latest_summary.final_summary = [
+                    item for item in latest_summary.final_summary 
                     if not any(word.lower() in item['content'].lower() for word in negative_list)
                 ]
 
-            # Attach the processed summary to the topic object
-            #latest_summary.final_summary = summary  
             topic_list.append(topic)
 
         except Topic.DoesNotExist:
