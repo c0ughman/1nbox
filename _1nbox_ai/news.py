@@ -490,7 +490,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         )
 
         print(f"SUMMARY for {topic.name} created:")
-        print(updated_final_summary_json)
+        print(final_summary_data)
 
     else:
         print("OJO - Topic has no sources")
