@@ -480,13 +480,10 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             image_url = get_image_for_item(item, INSIGNIFICANT_WORDS)
             if image_url:
                 item['image'] = image_url
-        
-        # Convert back to JSON
-        updated_final_summary_json = json.dumps(final_summary_data)
-        
+                
         new_summary = Summary.objects.create(
             topic=topic,
-            final_summary=updated_final_summary_json,
+            final_summary=final_summary_data,
             clusters=final_clusters,
             cluster_summaries=cluster_summaries,
             number_of_articles=number_of_articles,
