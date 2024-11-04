@@ -194,13 +194,13 @@ def calculate_cluster_tokens(cluster):
         total_tokens += estimate_tokens(article['content'])
     return total_tokens
 
-def limit_cluster_content(cluster, max_tokens=124000):
+def limit_cluster_content(cluster, max_tokens=100000):  # Reduced from 124000 to 100000
     """
     Limits cluster content to stay within token limits while preserving the most recent articles.
     
     Args:
         cluster (dict): The cluster containing articles
-        max_tokens (int): Maximum number of tokens allowed (default 124000)
+        max_tokens (int): Maximum number of tokens allowed (default 100000)
     
     Returns:
         dict: A new cluster with articles limited to fit within token limit
@@ -219,15 +219,15 @@ def limit_cluster_content(cluster, max_tokens=124000):
     
     print(f"Estimated total tokens for cluster: {total_tokens}")
     
-    if total_tokens > 220000:
-        print("Token count exceeds 220000, splitting cluster in half")
+    if total_tokens > 180000:  # Reduced from 220000 to 180000
+        print("Token count exceeds 180000, splitting cluster in half")
         mid_point = len(cluster['articles']) // 2
         return {
             'common_words': cluster['common_words'],
             'articles': cluster['articles'][:mid_point]  # Return first half of articles
         }
     
-    available_tokens = max_tokens - header_tokens
+    available_tokens = max_tokens - header_tokens - 10000  # Reserve 10000 tokens for prompt and completion
     limited_articles = []
     current_tokens = 0
     
@@ -250,6 +250,7 @@ def limit_cluster_content(cluster, max_tokens=124000):
         else:
             break
     
+    print(f"Final token count after limiting: {current_tokens + header_tokens}")
     return {
         'common_words': cluster['common_words'],
         'articles': limited_articles
