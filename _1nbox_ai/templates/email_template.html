@@ -119,15 +119,15 @@
 <div class="news-list">
     {% for topic in topics %}
         {% with latest_summary=topic.summaries.first %}
-            {% if latest_summary and latest_summary.final_summary %}
-                {% for item in latest_summary.final_summary %}
+            {% if latest_summary %}
+                {% for item in latest_summary.final_summary.summary %}
                     <div class="news-item">• {{ item.title }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
     {% endfor %}
 </div>
-
+        
 {% if topics %}
     {% for topic in topics %}
         <div class="world-news">
@@ -136,8 +136,8 @@
             <a href="https://www.1nbox-ai.com/sources?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="view-sources-link">View Sources</a>
             
             {% with latest_summary=topic.summaries.first %}
-                {% if latest_summary and latest_summary.final_summary %}
-                    {% for item in latest_summary.final_summary %}
+                {% if latest_summary %}
+                    {% for item in latest_summary.final_summary.summary %}
                         <div>
                             <div class="news-title">{{ item.title }}</div>
                             <div class="news-detail">{{ item.content | safe | linebreaksbr }}</div>
