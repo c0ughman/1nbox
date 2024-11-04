@@ -194,46 +194,53 @@ def calculate_cluster_tokens(cluster):
         total_tokens += estimate_tokens(article['content'])
     return total_tokens
 
-def limit_cluster_content(cluster, max_tokens=100000):  # Reduced significantly for safety
+def limit_cluster_content(cluster, max_tokens=124000):
     """
     Limits cluster content to stay within token limits while preserving the most recent articles.
     
     Args:
         cluster (dict): The cluster containing articles
-        max_tokens (int): Maximum number of tokens allowed
+        max_tokens (int): Maximum number of tokens allowed (default 124000)
     
     Returns:
         dict: A new cluster with articles limited to fit within token limit
     """
-    # Account for prompt overhead and formatting
-    overhead_tokens = 1000  # Reserve tokens for prompt and formatting
-    available_tokens = max_tokens - overhead_tokens
-    
-    # Estimate tokens more conservatively
-    def estimate_tokens(text):
-        # Count words plus extra for special characters and formatting
-        return int(len(text.split()) * 1.3)  # 30% overhead for safety
-    
     cluster_headers = f"Common words: {', '.join(cluster['common_words'])}\n\n"
     header_tokens = estimate_tokens(cluster_headers)
-    available_tokens = available_tokens - header_tokens
+    
+    # Calculate total tokens for the entire cluster
+    total_tokens = header_tokens
+    for article in cluster['articles']:
+        article_content = f"Title: {article['title']}\n"
+        article_content += f"URL: {article['link']}\n"
+        article_content += f"Summary: {article['summary']}\n"
+        article_content += f"Content: {article['content']}\n\n"
+        total_tokens += estimate_tokens(article_content)
+    
+    print(f"Estimated total tokens for cluster: {total_tokens}")
+    
+    if total_tokens > 220000:
+        print("Token count exceeds 220000, splitting cluster in half")
+        mid_point = len(cluster['articles']) // 2
+        return {
+            'common_words': cluster['common_words'],
+            'articles': cluster['articles'][:mid_point]  # Return first half of articles
+        }
+    
+    available_tokens = max_tokens - header_tokens
+    limited_articles = []
+    current_tokens = 0
     
     # Sort articles by publication date (newest first)
     sorted_articles = sorted(cluster['articles'], 
                            key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')),
                            reverse=True)
     
-    limited_articles = []
-    current_tokens = 0
-    
     for article in sorted_articles:
-        # Calculate tokens including formatting
-        article_content = (
-            f"Title: {article['title']}\n"
-            f"URL: {article['link']}\n"
-            f"Summary: {article['summary']}\n"
-            f"Content: {article['content']}\n\n"
-        )
+        article_content = f"Title: {article['title']}\n"
+        article_content += f"URL: {article['link']}\n"
+        article_content += f"Summary: {article['summary']}\n"
+        article_content += f"Content: {article['content']}\n\n"
         
         article_tokens = estimate_tokens(article_content)
         
@@ -252,30 +259,42 @@ def get_openai_response(cluster, max_tokens=4000):
     openai_key = os.environ.get('OPENAI_KEY')
     client = OpenAI(api_key=openai_key)
 
-    # Use a more conservative token limit
-    limited_cluster = limit_cluster_content(cluster, max_tokens=100000)
+    # Limit cluster content to 124000 tokens before processing
+    limited_cluster = limit_cluster_content(cluster, max_tokens=124000)
     
-    cluster_content = f"Common words: {', '.join(limited_cluster['common_words'])}\n\n"
+    # If the cluster was split due to high token count, process the second half separately
+    if len(limited_cluster['articles']) < len(cluster['articles']) // 2:
+        print("Processing second half of split cluster")
+        second_half_cluster = {
+            'common_words': cluster['common_words'],
+            'articles': cluster['articles'][len(cluster['articles']) // 2:]
+        }
+        second_half_limited = limit_cluster_content(second_half_cluster, max_tokens=124000)
+        
+        # Process both halves and combine results
+        first_half_summary = process_cluster_chunk(limited_cluster, client, max_tokens)
+        second_half_summary = process_cluster_chunk(second_half_limited, client, max_tokens)
+        
+        return f"{first_half_summary}\n\n{second_half_summary}"
+    
+    return process_cluster_chunk(limited_cluster, client, max_tokens)
+
+def process_cluster_chunk(cluster, client, max_tokens):
+    cluster_content = f"Common words: {', '.join(cluster['common_words'])}\n\n"
     current_tokens = 0
     sub_clusters = []
     current_sub_cluster = []
 
-    # Reduce max_tokens for sub-clusters to account for overhead
-    sub_cluster_max_tokens = 3000  # Reduced from 4000
-
-    for article in limited_cluster['articles']:
-        article_content = (
-            f"Title: {article['title']}\n"
-            f"URL: {article['link']}\n"
-            f"Summary: {article['summary']}\n"
-            f"Content: {article['content']}\n\n"
-        )
+    for article in cluster['articles']:
+        article_content = f"Title: {article['title']}\n"
+        article_content += f"URL: {article['link']}\n"
+        article_content += f"Summary: {article['summary']}\n"
+        article_content += f"Content: {article['content']}\n\n"
         
-        article_tokens = len(article_content.split()) * 1.3  # Conservative estimate
+        article_tokens = estimate_tokens(article_content)
         
-        if current_tokens + article_tokens > sub_cluster_max_tokens:
-            if current_sub_cluster:  # Only append if there's content
-                sub_clusters.append(current_sub_cluster)
+        if current_tokens + article_tokens > max_tokens:
+            sub_clusters.append(current_sub_cluster)
             current_sub_cluster = []
             current_tokens = 0
         
@@ -289,9 +308,16 @@ def get_openai_response(cluster, max_tokens=4000):
     for sub_cluster in sub_clusters:
         sub_cluster_content = cluster_content + ''.join(sub_cluster)
         
+        prompt = ("You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
+                  "all the facts from each of the articles in a small but fact-dense summary "
+                  "including all the dates, names and key factors to provide full context on the events."
+                  "also, i want you to add the corresponding url next to every line you put in the summary in parentheses"
+                  "Finally, It is required to add a general summary of the cluster with 3-4 sentences about"
+                  "what is happening, the context and the overall big picture of the events in the articles. ")
+
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
-            max_tokens=4000,  # Reduced from 5000
+            max_tokens=5000,
             temperature=0.125,
             messages=[
                 {"role": "system", "content": prompt},
