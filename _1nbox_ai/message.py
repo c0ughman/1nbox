@@ -36,25 +36,20 @@ def get_user_topics_summary(organization):
             if not latest_summary:
                 continue
 
-            # Parse the JSON string into a Python dictionary
-            if latest_summary.final_summary and latest_summary.final_summary.strip():
-                try:
-                    summary_data = json.loads(latest_summary.final_summary)
-                    # Extract the summary array from the parsed JSON
-                    latest_summary.final_summary = summary_data.get('summary', [])
-                except json.JSONDecodeError as e:
-                    logging.error(f"Invalid JSON for topic '{topic.name}': {e}")
-                    logging.error(f"Raw summary data: {latest_summary.final_summary}")
-                    latest_summary.final_summary = []
+            # JSONField is already a Python dict/list, just access it directly
+            if latest_summary.final_summary:
+                # Assuming the structure is {'summary': [...]}
+                if isinstance(latest_summary.final_summary, dict):
+                    latest_summary.final_summary = latest_summary.final_summary.get('summary', [])
             else:
                 latest_summary.final_summary = []
 
             # Filter out summaries containing negative keywords if specified
             if topic.negative_keywords:
-                negative_list = topic.negative_keywords.split(",")
+                negative_list = [word.strip().lower() for word in topic.negative_keywords.split(",")]
                 latest_summary.final_summary = [
                     item for item in latest_summary.final_summary 
-                    if not any(word.lower() in item['content'].lower() for word in negative_list)
+                    if not any(word in item['content'].lower() for word in negative_list)
                 ]
 
             topic_list.append(topic)
