@@ -42,6 +42,79 @@ def firebase_auth_required(view_func):
 
 @csrf_exempt
 @firebase_auth_required
+def get_user_organization_data(request):
+    try:
+        # Get Firebase user email from the token
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Fetch user and related data with select_related and prefetch_related
+        user = User.objects.select_related('organization').prefetch_related(
+            'organization__topics',
+            'organization__topics__summaries'
+        ).get(email=email)
+        
+        # Build topics data with their latest summaries
+        topics_data = []
+        for topic in user.organization.topics.all():
+            latest_summary = topic.summaries.first()  # Gets the latest summary due to Meta ordering
+            topic_data = {
+                'id': topic.id,
+                'name': topic.name,
+                'sources': topic.sources,
+                'prompt': topic.prompt,
+                'negative_keywords': topic.negative_keywords,
+                'positive_keywords': topic.positive_keywords,
+                'created_at': topic.created_at,
+            }
+            
+            if latest_summary:
+                topic_data['latest_summary'] = {
+                    'id': latest_summary.id,
+                    'clusters': latest_summary.clusters,
+                    'cluster_summaries': latest_summary.cluster_summaries,
+                    'final_summary': latest_summary.final_summary,
+                    'questions': latest_summary.questions,
+                    'number_of_articles': latest_summary.number_of_articles,
+                    'created_at': latest_summary.created_at,
+                }
+            else:
+                topic_data['latest_summary'] = None
+            
+            topics_data.append(topic_data)
+        
+        # Build the response
+        response_data = {
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'role': user.role,
+                'joined_at': user.joined_at,
+            },
+            'organization': {
+                'id': user.organization.id,
+                'name': user.organization.name,
+                'plan': user.organization.plan,
+                'status': user.organization.status,
+                'created_at': user.organization.created_at,
+            },
+            'topics': topics_data
+        }
+        
+        return JsonResponse(response_data)
+    
+    except User.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found in database'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@firebase_auth_required
 def initial_signup(request):
     try:
         data = json.loads(request.body)
