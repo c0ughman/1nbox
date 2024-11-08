@@ -518,11 +518,29 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             image_url = get_image_for_item(item, INSIGNIFICANT_WORDS)
             if image_url:
                 item['image'] = image_url
-                
+
+
+        # Cleaning clusters so it doesent overwhelm everything in life
+        cleaned_data = []
+        for item in final_clusters:
+            cleaned_item = {
+                "articles": [
+                    {
+                        "title": article["title"],
+                        "link": article["link"],
+                        "favicon": article["favicon"]
+                    }
+                    for article in item.get("articles", [])
+                ],
+                "common_words": item.get("common_words", [])
+            }
+            cleaned_data.append(cleaned_item)
+        
+                        
         new_summary = Summary.objects.create(
             topic=topic,
             final_summary=final_summary_data,
-            clusters=final_clusters,
+            clusters=cleaned_data,
             cluster_summaries=cluster_summaries,
             number_of_articles=number_of_articles,
         )
