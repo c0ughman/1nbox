@@ -29,6 +29,7 @@ urlpatterns = [
     path('topic/clusters/<str:id>/', views.get_clusters),
     path('initial_signup/', views.initial_signup),
     path('get_user_data/', views.get_user_data),
+    path('get_user_organization_data/', views.get_user_organization_data),
 
     
     
