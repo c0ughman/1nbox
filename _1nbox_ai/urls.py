@@ -26,6 +26,8 @@ urlpatterns = [
     path('sign_up/', views.sign_up),
     path('message_received/', views.message_received),
     path('create_topic/', views.create_topic),
+    path('update_topic/<int:topic_id>/', views.update_topic),
+    path('delete_topic/<int:topic_id>/', views.delete_topic),
     path('topic/clusters/<str:id>/', views.get_clusters),
     path('initial_signup/', views.initial_signup),
     path('get_user_data/', views.get_user_data),
