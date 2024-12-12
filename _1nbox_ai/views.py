@@ -192,11 +192,32 @@ def get_clusters(request, id):
     except Topic.DoesNotExist:
         return JsonResponse({'error': 'Topic not found'}, status=404)
 
+# TOPIC MANAGEMENT
+
 @csrf_exempt
+@firebase_auth_required
 @require_http_methods(["POST"])
 def create_topic(request):
-    print(request.body)
     try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Check if user exists and is admin
+        try:
+            user = User.objects.get(email=email)
+            if user.role != 'admin':
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Only admin users can create topics'
+                }, status=403)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Proceed with existing topic creation logic
         data = json.loads(request.body)
         name = data.get('name')
         sources = data.get('sources')
@@ -213,10 +234,17 @@ def create_topic(request):
     
         try:
             organization = Organization.objects.get(id=organization_id)
-            topic = Topic.objects.create(name=name, sources=all_sources, prompt=prompt, organization=organization, positive_keywords=positive_keywords, negative_keywords=negative_keywords)
+            topic = Topic.objects.create(
+                name=name, 
+                sources=all_sources, 
+                prompt=prompt, 
+                organization=organization, 
+                positive_keywords=positive_keywords, 
+                negative_keywords=negative_keywords
+            )
             
         except Exception as e:
-            print(f"OJO - Counldn't create Topic: {e}")
+            print(f"OJO - Couldn't create Topic: {e}")
             
         return JsonResponse({'success': True, 'id': topic.id})
         
@@ -224,6 +252,143 @@ def create_topic(request):
         return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["PUT", "PATCH"])
+def update_topic(request, topic_id):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Check if user exists and is admin
+        try:
+            user = User.objects.get(email=email)
+            if user.role != 'admin':
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Only admin users can update topics'
+                }, status=403)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Parse request data
+        data = json.loads(request.body)
+        name = data.get('name')
+        sources = data.get('sources', [])
+        custom_rss = data.get('customRss', [])
+        prompt = data.get('customPrompt')
+        organization_id = data.get('organization_id')
+        negative_keywords = data.get('negative_keywords')
+        positive_keywords = data.get('positive_keywords')
+        
+        # Get the topic and verify it belongs to the user's organization
+        try:
+            topic = Topic.objects.get(
+                id=topic_id, 
+                organization_id=organization_id,
+                organization=user.organization  # Extra check to ensure topic belongs to user's org
+            )
+        except Topic.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Topic not found or access denied'
+            }, status=404)
+
+        # Update the topic fields
+        if name:
+            topic.name = name
+        
+        if sources is not None or custom_rss is not None:
+            all_sources = sources + custom_rss
+            topic.sources = all_sources
+            
+        if prompt is not None:
+            topic.prompt = prompt
+            
+        if negative_keywords is not None:
+            topic.negative_keywords = negative_keywords
+            
+        if positive_keywords is not None:
+            topic.positive_keywords = positive_keywords
+
+        # Save the changes
+        topic.save()
+
+        return JsonResponse({
+            'success': True,
+            'id': topic.id,
+            'message': 'Topic updated successfully'
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON.'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["DELETE"])
+def delete_topic(request, topic_id):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Check if user exists and is admin
+        try:
+            user = User.objects.get(email=email)
+            if user.role != 'admin':
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Only admin users can delete topics'
+                }, status=403)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Get the topic and verify it belongs to the user's organization
+        try:
+            topic = Topic.objects.get(
+                id=topic_id,
+                organization=user.organization  # Ensures topic belongs to user's org
+            )
+        except Topic.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Topic not found or access denied'
+            }, status=404)
+
+        # Delete the topic
+        topic.delete()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Topic deleted successfully'
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+
+
 
 # Update the view function
 @csrf_exempt
