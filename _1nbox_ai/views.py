@@ -408,6 +408,7 @@ def delete_topic(request, topic_id):
 @firebase_auth_required
 @require_http_methods(["PUT", "PATCH"])
 def update_team_member(request, user_id):
+    print("Started updating team member")
     try:
         # Get the Firebase user from the decorator
         firebase_user = request.firebase_user
@@ -495,6 +496,7 @@ def update_team_member(request, user_id):
 @firebase_auth_required
 @require_http_methods(["DELETE"])
 def delete_team_member(request, user_id):
+    print("Started deleting team member")
     try:
         # Get the Firebase user from the decorator
         firebase_user = request.firebase_user
