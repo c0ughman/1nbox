@@ -402,6 +402,151 @@ def delete_topic(request, topic_id):
 
 
 
+# TEAM MANAGEMENT
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["PUT", "PATCH"])
+def update_team_member(request, user_id):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Check if current user exists and is admin
+        try:
+            current_user = User.objects.get(email=email)
+            if current_user.role != 'admin':
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Only admin users can update team members'
+                }, status=403)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Parse request data
+        data = json.loads(request.body)
+        new_email = data.get('email')
+        new_role = data.get('role')
+        
+        # Validate role if provided
+        if new_role and new_role not in ['admin', 'member']:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid role. Must be either "admin" or "member"'
+            }, status=400)
+
+        # Get the team member to update and verify they belong to the same organization
+        try:
+            team_member = User.objects.get(
+                id=user_id,
+                organization=current_user.organization  # Ensures user belongs to same org
+            )
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Team member not found or access denied'
+            }, status=404)
+
+        # Prevent self-role modification
+        if team_member.id == current_user.id and new_role and new_role != current_user.role:
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot modify your own role'
+            }, status=403)
+
+        # Update the user fields
+        if new_email:
+            # Check if email already exists
+            if User.objects.filter(email=new_email).exclude(id=user_id).exists():
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Email already exists'
+                }, status=400)
+            team_member.email = new_email
+            
+        if new_role:
+            team_member.role = new_role
+
+        # Save the changes
+        team_member.save()
+
+        return JsonResponse({
+            'success': True,
+            'id': team_member.id,
+            'message': 'Team member updated successfully'
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["DELETE"])
+def delete_team_member(request, user_id):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Check if current user exists and is admin
+        try:
+            current_user = User.objects.get(email=email)
+            if current_user.role != 'admin':
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Only admin users can delete team members'
+                }, status=403)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Prevent self-deletion
+        if str(user_id) == str(current_user.id):
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot delete your own account'
+            }, status=403)
+
+        # Get the team member to delete and verify they belong to the same organization
+        try:
+            team_member = User.objects.get(
+                id=user_id,
+                organization=current_user.organization  # Ensures user belongs to same org
+            )
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Team member not found or access denied'
+            }, status=404)
+
+        # Delete the team member
+        team_member.delete()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Team member deleted successfully'
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
 
 
 # Update the view function
