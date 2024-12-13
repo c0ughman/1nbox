@@ -3,10 +3,9 @@ from django.contrib.postgres.fields import ArrayField
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
-
 class Organization(models.Model):
-    # AutoField id is automatically added by Django, no need to specify
-    name = models.CharField(max_length=255)  # Added this as it's usually needed
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)  # Added description field
     plan = models.CharField(max_length=255)
     status = models.CharField(
         max_length=50,
@@ -27,10 +26,10 @@ class Organization(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-
 class User(models.Model):
-    # AutoField id is automatically added by Django
     email = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255, blank=True, null=True)  # Added name field
+    state = models.CharField(max_length=255, blank=True, null=True)  # Added state field
     joined_at = models.DateTimeField(default=timezone.now)
     role = models.CharField(
         max_length=50,
@@ -52,9 +51,7 @@ class User(models.Model):
     class Meta:
         ordering = ['-joined_at']
 
-
 class Topic(models.Model):
-    # AutoField id is automatically added by Django
     name = models.CharField(max_length=255)
     sources = ArrayField(
         models.CharField(max_length=255),
@@ -77,9 +74,7 @@ class Topic(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-
 class Summary(models.Model):
-    # AutoField id is automatically added by Django
     topic = models.ForeignKey(
         Topic,
         on_delete=models.CASCADE,
