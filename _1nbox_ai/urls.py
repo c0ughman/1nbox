@@ -28,6 +28,8 @@ urlpatterns = [
     path('create_topic/', views.create_topic),
     path('update_topic/<int:topic_id>/', views.update_topic),
     path('delete_topic/<int:topic_id>/', views.delete_topic),
+    path('update_member/<int:user_id>/', views.update_team_member),
+    path('delete_member/<int:user_id>/', views.delete_team_member),
     path('topic/clusters/<str:id>/', views.get_clusters),
     path('initial_signup/', views.initial_signup),
     path('get_user_data/', views.get_user_data),
