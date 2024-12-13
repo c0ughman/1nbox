@@ -39,7 +39,7 @@ def firebase_auth_required(view_func):
             return JsonResponse({'error': 'Invalid token'}, status=401)
             
     return wrapped_view
-
+    
 @csrf_exempt
 @firebase_auth_required
 def get_user_organization_data(request):
@@ -48,15 +48,28 @@ def get_user_organization_data(request):
         firebase_user = request.firebase_user
         email = firebase_user['email']
         
-        # Fetch user and related data with select_related and prefetch_related
-        user = User.objects.select_related('organization').prefetch_related(
+        # Fetch current user and related data with select_related and prefetch_related
+        current_user = User.objects.select_related('organization').prefetch_related(
             'organization__topics',
             'organization__topics__summaries'
         ).get(email=email)
         
+        # Fetch all users in the same organization
+        organization_users = User.objects.filter(
+            organization=current_user.organization
+        ).select_related('organization')
+        
+        # Build users data
+        users_data = [{
+            'id': org_user.id,
+            'email': org_user.email,
+            'role': org_user.role,
+            'joined_at': org_user.joined_at,
+        } for org_user in organization_users]
+        
         # Build topics data with their latest summaries
         topics_data = []
-        for topic in user.organization.topics.all():
+        for topic in current_user.organization.topics.all():
             latest_summary = topic.summaries.first()  # Gets the latest summary due to Meta ordering
             topic_data = {
                 'id': topic.id,
@@ -86,17 +99,18 @@ def get_user_organization_data(request):
         # Build the response
         response_data = {
             'user': {
-                'id': user.id,
-                'email': user.email,
-                'role': user.role,
-                'joined_at': user.joined_at,
+                'id': current_user.id,
+                'email': current_user.email,
+                'role': current_user.role,
+                'joined_at': current_user.joined_at,
             },
+            'users': users_data,  # Added all users in the organization
             'organization': {
-                'id': user.organization.id,
-                'name': user.organization.name,
-                'plan': user.organization.plan,
-                'status': user.organization.status,
-                'created_at': user.organization.created_at,
+                'id': current_user.organization.id,
+                'name': current_user.organization.name,
+                'plan': current_user.organization.plan,
+                'status': current_user.organization.status,
+                'created_at': current_user.organization.created_at,
             },
             'topics': topics_data
         }
