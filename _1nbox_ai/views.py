@@ -549,6 +549,90 @@ def delete_team_member(request, user_id):
             'error': str(e)
         }, status=500)
 
+@csrf_exempt
+@require_http_methods(["POST"])
+def check_pending_invitation(request, organization_id):
+    try:
+        data = json.loads(request.body)
+        email = data.get('email')
+        
+        if not email:
+            return JsonResponse({
+                'success': False,
+                'error': 'Email is required'
+            }, status=400)
+
+        # Check for pending user
+        pending_user = User.objects.filter(
+            email=email,
+            organization_id=organization_id,
+            status='pending'
+        ).exists()
+        
+        return JsonResponse({
+            'success': True,
+            'has_pending_invitation': pending_user
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["POST"])
+def join_team_member(request, organization_id):
+    try:
+        # Get Firebase user email from the token
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        if not email:
+            return JsonResponse({
+                'success': False,
+                'error': 'Email is required'
+            }, status=400)
+
+        # Look for pending user in the organization
+        try:
+            user = User.objects.get(
+                email=email,
+                organization_id=organization_id,
+                status='pending'
+            )
+            
+            # Update user status to active
+            user.status = 'active'
+            user.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Successfully joined organization',
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'role': user.role,
+                    'organization': {
+                        'id': user.organization.id,
+                        'name': user.organization.name,
+                        'plan': user.organization.plan
+                    }
+                }
+            })
+
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'No pending invitation found for this email'
+            }, status=404)
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 
 
 # Update the view function
