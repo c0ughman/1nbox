@@ -566,7 +566,7 @@ def check_pending_invitation(request, organization_id):
         pending_user = User.objects.filter(
             email=email,
             organization_id=organization_id,
-            status='pending'
+            state='pending'
         ).exists()
         
         return JsonResponse({
@@ -600,11 +600,11 @@ def join_team_member(request, organization_id):
             user = User.objects.get(
                 email=email,
                 organization_id=organization_id,
-                status='pending'
+                state='pending'
             )
             
             # Update user status to active
-            user.status = 'active'
+            user.state = 'active'
             user.save()
             
             return JsonResponse({
