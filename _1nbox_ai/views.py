@@ -19,6 +19,9 @@ from firebase_admin import auth
 from functools import wraps
 from django.http import JsonResponse
 
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+
 def firebase_auth_required(view_func):
     @wraps(view_func)
     def wrapped_view(request, *args, **kwargs):
@@ -645,6 +648,122 @@ def join_team_member(request, organization_id):
             'success': False,
             'error': str(e)
         }, status=500)
+
+def send_invitation_email(email, organization_name, organization_id):
+    """
+    Send an invitation email using SendGrid.
+    """
+    # Initialize SendGrid client inside the function
+    sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+    
+    subject = f"You've been invited to join {organization_name} on 1nbox"
+    
+    join_url = f"https://1nbox.netlify.app/pages/join.html?org={organization_id}"
+    
+    with open('email_templates/invitation.html', 'r') as file:
+        template = file.read()
+    
+    # Replace placeholders in template
+    content = template.replace('{{organization_name}}', organization_name)\
+                     .replace('{{join_url}}', join_url)
+    
+    message = Mail(
+        from_email='news@1nbox-ai.com',
+        to_emails=email,
+        subject=subject,
+        html_content=content
+    )
+    
+    try:
+        response = sg.send(message)
+        return True, response.status_code
+    except Exception as e:
+        logging.error(f"Failed to send invitation email to {email}: {str(e)}")
+        return False, str(e)
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["POST"])
+def invite_team_member(request):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Check if current user exists and is admin
+        try:
+            current_user = User.objects.get(email=email)
+            if current_user.role != 'admin':
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Only admin users can invite team members'
+                }, status=403)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Get invitation data
+        data = json.loads(request.body)
+        new_member_email = data.get('email')
+        
+        if not new_member_email:
+            return JsonResponse({
+                'success': False,
+                'error': 'Email is required'
+            }, status=400)
+            
+        # Check if user already exists in this organization
+        if User.objects.filter(
+            email=new_member_email,
+            organization=current_user.organization
+        ).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'User already exists in this organization'
+            }, status=400)
+            
+        # Create new pending user
+        new_user = User.objects.create(
+            email=new_member_email,
+            organization=current_user.organization,
+            role='member',
+            state='pending'
+        )
+        
+        # Send invitation email
+        email_success, email_result = send_invitation_email(
+            new_member_email,
+            current_user.organization.name,
+            current_user.organization.id
+        )
+        
+        if not email_success:
+            # Optionally delete the user if email fails
+            new_user.delete()
+            return JsonResponse({
+                'success': False,
+                'error': f'Failed to send invitation email: {email_result}'
+            }, status=500)
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Invitation sent successfully',
+            'user_id': new_user.id
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
 
 
 # Update the view function
