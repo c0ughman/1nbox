@@ -63,10 +63,12 @@ def get_user_organization_data(request):
             organization=current_user.organization
         ).select_related('organization')
         
-        # Build users data
+        # Build users data with additional fields
         users_data = [{
             'id': org_user.id,
             'email': org_user.email,
+            'name': org_user.name,
+            'state': org_user.state,
             'role': org_user.role,
             'joined_at': org_user.joined_at,
         } for org_user in organization_users]
@@ -100,21 +102,26 @@ def get_user_organization_data(request):
             
             topics_data.append(topic_data)
         
-        # Build the response
+        # Build the response with additional user fields
         response_data = {
             'user': {
                 'id': current_user.id,
                 'email': current_user.email,
+                'name': current_user.name,
+                'state': current_user.state,
                 'role': current_user.role,
                 'joined_at': current_user.joined_at,
             },
-            'users': users_data,  # Added all users in the organization
+            'users': users_data,
             'organization': {
                 'id': current_user.organization.id,
                 'name': current_user.organization.name,
                 'plan': current_user.organization.plan,
                 'status': current_user.organization.status,
                 'created_at': current_user.organization.created_at,
+                'description': current_user.organization.description,  # Added organization description
+                'stripe_customer_id': current_user.organization.stripe_customer_id,
+                'stripe_subscription_id': current_user.organization.stripe_subscription_id,
             },
             'topics': topics_data
         }
