@@ -30,6 +30,8 @@ urlpatterns = [
     path('delete_topic/<int:topic_id>/', views.delete_topic),
     path('update_member/<int:user_id>/', views.update_team_member),
     path('delete_member/<int:user_id>/', views.delete_team_member),
+    path('join_member/<int:organization_id>/', views.join_team_member),
+    path('check_pending_invitation/<int:organization_id>/', views.check_pending_invitation),
     path('topic/clusters/<str:id>/', views.get_clusters),
     path('initial_signup/', views.initial_signup),
     path('get_user_data/', views.get_user_data),
