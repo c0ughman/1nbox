@@ -660,7 +660,7 @@ def send_invitation_email(email, organization_name, organization_id):
     
     join_url = f"https://1nbox.netlify.app/pages/join.html?org={organization_id}"
     
-    with open('email_templates/invitation.html', 'r') as file:
+    with open('templates/invitation.html', 'r') as file:
         template = file.read()
     
     # Replace placeholders in template
