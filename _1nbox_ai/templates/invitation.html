@@ -7,57 +7,103 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            line-height: 1.6;
+            background-color: #F4FAF8;
             margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
+            padding: 20px;
         }
         .container {
+            background-color: white;
+            border-radius: 20px;
+            padding: 32px;
+            width: 100%;
             max-width: 600px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .header {
+            margin-bottom: 25px;
             text-align: center;
-            padding: 20px 0;
+        }
+        h1 {
+            font-size: 34px;
+            color: #2D4B48;
+            margin: 0;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        .subtitle {
+            color: #5C7A76;
+            font-size: 17px;
+            margin: 0;
+            line-height: 1.5;
         }
         .content {
-            padding: 20px 0;
+            margin-bottom: 30px;
+            color: #5C7A76;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .button-container {
+            text-align: center;
+            margin: 32px 0;
         }
         .button {
             display: inline-block;
-            padding: 12px 24px;
-            background-color: #007bff;
-            color: #ffffff;
+            background-color: #0FD7D7;
+            color: white;
             text-decoration: none;
-            border-radius: 4px;
-            margin: 20px 0;
+            padding: 12px 24px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .url-fallback {
+            background-color: #F4FAF8;
+            padding: 16px;
+            border-radius: 10px;
+            margin-top: 20px;
+            color: #5C7A76;
+            font-size: 14px;
+            word-break: break-all;
         }
         .footer {
+            border-top: 2px solid #F0F0F0;
+            padding-top: 24px;
+            margin-top: 32px;
             text-align: center;
-            padding: 20px 0;
-            color: #666666;
-            font-size: 12px;
+            color: #5C7A76;
+            font-size: 14px;
+        }
+        .organization-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            background-color: #F4FAF8;
+            border-radius: 6px;
+            color: #5C7A76;
+            font-size: 15px;
+            margin-top: 8px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Welcome to 1nbox!</h1>
+            <h1>Your Team is on 1nbox</h1>
+            <p class="subtitle">You've been invited to join</p>
+            <div class="organization-badge">{{ organization_name }}</div>
         </div>
         <div class="content">
-            <p>You've been invited to join {{organization_name}} on 1nbox.</p>
-            <p>1nbox is your team's AI-powered news monitoring and analysis platform. Join your team to start collaborating and stay informed together.</p>
-            <div style="text-align: center;">
-                <a href="{{join_url}}" class="button">Join Your Team</a>
-            </div>
-            <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
-            <p>{{join_url}}</p>
+            <p>1nbox helps teams stay informed and make better decisions with AI-powered news monitoring and analysis.</p>
+        </div>
+        <div class="button-container">
+            <a href="{{ join_url }}" class="button">Join Team</a>
+        </div>
+        <div class="url-fallback">
+            <p style="margin: 0; margin-bottom: 8px;">If the button doesn't work, copy and paste this link:</p>
+            <p style="margin: 0;">{{ join_url }}</p>
         </div>
         <div class="footer">
-            <p>This invitation was sent from 1nbox. If you didn't expect this invitation, you can ignore this email.</p>
+            <p>This invitation was sent from your team members through the 1nbox platform. If you didn't expect this invitation, you can safely ignore it.</p>
         </div>
     </div>
 </body>
