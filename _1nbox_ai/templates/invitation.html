@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>1nbox Invitation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+        }
+        .content {
+            padding: 20px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px 0;
+            color: #666666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Welcome to 1nbox!</h1>
+        </div>
+        <div class="content">
+            <p>You've been invited to join {{organization_name}} on 1nbox.</p>
+            <p>1nbox is your team's AI-powered news monitoring and analysis platform. Join your team to start collaborating and stay informed together.</p>
+            <div style="text-align: center;">
+                <a href="{{join_url}}" class="button">Join Your Team</a>
+            </div>
+            <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
+            <p>{{join_url}}</p>
+        </div>
+        <div class="footer">
+            <p>This invitation was sent from 1nbox. If you didn't expect this invitation, you can ignore this email.</p>
+        </div>
+    </div>
+</body>
+</html>
