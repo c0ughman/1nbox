@@ -19,6 +19,7 @@ from firebase_admin import auth
 from functools import wraps
 from django.http import JsonResponse
 
+from django.template.loader import render_to_string
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
@@ -649,28 +650,23 @@ def join_team_member(request, organization_id):
             'error': str(e)
         }, status=500)
 
-def send_invitation_email(email, organization_name, organization_id):
+def send_email(email, organization_name, organization_id):
     """
     Send an invitation email using SendGrid.
     """
-    # Initialize SendGrid client inside the function
     sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
     
-    subject = f"You've been invited to join {organization_name} on 1nbox"
+    context = {
+        'organization_name': organization_name,
+        'join_url': f"https://1nbox.netlify.app/pages/join.html?org={organization_id}"
+    }
     
-    join_url = f"https://1nbox.netlify.app/pages/join.html?org={organization_id}"
-    
-    with open('invitation.html', 'r') as file:
-        template = file.read()
-    
-    # Replace placeholders in template
-    content = template.replace('{{organization_name}}', organization_name)\
-                     .replace('{{join_url}}', join_url)
+    content = render_to_string('invitation_email.html', context)
     
     message = Mail(
         from_email='news@1nbox-ai.com',
         to_emails=email,
-        subject=subject,
+        subject=f"You've been invited to join {organization_name} on 1nbox",
         html_content=content
     )
     
@@ -678,7 +674,7 @@ def send_invitation_email(email, organization_name, organization_id):
         response = sg.send(message)
         return True, response.status_code
     except Exception as e:
-        logging.error(f"Failed to send invitation email to {email}: {str(e)}")
+        print(f"Failed to send email to {email}: {str(e)}")
         return False, str(e)
 
 @csrf_exempt
@@ -733,14 +729,14 @@ def invite_team_member(request):
         )
         
         # Send invitation email
-        email_success, email_result = send_invitation_email(
+        email_success, email_result = send_email(
             new_member_email,
             current_user.organization.name,
             current_user.organization.id
         )
         
         if not email_success:
-            # Optionally delete the user if email fails
+            # Delete the user if email fails
             new_user.delete()
             return JsonResponse({
                 'success': False,
@@ -763,8 +759,6 @@ def invite_team_member(request):
             'success': False,
             'error': str(e)
         }, status=500)
-
-
 
 # Update the view function
 @csrf_exempt
