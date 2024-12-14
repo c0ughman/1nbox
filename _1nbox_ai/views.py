@@ -661,7 +661,7 @@ def send_email(email, organization_name, organization_id):
         'join_url': f"https://1nbox.netlify.app/pages/join.html?org={organization_id}"
     }
     
-    content = render_to_string('invitation_email.html', context)
+    content = render_to_string('invitation.html', context)
     
     message = Mail(
         from_email='news@1nbox-ai.com',
