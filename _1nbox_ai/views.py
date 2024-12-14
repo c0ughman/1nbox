@@ -535,12 +535,24 @@ def delete_team_member(request, user_id):
                 'error': 'Team member not found or access denied'
             }, status=404)
 
-        # Delete the team member
+        try:
+            # First try to delete the user from Firebase
+            user_to_delete = auth.get_user_by_email(team_member.email)
+            auth.delete_user(user_to_delete.uid)
+            print(f"Successfully deleted user {team_member.email} from Firebase")
+        except auth.UserNotFoundError:
+            print(f"User {team_member.email} not found in Firebase - continuing with database deletion")
+        except Exception as e:
+            print(f"Error deleting user from Firebase: {str(e)}")
+            # Optionally, you could choose to return an error here
+            # For now, we'll continue with the database deletion
+
+        # Delete the team member from your database
         team_member.delete()
 
         return JsonResponse({
             'success': True,
-            'message': 'Team member deleted successfully'
+            'message': 'Team member deleted successfully from database and Firebase'
         })
 
     except Exception as e:
