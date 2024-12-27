@@ -1024,6 +1024,296 @@ def cancel_subscription(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["DELETE"])
+def delete_current_user(request):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Get the current user
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        try:
+            # First try to delete the user from Firebase
+            user_to_delete = auth.get_user_by_email(email)
+            auth.delete_user(user_to_delete.uid)
+            print(f"Successfully deleted user {email} from Firebase")
+        except auth.UserNotFoundError:
+            print(f"User {email} not found in Firebase - continuing with database deletion")
+        except Exception as e:
+            print(f"Error deleting user from Firebase: {str(e)}")
+
+        # Delete the user from your database
+        user.delete()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'User deleted successfully'
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["PUT", "PATCH"])
+def update_current_user_name(request):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Parse request data
+        data = json.loads(request.body)
+        new_name = data.get('name')
+        
+        if not new_name:
+            return JsonResponse({
+                'success': False,
+                'error': 'Name is required'
+            }, status=400)
+
+        # Get and update the user
+        try:
+            user = User.objects.get(email=email)
+            user.name = new_name
+            user.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Name updated successfully',
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'name': user.name
+                }
+            })
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["DELETE"])
+def delete_organization(request, organization_id):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Check if user exists and is admin
+        try:
+            user = User.objects.get(email=email)
+            if user.role != 'admin':
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Only admin users can delete organizations'
+                }, status=403)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Get and delete the organization
+        try:
+            organization = Organization.objects.get(
+                id=organization_id,
+                users__email=email  # Ensures user belongs to this organization
+            )
+            organization.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Organization deleted successfully'
+            })
+        except Organization.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Organization not found or access denied'
+            }, status=404)
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["PUT", "PATCH"])
+def update_organization_name(request, organization_id):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Check if user exists and is admin
+        try:
+            user = User.objects.get(email=email)
+            if user.role != 'admin':
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Only admin users can update organization names'
+                }, status=403)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Parse request data
+        data = json.loads(request.body)
+        new_name = data.get('name')
+        
+        if not new_name:
+            return JsonResponse({
+                'success': False,
+                'error': 'Name is required'
+            }, status=400)
+
+        # Get and update the organization
+        try:
+            organization = Organization.objects.get(
+                id=organization_id,
+                users__email=email  # Ensures user belongs to this organization
+            )
+            organization.name = new_name
+            organization.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Organization name updated successfully',
+                'organization': {
+                    'id': organization.id,
+                    'name': organization.name
+                }
+            })
+        except Organization.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Organization not found or access denied'
+            }, status=404)
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["PUT", "PATCH"])
+def update_organization_plan(request, organization_id):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Check if user exists and is admin
+        try:
+            user = User.objects.get(email=email)
+            if user.role != 'admin':
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Only admin users can update organization plans'
+                }, status=403)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Parse request data
+        data = json.loads(request.body)
+        new_plan = data.get('plan')
+        
+        if not new_plan:
+            return JsonResponse({
+                'success': False,
+                'error': 'Plan is required'
+            }, status=400)
+
+        # Validate plan value
+        valid_plans = ['free', 'paid']  # Add other valid plans as needed
+        if new_plan not in valid_plans:
+            return JsonResponse({
+                'success': False,
+                'error': f'Invalid plan. Must be one of: {", ".join(valid_plans)}'
+            }, status=400)
+
+        # Get and update the organization
+        try:
+            organization = Organization.objects.get(
+                id=organization_id,
+                users__email=email  # Ensures user belongs to this organization
+            )
+            
+            # TODO: Update the plan in Stripe
+            # This part would need to be implemented based on your Stripe integration
+            
+            organization.plan = new_plan
+            organization.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Organization plan updated successfully',
+                'organization': {
+                    'id': organization.id,
+                    'name': organization.name,
+                    'plan': organization.plan
+                }
+            })
+        except Organization.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Organization not found or access denied'
+            }, status=404)
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+
+
 # OLD 1NBOX RIP
 
 
