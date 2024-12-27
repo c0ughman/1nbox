@@ -693,14 +693,9 @@ def invite_team_member(request):
         firebase_user = request.firebase_user
         email = firebase_user['email']
         
-        # Check if current user exists and is admin
         try:
             current_user = User.objects.get(email=email)
-            if current_user.role != 'admin':
-                return JsonResponse({
-                    'success': False, 
-                    'error': 'Only admin users can invite team members'
-                }, status=403)
+            
         except User.DoesNotExist:
             return JsonResponse({
                 'success': False,
