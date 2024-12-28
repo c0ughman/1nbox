@@ -839,184 +839,166 @@ def sign_up(request):
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
         
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.conf import settings
+import stripe
+import json
+from .models import Organization, User
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
+# Map your plans to Stripe Price IDs
+PLAN_PRICE_MAPPING = {
+    'core': 'price_1Qb4GKCHpOkAgMGGcMaNiN9L',
+    'executive': 'price_1Qb4GvCHpOkAgMGGSJRK8ZVH',
+    'corporate': 'price_1Qb4I2CHpOkAgMGGFBbRBl0J'
+}
+
+# Map your plans to features/limits
+PLAN_FEATURES = {
+    'core': {'price': 80, 'users': 5},
+    'executive': {'price': 170, 'users': 15},
+    'corporate': {'price': 320, 'users': 50}
+}
+
 @csrf_exempt
-def create_checkout_session(request):
+@require_http_methods(["POST"])
+def create_subscription(request):
     try:
         data = json.loads(request.body)
-        user_id = data.get('user_id')
+        org_id = data.get('organization_id')
+        plan = data.get('plan')
         
-        if data.get('user_email'):
-            user_email = data.get('user_email')  
+        if plan not in PLAN_PRICE_MAPPING:
+            return JsonResponse({'error': 'Invalid plan selected'}, status=400)
+            
+        organization = Organization.objects.get(id=org_id)
+        
+        # Create or retrieve Stripe customer
+        if organization.stripe_customer_id:
+            customer = stripe.Customer.retrieve(organization.stripe_customer_id)
         else:
-            user = User.objects.filter(supabase_user_id=user_id).first()
-            user_email = user.email  
-        
-        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+            customer = stripe.Customer.create(
+                email=organization.users.filter(role='admin').first().email,
+                metadata={'organization_id': org_id}
+            )
+            organization.stripe_customer_id = customer.id
+            organization.save()
 
-        # Create a new customer with metadata
-        customer = stripe.Customer.create(
-            email=user_email,
-            metadata={'user_id': user_id}
-        )
-
-        # Get the discount code from the request if available
-        discount_code = data.get('discount_code')
-
-        # Initialize the discount ID to None
-        promotion_code = None
-
-        # Map the discount code to the promotion code ID
-        if discount_code == 'MISSME':
-            promotion_code = 'promo_1PoSWZCHpOkAgMGGYb4LJ8fm'
-
-        # Create the checkout session, including the discount if available
-        checkout_session_params = {
-            'customer': customer.id,
-            'client_reference_id': user_id,
-            'payment_method_types': ['card'],
-            'line_items': [{
-                'price': 'price_1PYv2KCHpOkAgMGGyv0S3LW8',  # Basic price ID
+        # Create payment link
+        payment_link = stripe.PaymentLink.create(
+            line_items=[{
+                'price': PLAN_PRICE_MAPPING[plan],
                 'quantity': 1,
             }],
-            'mode': 'subscription',
-            'success_url': 'https://www.1nbox-ai.com/home?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url': 'https://www.1nbox-ai.com/pricing',
-        }
+            after_completion={'type': 'redirect', 'redirect': {'url': 'https://1nbox.netlify.app/pages/main'}},
+            custom_fields=[{'key': 'organization_id', 'optional': False, 'type': 'text'}],
+            metadata={'organization_id': org_id}
+        )
 
-        # Add the promotion code if it exists
-        if promotion_code:
-            checkout_session_params['discounts'] = [{
-                'promotion_code': promotion_code,
-            }]
-
-        # Create the checkout session with the parameters
-        checkout_session = stripe.checkout.Session.create(**checkout_session_params)
-
-        return JsonResponse({'checkoutUrl': checkout_session.url})
+        return JsonResponse({'payment_link': payment_link.url})
+        
     except Exception as e:
-        return JsonResponse({'error': str(e)})
+        return JsonResponse({'error': str(e)}, status=400)
 
 @csrf_exempt
 def stripe_webhook(request):
     payload = request.body
-    sig_header = request.META['HTTP_STRIPE_SIGNATURE']
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
     
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, "whsec_3qSD5i1N7n7XKePc6dYayY939tr9M4h4"
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
-    except ValueError as e:
-        return HttpResponse(status=400)
-    except stripe.error.SignatureVerificationError as e:
-        return HttpResponse(status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+    if event['type'] == 'customer.subscription.created':
+        handle_subscription_update(event.data.object)
+    elif event['type'] == 'customer.subscription.updated':
+        handle_subscription_update(event.data.object)
+    elif event['type'] == 'customer.subscription.deleted':
+        handle_subscription_deleted(event.data.object)
+
+    return JsonResponse({'status': 'success'})
+
+def handle_subscription_update(subscription):
+    customer = stripe.Customer.retrieve(subscription.customer)
+    org_id = customer.metadata.get('organization_id')
     
-    print("EVENT TYPE: " + event['type']) 
-
-    if event['type'] == 'customer.subscription.updated':
-        session = event['data']['object']
-        handle_subscription_event(session, deleted=False)
-
-    if event['type'] == 'customer.subscription.deleted':
-        session = event['data']['object']
-        handle_subscription_event(session, deleted=True)
-    
-    return HttpResponse(status=200)
-
-def handle_subscription_event(subscription, deleted): 
-
-    customer_id = subscription.get('customer')
-    print(f"Customer ID: {customer_id}")
-    
-    try:
-        customer = stripe.Customer.retrieve(customer_id)
-        user_id = customer.metadata.get('user_id')
-        print(f"User ID from metadata: {user_id}")
+    if not org_id:
+        return
         
-        if user_id:
-            matching_users = User.objects.filter(supabase_user_id=user_id)
-            
-            if matching_users.exists():
-                if matching_users.count() > 1:
-                    print(f"Warning: Multiple users found with ID {user_id}")
-                # Update all matching users
-                for user in matching_users:
+    try:
+        organization = Organization.objects.get(id=org_id)
+        
+        # Map Stripe Price ID back to plan name
+        price_id = subscription.items.data[0].price.id
+        plan = next(
+            (plan for plan, stripe_price in PLAN_PRICE_MAPPING.items() 
+             if stripe_price == price_id),
+            'basic'  # default to basic if not found
+        )
+        
+        organization.plan = plan
+        organization.status = 'active'
+        organization.stripe_subscription_id = subscription.id
+        organization.save()
+        
+    except Organization.DoesNotExist:
+        print(f"Organization not found: {org_id}")
 
-                    if deleted == True:
-                        user.plan = "inactive"  # Set the plan to "no plan"
-                        print("UPDATED TO: inactive")
-
-                    else:
-                        if subscription['items']['data'][0]['price']['id'] == 'price_1PYv2KCHpOkAgMGGyv0S3LW8':
-                            user.plan = "paid"  # Set the plan to "basic"
-                            print("UPDATED TO: paid")
-                        elif subscription['items']['data'][0]['price']['id'] == 'price_1PYv2VCHpOkAgMGGwiAyZpN3':
-                            user.plan = "paid"  # Set the plan to "pro"
-                            print("UPDATED TO: paid")
-
-                        else:
-                            print("SOMETHING WRONG WITH PLAN PRICE ID BROTHER")
-
-                    user.save()
-
-                    print(f"Updated subscription for user {user.email}")
-            else:
-                print(f"No user found with ID {user_id}")
-        else:
-            print("User ID not found in customer metadata")
-    except stripe.error.StripeError as e:
-        print(f"Error retrieving customer: {str(e)}")
-
-
-import stripe
-import json
-import os
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from .models import User  # Adjust this import based on your project structure
+def handle_subscription_deleted(subscription):
+    customer = stripe.Customer.retrieve(subscription.customer)
+    org_id = customer.metadata.get('organization_id')
+    
+    if not org_id:
+        return
+        
+    try:
+        organization = Organization.objects.get(id=org_id)
+        organization.plan = 'free'
+        organization.status = 'canceled'
+        organization.stripe_subscription_id = None
+        organization.save()
+        
+    except Organization.DoesNotExist:
+        print(f"Organization not found: {org_id}")
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def cancel_subscription(request):
+def change_subscription(request):
     try:
         data = json.loads(request.body)
-        user_id = data.get('user_id')
-
-        # Retrieve the user
-        user = User.objects.filter(supabase_user_id=user_id).first()
-        if not user:
-            return JsonResponse({'error': 'User not found'}, status=404)
-
-        # Set up Stripe API key
-        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
-
-        # Find the Stripe customer using the user's email
-        customers = stripe.Customer.list(email=user.email)
-        if not customers.data:
-            return JsonResponse({'error': 'No Stripe customer found for this user'}, status=404)
+        org_id = data.get('organization_id')
+        new_plan = data.get('plan')
         
-        customer = customers.data[0]
-
-        # Retrieve the customer's subscriptions
-        subscriptions = stripe.Subscription.list(customer=customer.id)
-
-        if not subscriptions.data:
+        if new_plan not in PLAN_PRICE_MAPPING:
+            return JsonResponse({'error': 'Invalid plan selected'}, status=400)
+            
+        organization = Organization.objects.get(id=org_id)
+        
+        if not organization.stripe_subscription_id:
             return JsonResponse({'error': 'No active subscription found'}, status=400)
-
-        # Cancel the subscription
-        for subscription in subscriptions.data:
-            canceled_subscription = stripe.Subscription.delete(subscription.id)
-
-        # Update user's plan in your database
-        user.plan = "inactive"
-        user.save()
-
-        return JsonResponse({'message': 'Subscription canceled successfully'})
-
-    except stripe.error.StripeError as e:
-        return JsonResponse({'error': str(e)}, status=400)
+            
+        # Update the subscription
+        subscription = stripe.Subscription.retrieve(organization.stripe_subscription_id)
+        
+        stripe.Subscription.modify(
+            subscription.id,
+            items=[{
+                'id': subscription['items']['data'][0].id,
+                'price': PLAN_PRICE_MAPPING[new_plan],
+            }],
+            proration_behavior='always_invoice',
+        )
+        
+        return JsonResponse({'status': 'success', 'message': 'Subscription updated successfully'})
+        
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': str(e)}, status=400)
 
 
 @csrf_exempt
