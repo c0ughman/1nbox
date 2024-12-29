@@ -867,68 +867,98 @@ PLAN_FEATURES = {
 @require_http_methods(["POST"])
 def create_subscription(request):
     try:
-        # Verify Firebase token first
+        # Log incoming request
+        print("Request Headers:", dict(request.headers))
+        print("Request Body:", request.body.decode('utf-8'))
+
+        # Verify Firebase token
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Bearer '):
+            print("Error: Missing or invalid authorization header")
             return JsonResponse({'error': 'No valid authorization token provided'}, status=401)
         
         token = auth_header.split('Bearer ')[1]
         try:
             # Verify the Firebase token
             decoded_token = auth.verify_id_token(token)
-            user_id = decoded_token['uid']
+            user_email = decoded_token['email']  # Get email from token instead of uid
+            print(f"Authenticated user email: {user_email}")
         except Exception as e:
+            print(f"Token verification failed: {str(e)}")
             return JsonResponse({'error': 'Invalid authorization token'}, status=401)
 
-        data = json.loads(request.body)
+        # Parse request data
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {str(e)}")
+            return JsonResponse({'error': 'Invalid JSON in request body'}, status=400)
+
         org_id = data.get('organization_id')
         plan = data.get('plan')
+
+        print(f"Processing request for org_id: {org_id}, plan: {plan}")
 
         if not org_id:
             return JsonResponse({'error': 'organization_id is required'}, status=400)
         if not plan:
             return JsonResponse({'error': 'plan is required'}, status=400)
+        if plan.lower() not in PLAN_PRICE_MAPPING:
+            return JsonResponse({'error': f'Invalid plan. Must be one of: {", ".join(PLAN_PRICE_MAPPING.keys())}'}, status=400)
 
-        # Get the organization and verify user has access
+        # Get the organization
         try:
             organization = Organization.objects.get(id=org_id)
-            if not organization.users.filter(firebase_uid=user_id).exists():
-                return JsonResponse({'error': 'Unauthorized access'}, status=403)
+            print(f"Found organization: {organization.id}")
         except Organization.DoesNotExist:
+            print(f"Organization not found: {org_id}")
             return JsonResponse({'error': 'Organization not found'}, status=404)
 
+        # Verify user has access to organization using email
+        if not organization.users.filter(email=user_email).exists():
+            print(f"User {user_email} not authorized for organization {org_id}")
+            return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
         # Create or retrieve Stripe customer
-        if organization.stripe_customer_id:
-            customer = stripe.Customer.retrieve(organization.stripe_customer_id)
-        else:
-            admin_user = organization.users.filter(role='admin').first()
-            if not admin_user:
-                return JsonResponse({'error': 'No admin user found for organization'}, status=400)
+        try:
+            if organization.stripe_customer_id:
+                customer = stripe.Customer.retrieve(organization.stripe_customer_id)
+                print(f"Retrieved existing Stripe customer: {customer.id}")
+            else:
+                admin_user = organization.users.filter(role='admin').first()
+                if not admin_user:
+                    return JsonResponse({'error': 'No admin user found for organization'}, status=400)
 
-            customer = stripe.Customer.create(
-                email=admin_user.email,
-                metadata={'organization_id': str(org_id)}
+                customer = stripe.Customer.create(
+                    email=admin_user.email,
+                    metadata={'organization_id': str(org_id)}
+                )
+                organization.stripe_customer_id = customer.id
+                organization.save()
+                print(f"Created new Stripe customer: {customer.id}")
+
+            # Create payment link
+            success_url = f'{settings.FRONTEND_URL}/dashboard?success=true&org={org_id}&plan={plan}'
+            payment_link = stripe.PaymentLink.create(
+                line_items=[{
+                    'price': PLAN_PRICE_MAPPING[plan.lower()],
+                    'quantity': 1,
+                }],
+                after_completion={'type': 'redirect', 'redirect': {'url': success_url}},
+                customer_creation='always',
+                metadata={'organization_id': str(org_id), 'plan': plan}
             )
-            organization.stripe_customer_id = customer.id
-            organization.save()
 
-        # Create payment link with success URL including org context
-        success_url = f'{settings.FRONTEND_URL}/dashboard?success=true&org={org_id}&plan={plan}'
-        payment_link = stripe.PaymentLink.create(
-            line_items=[{
-                'price': PLAN_PRICE_MAPPING[plan.lower()],
-                'quantity': 1,
-            }],
-            after_completion={'type': 'redirect', 'redirect': {'url': success_url}},
-            customer_creation='always',
-            metadata={'organization_id': str(org_id), 'plan': plan}
-        )
+            print(f"Created payment link: {payment_link.url}")
+            return JsonResponse({'payment_link': payment_link.url})
 
-        return JsonResponse({'payment_link': payment_link.url})
+        except stripe.error.StripeError as e:
+            print(f"Stripe error: {str(e)}")
+            return JsonResponse({'error': str(e)}, status=400)
 
     except Exception as e:
+        print(f"Unexpected error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=400)
-
 
 @csrf_exempt
 def stripe_webhook(request):
