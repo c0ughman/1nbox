@@ -867,41 +867,64 @@ PLAN_FEATURES = {
 @require_http_methods(["POST"])
 def create_subscription(request):
     try:
+        # Log the incoming request
+        print("Received request body:", request.body.decode('utf-8'))
+        print("Request headers:", request.headers)
+
         data = json.loads(request.body)
         org_id = data.get('organization_id')
         plan = data.get('plan')
-        
-        if plan not in PLAN_PRICE_MAPPING:
-            return JsonResponse({'error': 'Invalid plan selected'}, status=400)
-            
-        organization = Organization.objects.get(id=org_id)
-        
+
+        print(f"Processing subscription creation for org_id: {org_id}, plan: {plan}")
+
+        if not org_id:
+            return JsonResponse({'error': 'organization_id is required'}, status=400)
+        if not plan:
+            return JsonResponse({'error': 'plan is required'}, status=400)
+
+        # Get the organization
+        try:
+            organization = Organization.objects.get(id=org_id)
+            print(f"Found organization: {organization}")
+        except Organization.DoesNotExist:
+            return JsonResponse({'error': 'Organization not found'}, status=404)
+
         # Create or retrieve Stripe customer
         if organization.stripe_customer_id:
             customer = stripe.Customer.retrieve(organization.stripe_customer_id)
+            print(f"Retrieved existing customer: {customer.id}")
         else:
+            # Get admin user's email
+            admin_user = organization.users.filter(role='admin').first()
+            if not admin_user:
+                return JsonResponse({'error': 'No admin user found for organization'}, status=400)
+
             customer = stripe.Customer.create(
-                email=organization.users.filter(role='admin').first().email,
-                metadata={'organization_id': org_id}
+                email=admin_user.email,
+                metadata={'organization_id': str(org_id)}
             )
             organization.stripe_customer_id = customer.id
             organization.save()
+            print(f"Created new customer: {customer.id}")
 
         # Create payment link
         payment_link = stripe.PaymentLink.create(
             line_items=[{
-                'price': PLAN_PRICE_MAPPING[plan],
+                'price': PLAN_PRICE_MAPPING[plan.lower()],
                 'quantity': 1,
             }],
-            after_completion={'type': 'redirect', 'redirect': {'url': 'https://1nbox.netlify.app/pages/main'}},
-            custom_fields=[{'key': 'organization_id', 'optional': False, 'type': 'text'}],
-            metadata={'organization_id': org_id}
+            after_completion={'type': 'redirect', 'redirect': {'url': f'{settings.FRONTEND_URL}/dashboard?success=true'}},
+            customer_creation='always',
+            metadata={'organization_id': str(org_id)}
         )
 
+        print(f"Created payment link: {payment_link.url}")
         return JsonResponse({'payment_link': payment_link.url})
-        
+
     except Exception as e:
+        print(f"Error creating subscription: {str(e)}")
         return JsonResponse({'error': str(e)}, status=400)
+
 
 @csrf_exempt
 def stripe_webhook(request):
