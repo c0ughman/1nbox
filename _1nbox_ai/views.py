@@ -937,15 +937,15 @@ def create_subscription(request):
                 organization.save()
                 print(f"Created new Stripe customer: {customer.id}")
 
-            # Create payment link
-            success_url = f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={plan}'
+            # Create payment link without customer_creation parameter
+            success_url = f'{settings.FRONTEND_URL}/dashboard?success=true&org={org_id}&plan={plan}'
             payment_link = stripe.PaymentLink.create(
                 line_items=[{
                     'price': PLAN_PRICE_MAPPING[plan.lower()],
                     'quantity': 1,
                 }],
                 after_completion={'type': 'redirect', 'redirect': {'url': success_url}},
-                customer_creation='always',
+                customer=customer.id,  # Associate with existing customer
                 metadata={'organization_id': str(org_id), 'plan': plan}
             )
 
