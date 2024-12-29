@@ -100,6 +100,8 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "https://www.1nbox-ai.com",
     "https://editor.weweb.io",
+    "https://1nbox.netlify.app",
+
     # Add other allowed origins as needed
 ]
 
