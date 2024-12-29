@@ -938,7 +938,7 @@ def create_subscription(request):
                 print(f"Created new Stripe customer: {customer.id}")
 
             # Create payment link
-            success_url = f'{settings.FRONTEND_URL}/dashboard?success=true&org={org_id}&plan={plan}'
+            success_url = f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={plan}'
             payment_link = stripe.PaymentLink.create(
                 line_items=[{
                     'price': PLAN_PRICE_MAPPING[plan.lower()],
