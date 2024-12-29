@@ -883,31 +883,57 @@ PLAN_PRICE_MAPPING = {
 @require_http_methods(["POST"])
 def create_subscription(request):
     try:
+        # Log incoming request
+        print("Request Headers:", dict(request.headers))
+        print("Request Body:", request.body.decode('utf-8'))
+
+        # Parse request data first
+        try:
+            data = json.loads(request.body)
+            org_id = data.get('organization_id')
+            plan = data.get('plan')
+            
+            if not org_id:
+                return JsonResponse({'error': 'organization_id is required'}, status=400)
+            if not plan:
+                return JsonResponse({'error': 'plan is required'}, status=400)
+                
+            print(f"Received request for org_id: {org_id}, plan: {plan}")
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {str(e)}")
+            return JsonResponse({'error': 'Invalid JSON in request body'}, status=400)
+
         # Verify Firebase token
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Bearer '):
+            print("Error: Missing or invalid authorization header")
             return JsonResponse({'error': 'No valid authorization token provided'}, status=401)
         
         token = auth_header.split('Bearer ')[1]
         try:
             decoded_token = auth.verify_id_token(token)
             user_email = decoded_token['email']
+            print(f"Successfully authenticated user: {user_email}")
         except Exception as e:
+            print(f"Token verification failed: {str(e)}")
             return JsonResponse({'error': 'Invalid authorization token'}, status=401)
 
-        # Parse request data
-        data = json.loads(request.body)
-        org_id = data.get('organization_id')
-        plan = data.get('plan')
-
-        if not org_id or not plan or plan.lower() not in PLAN_PRICE_MAPPING:
-            return JsonResponse({'error': 'Invalid request parameters'}, status=400)
-
-        # Get the organization and verify access
+        # Get the organization BEFORE checking user access
         try:
             organization = Organization.objects.get(id=org_id)
-            if not organization.users.filter(email=user_email).exists():
-                return JsonResponse({'error': 'Unauthorized access'}, status=403)
+            print(f"Found organization: {organization.id}")
+        except Organization.DoesNotExist:
+            print(f"Organization not found: {org_id}")
+            return JsonResponse({'error': 'Organization not found'}, status=404)
+
+        # Now check if user has access
+        print(f"Checking if user {user_email} has access to organization {org_id}")
+        if not organization.users.filter(email=user_email).exists():
+            print(f"Access denied: User {user_email} not found in organization {org_id}")
+            print(f"Organization users: {list(organization.users.values_list('email', flat=True))}")
+            return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+        print(f"User {user_email} authorized for organization {org_id}")
         except Organization.DoesNotExist:
             return JsonResponse({'error': 'Organization not found'}, status=404)
 
