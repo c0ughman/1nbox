@@ -143,6 +143,11 @@ USE_I18N = True
 
 USE_TZ = True
 
+# Stripe stuff
+STRIPE_PUBLISHABLE_KEY = os.os.environ.get('STRIPE_PUBLISHABLE_KEY')
+STRIPE_SECRET_KEY = os.os.environ.get('STRIPE_SECRET_KEY')
+STRIPE_WEBHOOK_SECRET = os.os.environ.get('STRIPE_WEBHOOK_SECRET')
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
