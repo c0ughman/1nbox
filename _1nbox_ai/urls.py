@@ -46,11 +46,8 @@ urlpatterns = [
     path('update_organization/<int:organization_id>/plan/', views.update_organization_plan),
 
     
-    
-
-    
-    path('cancel_subscription/', views.cancel_subscription, name='cancel_subscription'),
-    path('stripe_webhook/', views.stripe_webhook, name='stripe_webhook'),
-    path('create_checkout_session/', views.create_checkout_session, name='create_checkout_session'),
+    path('subscriptions/create/', views.create_subscription),
+    path('webhooks/stripe/', views.stripe_webhook),
+    path('subscriptions/change/', views.change_subscription),
 
 ]
