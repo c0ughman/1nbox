@@ -987,36 +987,44 @@ def stripe_webhook(request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
+        print(f"Received Stripe webhook event: {event['type']}")
+
+        # Handle checkout.session.completed event
+        if event['type'] == 'checkout.session.completed':
+            session = event.data.object
+            print(f"Processing checkout completion for org_id: {session.metadata.get('organization_id')}, plan: {session.metadata.get('plan')}")
+            handle_checkout_session_completed(session)
+            
+        # Handle subscription events
+        elif event['type'] == 'customer.subscription.updated':
+            subscription = event.data.object
+            handle_subscription_update(subscription)
+        elif event['type'] == 'customer.subscription.deleted':
+            subscription = event.data.object
+            handle_subscription_deleted(subscription)
+
+        return JsonResponse({'status': 'success'})
+
     except Exception as e:
+        print(f"Error processing webhook: {str(e)}")
         return JsonResponse({'error': str(e)}, status=400)
-
-    # Handle checkout.session.completed event
-    if event['type'] == 'checkout.session.completed':
-        session = event.data.object
-        handle_checkout_session_completed(session)
-    # Handle subscription events
-    elif event['type'] == 'customer.subscription.updated':
-        subscription = event.data.object
-        handle_subscription_update(subscription)
-    elif event['type'] == 'customer.subscription.deleted':
-        subscription = event.data.object
-        handle_subscription_deleted(subscription)
-
-    return JsonResponse({'status': 'success'})
 
 def handle_checkout_session_completed(session):
     org_id = session.metadata.get('organization_id')
     plan = session.metadata.get('plan')
     
     if not org_id or not plan:
+        print("Missing org_id or plan in session metadata")
         return
         
     try:
         organization = Organization.objects.get(id=org_id)
+        print(f"Updating organization {org_id} from plan {organization.plan} to {plan}")
         organization.plan = plan
         organization.status = 'active'
         organization.stripe_subscription_id = session.subscription
         organization.save()
+        print(f"Successfully updated organization plan to {plan}")
     except Organization.DoesNotExist:
         print(f"Organization not found: {org_id}")
 
