@@ -918,23 +918,21 @@ def create_subscription(request):
             print(f"Token verification failed: {str(e)}")
             return JsonResponse({'error': 'Invalid authorization token'}, status=401)
 
-        # Get the organization BEFORE checking user access
+        # Get the organization and verify access
         try:
             organization = Organization.objects.get(id=org_id)
             print(f"Found organization: {organization.id}")
+            
+            # Check if user has access
+            print(f"Checking if user {user_email} has access to organization {org_id}")
+            if not organization.users.filter(email=user_email).exists():
+                print(f"Access denied: User {user_email} not found in organization {org_id}")
+                print(f"Organization users: {list(organization.users.values_list('email', flat=True))}")
+                return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+            print(f"User {user_email} authorized for organization {org_id}")
         except Organization.DoesNotExist:
             print(f"Organization not found: {org_id}")
-            return JsonResponse({'error': 'Organization not found'}, status=404)
-
-        # Now check if user has access
-        print(f"Checking if user {user_email} has access to organization {org_id}")
-        if not organization.users.filter(email=user_email).exists():
-            print(f"Access denied: User {user_email} not found in organization {org_id}")
-            print(f"Organization users: {list(organization.users.values_list('email', flat=True))}")
-            return JsonResponse({'error': 'Unauthorized access'}, status=403)
-
-        print(f"User {user_email} authorized for organization {org_id}")
-        except Organization.DoesNotExist:
             return JsonResponse({'error': 'Organization not found'}, status=404)
 
         # Create or retrieve Stripe customer
@@ -978,6 +976,7 @@ def create_subscription(request):
         return JsonResponse({'error': str(e)}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
 
 @csrf_exempt
 def stripe_webhook(request):
