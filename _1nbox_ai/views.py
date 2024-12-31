@@ -983,37 +983,65 @@ def stripe_webhook(request):
     payload = request.body
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
     
-    print("Received webhook from Stripe")  # Add this log
+    print("Received webhook from Stripe")
     
     try:
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
-        print(f"Webhook Event Type: {event['type']}")  # Add this log
-        print(f"Webhook Event Data: {event.data}")     # Add this log
+        print(f"Webhook Event Type: {event.type}")  # Changed from event['type']
+        print(f"Webhook Event Data: {event}")       # Changed from event.data
 
-        if event['type'] == 'checkout.session.completed':
-            session = event.data.object
-            print(f"Processing checkout completion:")   # Add this log
+        # Handle checkout.session.completed event
+        if event.type == 'checkout.session.completed':  # Changed from event['type']
+            session = event.data['object']  # Changed - correct way to access the object
+            print(f"Processing checkout completion:")
             print(f"- Organization ID: {session.metadata.get('organization_id')}")
             print(f"- Plan: {session.metadata.get('plan')}")
             handle_checkout_session_completed(session)
             
-        elif event['type'] == 'customer.subscription.updated':
-            subscription = event.data.object
-            print(f"Processing subscription update")    # Add this log
+        # Handle subscription events
+        elif event.type == 'customer.subscription.updated':
+            subscription = event.data['object']  # Changed
+            print(f"Processing subscription update")
             handle_subscription_update(subscription)
             
-        elif event['type'] == 'customer.subscription.deleted':
-            subscription = event.data.object
-            print(f"Processing subscription deletion")  # Add this log
+        elif event.type == 'customer.subscription.deleted':
+            subscription = event.data['object']  # Changed
+            print(f"Processing subscription deletion")
             handle_subscription_deleted(subscription)
 
         return JsonResponse({'status': 'success'})
 
     except Exception as e:
-        print(f"Error processing webhook: {str(e)}")   # Add this log
+        print(f"Error processing webhook: {str(e)}")
         return JsonResponse({'error': str(e)}, status=400)
+
+# Also fix the handle_checkout_session_completed function
+def handle_checkout_session_completed(session):
+    org_id = session.metadata.get('organization_id')
+    plan = session.metadata.get('plan')
+    
+    print(f"Processing completed checkout for org {org_id} with plan {plan}")
+    
+    if not org_id or not plan:
+        print("Missing org_id or plan in session metadata")
+        return
+        
+    try:
+        organization = Organization.objects.get(id=org_id)
+        print(f"Found organization {org_id}, updating plan from {organization.plan} to {plan}")
+        
+        organization.plan = plan
+        organization.status = 'active'
+        organization.stripe_subscription_id = session.subscription
+        organization.save()
+        
+        print(f"Successfully updated organization {org_id} to plan {plan}")
+    except Organization.DoesNotExist:
+        print(f"Organization not found: {org_id}")
+    except Exception as e:
+        print(f"Error updating organization: {str(e)}")
 
 @csrf_exempt
 @require_http_methods(["POST"])
