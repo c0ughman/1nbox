@@ -983,50 +983,37 @@ def stripe_webhook(request):
     payload = request.body
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
     
+    print("Received webhook from Stripe")  # Add this log
+    
     try:
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
-        print(f"Received Stripe webhook event: {event['type']}")
+        print(f"Webhook Event Type: {event['type']}")  # Add this log
+        print(f"Webhook Event Data: {event.data}")     # Add this log
 
-        # Handle checkout.session.completed event
         if event['type'] == 'checkout.session.completed':
             session = event.data.object
-            print(f"Processing checkout completion for org_id: {session.metadata.get('organization_id')}, plan: {session.metadata.get('plan')}")
+            print(f"Processing checkout completion:")   # Add this log
+            print(f"- Organization ID: {session.metadata.get('organization_id')}")
+            print(f"- Plan: {session.metadata.get('plan')}")
             handle_checkout_session_completed(session)
             
-        # Handle subscription events
         elif event['type'] == 'customer.subscription.updated':
             subscription = event.data.object
+            print(f"Processing subscription update")    # Add this log
             handle_subscription_update(subscription)
+            
         elif event['type'] == 'customer.subscription.deleted':
             subscription = event.data.object
+            print(f"Processing subscription deletion")  # Add this log
             handle_subscription_deleted(subscription)
 
         return JsonResponse({'status': 'success'})
 
     except Exception as e:
-        print(f"Error processing webhook: {str(e)}")
+        print(f"Error processing webhook: {str(e)}")   # Add this log
         return JsonResponse({'error': str(e)}, status=400)
-
-def handle_checkout_session_completed(session):
-    org_id = session.metadata.get('organization_id')
-    plan = session.metadata.get('plan')
-    
-    if not org_id or not plan:
-        print("Missing org_id or plan in session metadata")
-        return
-        
-    try:
-        organization = Organization.objects.get(id=org_id)
-        print(f"Updating organization {org_id} from plan {organization.plan} to {plan}")
-        organization.plan = plan
-        organization.status = 'active'
-        organization.stripe_subscription_id = session.subscription
-        organization.save()
-        print(f"Successfully updated organization plan to {plan}")
-    except Organization.DoesNotExist:
-        print(f"Organization not found: {org_id}")
 
 @csrf_exempt
 @require_http_methods(["POST"])
