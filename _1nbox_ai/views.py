@@ -1077,30 +1077,45 @@ def change_subscription(request):
         return JsonResponse({'error': str(e)}, status=400)
 
 def handle_subscription_update(subscription):
-    customer = stripe.Customer.retrieve(subscription.customer)
-    org_id = customer.metadata.get('organization_id')
-    
-    if not org_id:
-        return
-        
     try:
-        organization = Organization.objects.get(id=org_id)
+        customer = stripe.Customer.retrieve(subscription.customer)
         
-        # Map Stripe Price ID back to plan name
-        price_id = subscription.items.data[0].price.id
-        plan = next(
-            (plan for plan, stripe_price in PLAN_PRICE_MAPPING.items() 
-             if stripe_price == price_id),
-            'basic'  # default to basic if not found
-        )
+        # Check if there's metadata, if not, try to get from subscription
+        org_id = None
+        if hasattr(customer, 'metadata') and customer.metadata:
+            org_id = customer.metadata.get('organization_id')
         
-        organization.plan = plan
-        organization.status = 'active'
-        organization.stripe_subscription_id = subscription.id
-        organization.save()
-        
-    except Organization.DoesNotExist:
-        print(f"Organization not found: {org_id}")
+        # If we couldn't get org_id from customer, log error
+        if not org_id:
+            print(f"No organization_id found in metadata for customer: {subscription.customer}")
+            return
+            
+        try:
+            organization = Organization.objects.get(id=org_id)
+            
+            # Map Stripe Price ID back to plan name
+            price_id = subscription.items.data[0].price.id
+            plan = next(
+                (plan for plan, stripe_price in PLAN_PRICE_MAPPING.items() 
+                 if stripe_price == price_id),
+                'basic'  # default to basic if not found
+            )
+            
+            print(f"Updating organization {org_id} to plan: {plan}")
+            organization.plan = plan
+            organization.status = 'active'
+            organization.stripe_subscription_id = subscription.id
+            organization.save()
+            print(f"Successfully updated organization {org_id}")
+            
+        except Organization.DoesNotExist:
+            print(f"Organization not found: {org_id}")
+            
+    except Exception as e:
+        print(f"Error in handle_subscription_update: {str(e)}")
+        # Re-raise to let webhook handler deal with it
+        raise
+
 
 def handle_subscription_deleted(subscription):
     customer = stripe.Customer.retrieve(subscription.customer)
