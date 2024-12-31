@@ -33,7 +33,7 @@ SECRET_KEY = 'django-insecure-9y#asx20a^uqj@r!k4v#1op2as7u+ssl#=w1wf3(gfp*f7%_h+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com/', '127.0.0.1']
+ALLOWED_HOSTS = ['app-1nbox-ai-fb8295a32cce.herokuapp.com/', '127.0.0.1']
 
 # FIREBASE
 FIREBASE_CREDENTIALS = {
@@ -95,14 +95,34 @@ TEMPLATES = [
 
 WSGI_APPLICATION = '_1nbox_ai.wsgi.application'
 
-CORS_ALLOW_ALL_ORIGINS = True
-
 CORS_ALLOWED_ORIGINS = [
     "https://www.1nbox-ai.com",
     "https://editor.weweb.io",
     "https://1nbox.netlify.app",
+]
 
-    # Add other allowed origins as needed
+# Add these settings
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
 ]
 
 # Database
@@ -161,7 +181,7 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CSRF_TRUSTED_ORIGINS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com/',
+CSRF_TRUSTED_ORIGINS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com',
                         'https://www.1nbox-ai.com',
                         'https://api.stripe.com/v1/webhook_endpoints',
                         'https://a.stripecdn.com',
@@ -194,7 +214,8 @@ CSRF_TRUSTED_ORIGINS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com/',
                         'https://stripe.com',
                         'https://terminal.stripe.com',
                         'https://uploads.stripe.com',
-                        'https://editor.weweb.io'
+                        'https://editor.weweb.io',
+                        'https://1nbox.netlify.app'
                         ]
 
 django_heroku.settings(locals())
