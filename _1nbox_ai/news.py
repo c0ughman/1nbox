@@ -346,10 +346,13 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
         "formatted with bulletpoints. "
         "Each bulletpoint should be a key aspect of the story, and all bulletpoints should be part of a single text string. "
         f"Generate the content using {sentences_final_summary} sentences per story to fully explain the situation. "
+        "Also give me three short questions that you could answer with the information in the summaries, to give users an idea of what to ask"
         "Return your response in the following JSON structure: "
         "{'summary': [{'title': 'Title 1', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, "
-        "{'title': 'Title 2', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, ...]}."
+        "{'title': 'Title 2', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, ...],"
+        "'questions': ['Question one?', 'Question two?', 'Question three?']}"
         "Ensure each story's content is a single text string with bulletpoints separated by spaces or new lines."
+        "Make sure the questions are in that precise format, and expand properly upon the summaries."
     )
 
 
@@ -388,7 +391,7 @@ def parse_input(input_string):
 
 
 # WIKIMEDIA STUFF HERE
-
+'''
 def extract_capitalized_words(text, insignificant_words):
     words = re.findall(r'\b[A-Z][a-z]+\b', text)
     return [word for word in words if word not in insignificant_words and len(word) > 1]
@@ -451,6 +454,8 @@ def get_image_for_item(item, insignificant_words):
                 return image_url
     
     return None
+
+'''
     
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                   merge_threshold=2, min_articles=3, join_percentage=0.5,
@@ -503,8 +508,8 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             print("                       ")
             print("                       ")
             cluster_summaries[key] = summary
-    
-        # Get the final summary
+            
+        # Find this part in process_topic function
         final_summary_json = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
         print(final_summary_json)
         final_summary_json = extract_braces_content(final_summary_json)
@@ -513,13 +518,15 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         # Parse the JSON
         final_summary_data = json.loads(final_summary_json)
         
+        # Extract questions before they get removed from final_summary_data
+        questions = json.dumps(final_summary_data.get('questions', []))  # Convert list to JSON string
+        
         # Process each item in the summary
         for item in final_summary_data['summary']:
             image_url = get_image_for_item(item, INSIGNIFICANT_WORDS)
             if image_url:
                 item['image'] = image_url
-
-
+        
         # Cleaning clusters so it doesent overwhelm everything in life
         cleaned_data = []
         for item in final_clusters:
@@ -536,15 +543,15 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
             }
             cleaned_data.append(cleaned_item)
         
-                        
+        # Create the summary with the questions field
         new_summary = Summary.objects.create(
             topic=topic,
             final_summary=final_summary_data,
             clusters=cleaned_data,
             cluster_summaries=cluster_summaries,
             number_of_articles=number_of_articles,
+            questions=questions  # Add this line to save the questions
         )
-
         print(f"SUMMARY for {topic.name} created:")
         print(final_summary_data)
 
