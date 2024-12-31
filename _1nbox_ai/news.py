@@ -521,12 +521,6 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         # Extract questions before they get removed from final_summary_data
         questions = json.dumps(final_summary_data.get('questions', []))  # Convert list to JSON string
         
-        # Process each item in the summary
-        for item in final_summary_data['summary']:
-            image_url = get_image_for_item(item, INSIGNIFICANT_WORDS)
-            if image_url:
-                item['image'] = image_url
-        
         # Cleaning clusters so it doesent overwhelm everything in life
         cleaned_data = []
         for item in final_clusters:
