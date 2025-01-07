@@ -48,6 +48,5 @@ urlpatterns = [
     path('get_organization_for_payment/', views.get_pricing_organization_data),
     path('subscriptions/create/', views.create_subscription),
     path('webhooks/stripe/', views.stripe_webhook),
-    path('subscriptions/change/', views.change_subscription),
 
 ]
