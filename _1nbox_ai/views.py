@@ -849,7 +849,6 @@ from .models import Organization, User
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
-# Map your plans to Stripe Price IDs
 PLAN_PRICE_MAPPING = {
     'core': 'price_1Qb4GKCHpOkAgMGGcMaNiN9L',
     'executive': 'price_1Qb4GvCHpOkAgMGGSJRK8ZVH',
@@ -863,21 +862,6 @@ PLAN_FEATURES = {
     'corporate': {'price': 320, 'users': 50}
 }
 
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.conf import settings
-import stripe
-import json
-from .models import Organization, User
-
-stripe.api_key = settings.STRIPE_SECRET_KEY
-
-PLAN_PRICE_MAPPING = {
-    'core': 'price_1Qb4GKCHpOkAgMGGcMaNiN9L',
-    'executive': 'price_1Qb4GvCHpOkAgMGGSJRK8ZVH',
-    'corporate': 'price_1Qb4I2CHpOkAgMGGFBbRBl0J'
-}
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -1043,39 +1027,172 @@ def handle_checkout_session_completed(session):
     except Exception as e:
         print(f"Error updating organization: {str(e)}")
 
+def get_plan_from_price_id(price_id: str) -> str:
+    """Get plan name from Stripe price ID."""
+    return next(
+        (plan for plan, stripe_price in PLAN_PRICE_MAPPING.items() 
+         if stripe_price == price_id),
+        'free'
+    )
+
+def calculate_proration(current_subscription: stripe.Subscription, new_plan: str) -> Tuple[int, bool]:
+    """
+    Calculate proration amount and whether it's an upgrade or downgrade.
+    Returns (proration_amount_in_cents, is_upgrade)
+    """
+    # Get current plan price
+    current_price_id = current_subscription.items.data[0].price.id
+    current_plan = get_plan_from_price_id(current_price_id)
+    current_plan_price = PLAN_PRICES.get(current_plan, 0)
+    new_plan_price = PLAN_PRICES.get(new_plan, 0)
+
+    # Calculate remaining days in billing period
+    current_period_end = current_subscription.current_period_end
+    current_period_start = current_subscription.current_period_start
+    total_period_days = current_period_end - current_period_start
+    remaining_days = current_period_end - int(datetime.now().timestamp())
+    
+    # Calculate unused amount from current subscription
+    unused_amount = int((remaining_days / total_period_days) * current_plan_price)
+    
+    # Calculate prorated amount for new subscription
+    new_prorated_amount = int((remaining_days / total_period_days) * new_plan_price)
+    
+    # Final proration amount
+    proration_amount = new_prorated_amount - unused_amount
+    is_upgrade = new_plan_price > current_plan_price
+    
+    return proration_amount, is_upgrade
+
+async def handle_subscription_change(
+    organization: Organization,
+    new_plan: str,
+    current_subscription_id: str
+) -> Tuple[bool, Dict[str, Any], int]:
+    """
+    Handle subscription change logic.
+    Returns (success, response_data, status_code)
+    """
+    try:
+        # Retrieve current subscription
+        current_subscription = stripe.Subscription.retrieve(current_subscription_id)
+        
+        # Calculate proration
+        proration_amount, is_upgrade = calculate_proration(current_subscription, new_plan)
+        
+        if is_upgrade:
+            # For upgrades, immediately charge the prorated amount
+            # Cancel current subscription at period end
+            stripe.Subscription.modify(
+                current_subscription_id,
+                cancel_at_period_end=True
+            )
+            
+            # Create new subscription with immediate start
+            new_subscription = stripe.Subscription.create(
+                customer=organization.stripe_customer_id,
+                items=[{'price': PLAN_PRICE_MAPPING[new_plan]}],
+                proration_behavior='create_prorations',
+                billing_cycle_anchor='now',
+            )
+        else:
+            # For downgrades, schedule the change for next billing period
+            new_subscription = stripe.Subscription.modify(
+                current_subscription_id,
+                items=[{
+                    'id': current_subscription['items']['data'][0].id,
+                    'price': PLAN_PRICE_MAPPING[new_plan],
+                }],
+                proration_behavior='none',
+                billing_cycle_anchor='unchanged',
+            )
+
+        # Update organization record
+        organization.stripe_subscription_id = new_subscription.id
+        organization.plan = new_plan
+        organization.save()
+
+        return True, {
+            'success': True,
+            'message': 'Subscription updated successfully',
+            'proration_amount': proration_amount if is_upgrade else 0,
+            'is_upgrade': is_upgrade,
+            'effective_date': 'immediate' if is_upgrade else 'next_billing_period'
+        }, 200
+
+    except stripe.error.StripeError as e:
+        return False, {
+            'success': False,
+            'error': str(e)
+        }, 400
+    except Exception as e:
+        return False, {
+            'success': False,
+            'error': str(e)
+        }, 500
+
 @csrf_exempt
 @require_http_methods(["POST"])
-def change_subscription(request):
+async def change_subscription(request):
+    """
+    Handle subscription changes with proper proration handling.
+    Supports both upgrades (immediate) and downgrades (next billing period).
+    """
     try:
+        # Parse request data
         data = json.loads(request.body)
         org_id = data.get('organization_id')
         new_plan = data.get('plan')
         
+        # Validate input
+        if not org_id or not new_plan:
+            return JsonResponse({
+                'success': False,
+                'error': 'organization_id and plan are required'
+            }, status=400)
+            
         if new_plan not in PLAN_PRICE_MAPPING:
-            return JsonResponse({'error': 'Invalid plan selected'}, status=400)
-            
-        organization = Organization.objects.get(id=org_id)
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid plan selected'
+            }, status=400)
         
+        # Get organization
+        try:
+            organization = Organization.objects.get(id=org_id)
+        except Organization.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Organization not found'
+            }, status=404)
+            
+        # Verify current subscription
         if not organization.stripe_subscription_id:
-            return JsonResponse({'error': 'No active subscription found'}, status=400)
+            return JsonResponse({
+                'success': False,
+                'error': 'No active subscription found'
+            }, status=400)
             
-        # Create a prorated upgrade/downgrade
-        subscription = stripe.Subscription.retrieve(organization.stripe_subscription_id)
-        
-        stripe.Subscription.modify(
-            subscription.id,
-            items=[{
-                'id': subscription['items']['data'][0].id,
-                'price': PLAN_PRICE_MAPPING[new_plan],
-            }],
-            proration_behavior='always_invoice',
+        # Handle subscription change
+        success, response_data, status_code = await handle_subscription_change(
+            organization,
+            new_plan,
+            organization.stripe_subscription_id
         )
         
-        return JsonResponse({'status': 'success', 'message': 'Subscription updated successfully'})
+        return JsonResponse(response_data, status=status_code)
         
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON in request body'
+        }, status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+        
 def handle_subscription_update(subscription):
     try:
         customer = stripe.Customer.retrieve(subscription.customer)
