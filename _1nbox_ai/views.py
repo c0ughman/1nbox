@@ -879,93 +879,28 @@ def calculate_proration_amount(current_subscription: stripe.Subscription, new_pl
     Calculate proration amount for plan change.
     Returns amount in cents.
     """
-    current_price_id = current_subscription['items']['data'][0].price.id
-    current_plan = get_plan_from_price_id(current_price_id)
-    
-    # Get prices in cents
-    current_price = PLAN_PRICES[current_plan]
-    new_price = PLAN_PRICES[new_plan]
-    
-    # Calculate remaining time in current period
-    current_period_end = current_subscription.current_period_end
-    current_period_start = current_subscription.current_period_start
-    total_period = current_period_end - current_period_start
-    remaining_time = current_period_end - int(datetime.now().timestamp())
-    
-    # Calculate prorated amount
-    unused_amount = int((remaining_time / total_period) * current_price)
-    new_amount = int((remaining_time / total_period) * new_price)
-    
-    return max(0, new_amount - unused_amount)
-
-async def handle_subscription_upgrade(
-    organization: Organization,
-    new_plan: str,
-    current_subscription_id: str
-) -> Dict[str, Any]:
-    """Handle upgrading to a more expensive plan."""
     try:
-        # Create new subscription
-        new_subscription = stripe.Subscription.create(
-            customer=organization.stripe_customer_id,
-            items=[{'price': PLAN_PRICE_MAPPING[new_plan]}],
-            proration_behavior='create_prorations',
-            billing_cycle_anchor='now',
-        )
+        current_price_id = current_subscription['items']['data'][0].price.id
+        current_plan = get_plan_from_price_id(current_price_id)
         
-        # Cancel old subscription
-        stripe.Subscription.modify(
-            current_subscription_id,
-            cancel_at_period_end=True
-        )
+        # Get prices in cents
+        current_price = int(PLAN_PRICES[current_plan])
+        new_price = int(PLAN_PRICES[new_plan])
         
-        # Update organization record
-        organization.stripe_subscription_id = new_subscription.id
-        organization.plan = new_plan
-        organization.save()
+        # Calculate remaining time in current period
+        current_period_end = int(current_subscription.current_period_end)
+        current_period_start = int(current_subscription.current_period_start)
+        total_period = current_period_end - current_period_start
+        remaining_time = current_period_end - int(datetime.now().timestamp())
         
-        return {
-            'subscription_id': new_subscription.id,
-            'proration_amount': calculate_proration_amount(
-                await stripe.Subscription.retrieve(current_subscription_id),
-                new_plan
-            )
-        }
+        # Calculate prorated amount
+        unused_amount = int((remaining_time / total_period) * current_price)
+        new_amount = int((remaining_time / total_period) * new_price)
         
-    except stripe.error.StripeError as e:
-        raise e
-
-async def handle_subscription_downgrade(
-    organization: Organization,
-    new_plan: str,
-    current_subscription_id: str
-) -> Dict[str, Any]:
-    """Handle downgrading to a less expensive plan."""
-    try:
-        current_subscription = await stripe.Subscription.retrieve(current_subscription_id)
-        
-        # Modify existing subscription to take effect next billing period
-        updated_subscription = stripe.Subscription.modify(
-            current_subscription_id,
-            items=[{
-                'id': current_subscription['items']['data'][0].id,
-                'price': PLAN_PRICE_MAPPING[new_plan],
-            }],
-            proration_behavior='none',
-            billing_cycle_anchor='unchanged',
-        )
-        
-        # Update organization record
-        organization.plan = new_plan
-        organization.save()
-        
-        return {
-            'subscription_id': updated_subscription.id,
-            'effective_date': datetime.fromtimestamp(updated_subscription.current_period_end)
-        }
-        
-    except stripe.error.StripeError as e:
-        raise e
+        return max(0, new_amount - unused_amount)
+    except Exception as e:
+        print(f"Error calculating proration: {str(e)}")
+        return 0
 
 # Main Views
 @csrf_exempt
@@ -973,7 +908,6 @@ async def handle_subscription_downgrade(
 def create_subscription(request):
     """
     Creates or updates a subscription, handling proration automatically.
-    Maintains the same interface for the frontend while adding subscription change logic.
     """
     try:
         # Parse request data
@@ -1021,25 +955,46 @@ def create_subscription(request):
                 current_plan = get_plan_from_price_id(current_price_id)
                 
                 # Determine if upgrade or downgrade
-                is_upgrade = PLAN_PRICES[new_plan.lower()] > PLAN_PRICES[current_plan.lower()]
+                current_price = int(PLAN_PRICES[current_plan.lower()])
+                new_price = int(PLAN_PRICES[new_plan.lower()])
+                is_upgrade = new_price > current_price
                 
                 if is_upgrade:
                     print(f"Processing upgrade from {current_plan} to {new_plan}")
-                    # For upgrades, redirect to checkout for prorated amount
+                    # Create new subscription first
+                    new_subscription = stripe.Subscription.create(
+                        customer=organization.stripe_customer_id,
+                        items=[{'price': PLAN_PRICE_MAPPING[new_plan.lower()]}],
+                        payment_behavior='default_incomplete',
+                        proration_behavior='create_prorations',
+                        billing_cycle_anchor='now',
+                    )
+
+                    # Then create a checkout session for the proration
                     checkout_session = stripe.checkout.Session.create(
                         customer=organization.stripe_customer_id,
                         payment_method_types=['card'],
-                        line_items=[{
-                            'price': PLAN_PRICE_MAPPING[new_plan.lower()],
-                            'quantity': 1
-                        }],
-                        mode='subscription',
+                        mode='setup',
+                        setup_intent_data={
+                            'metadata': {
+                                'subscription_id': new_subscription.id,
+                            },
+                        },
                         success_url=f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}',
-                        cancel_url=f'https://1nbox.netlify.app/pages/main?canceled=true&org={org_id}',
-                        subscription_data={
-                            'billing_cycle_anchor': 'now',
-                        }
+                        cancel_url=f'https://1nbox.netlify.app/pages/main?canceled=true&org={org_id}'
                     )
+
+                    # Cancel old subscription
+                    stripe.Subscription.modify(
+                        organization.stripe_subscription_id,
+                        cancel_at_period_end=True
+                    )
+
+                    # Update organization record
+                    organization.stripe_subscription_id = new_subscription.id
+                    organization.plan = new_plan
+                    organization.save()
+
                     return JsonResponse({'checkout_url': checkout_session.url})
                 else:
                     print(f"Processing downgrade from {current_plan} to {new_plan}")
@@ -1062,6 +1017,7 @@ def create_subscription(request):
                     })
                     
             except stripe.error.StripeError as e:
+                print(f"Stripe error: {str(e)}")
                 return JsonResponse({'error': str(e)}, status=400)
                 
         # Handle new subscription creation
@@ -1133,12 +1089,30 @@ def stripe_webhook(request):
         elif event.type == 'customer.subscription.deleted':
             subscription = event.data['object']
             handle_subscription_deleted(subscription)
+            
+        elif event.type == 'setup_intent.succeeded':
+            setup_intent = event.data['object']
+            handle_setup_intent_succeeded(setup_intent)
 
         return JsonResponse({'status': 'success'})
 
     except Exception as e:
         print(f"Error processing webhook: {str(e)}")
         return JsonResponse({'error': str(e)}, status=400)
+
+def handle_setup_intent_succeeded(setup_intent):
+    """Handle successful setup intent for subscription updates."""
+    if 'subscription_id' in setup_intent.metadata:
+        subscription_id = setup_intent.metadata['subscription_id']
+        try:
+            subscription = stripe.Subscription.modify(
+                subscription_id,
+                default_payment_method=setup_intent.payment_method,
+                payment_behavior='default_incomplete',
+            )
+            print(f"Updated subscription {subscription_id} with new payment method")
+        except Exception as e:
+            print(f"Error updating subscription with new payment method: {str(e)}")
 
 def handle_checkout_session_completed(session):
     """Handle completed checkout session."""
@@ -1212,7 +1186,6 @@ def handle_subscription_deleted(subscription):
     except Exception as e:
         print(f"Error in handle_subscription_deleted: {str(e)}")
         raise
-
 
 @csrf_exempt
 @firebase_auth_required
