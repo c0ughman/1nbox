@@ -1422,7 +1422,52 @@ def update_organization_plan(request, organization_id):
             'error': str(e)
         }, status=500)
 
-
+@csrf_exempt
+@require_http_methods(["GET"])
+@firebase_auth_required  # Using your existing decorator
+def get_pricing_organization_data(request):
+    """
+    Retrieve organization data for the pricing page using Firebase authentication.
+    Returns organization ID, plan, and subscription status.
+    """
+    try:
+        # Get Firebase user email from the token (already verified by decorator)
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Fetch user and related organization data efficiently
+        user = User.objects.select_related('organization').get(email=email)
+        
+        # Build response with essential pricing-related data
+        response_data = {
+            'success': True,
+            'organization': {
+                'id': user.organization.id,
+                'name': user.organization.name,
+                'plan': user.organization.plan,
+                'status': user.organization.status,
+                'stripe_customer_id': user.organization.stripe_customer_id,
+                'stripe_subscription_id': user.organization.stripe_subscription_id
+            },
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'role': user.role
+            }
+        }
+        
+        return JsonResponse(response_data)
+    
+    except User.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'User not found in database'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 
 
 # OLD 1NBOX RIP
