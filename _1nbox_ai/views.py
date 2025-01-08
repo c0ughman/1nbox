@@ -903,7 +903,7 @@ def calculate_proration_amount(current_subscription: stripe.Subscription, new_pl
 @csrf_exempt
 @require_http_methods(["POST"])
 def create_subscription(request):
-    """Creates or updates a subscription, handling proration automatically."""
+    """Creates or updates a subscription, scheduling changes for the end of current period."""
     try:
         # Parse request data
         try:
@@ -946,65 +946,24 @@ def create_subscription(request):
                 current_subscription = stripe.Subscription.retrieve(
                     organization.stripe_subscription_id
                 )
-                current_price_id = current_subscription['items']['data'][0]['price']['id']
-                current_plan = get_plan_from_price_id(current_price_id)
                 
-                # Determine if upgrade or downgrade
-                current_price = PLAN_PRICES[current_plan.lower()]
-                new_price = PLAN_PRICES[new_plan.lower()]
-                is_upgrade = new_price > current_price
+                # Schedule the plan change for the end of the current period
+                stripe.Subscription.modify(
+                    organization.stripe_subscription_id,
+                    items=[{
+                        'id': current_subscription['items']['data'][0]['id'],
+                        'price': PLAN_PRICE_MAPPING[new_plan.lower()],
+                    }],
+                    proration_behavior='none',
+                )
                 
-                if is_upgrade:
-                    print(f"Processing upgrade from {current_plan} to {new_plan}")
-                    # Calculate proration amount for upgrade
-                    proration_amount = calculate_proration_amount(current_subscription, new_plan)
-                    
-                    # Create checkout session for upgrade payment
-                    checkout_session = stripe.checkout.Session.create(
-                        customer=organization.stripe_customer_id,
-                        payment_method_types=['card'],
-                        mode='payment',
-                        line_items=[{
-                            'price_data': {
-                                'currency': 'usd',
-                                'product_data': {
-                                    'name': f'Upgrade to {new_plan.title()} Plan',
-                                    'description': 'Prorated amount for plan upgrade'
-                                },
-                                'unit_amount': proration_amount,
-                            },
-                            'quantity': 1,
-                        }],
-                        metadata={
-                            'organization_id': str(org_id),
-                            'is_upgrade': 'true',
-                            'new_plan': new_plan,
-                            'old_subscription_id': organization.stripe_subscription_id
-                        },
-                        success_url=f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}',
-                        cancel_url=f'https://1nbox.netlify.app/pages/main?canceled=true&org={org_id}'
-                    )
-
-                    return JsonResponse({'checkout_url': checkout_session.url})
-                else:
-                    print(f"Processing downgrade from {current_plan} to {new_plan}")
-                    # For downgrades, schedule change for next period
-                    stripe.Subscription.modify(
-                        organization.stripe_subscription_id,
-                        items=[{
-                            'id': current_subscription['items']['data'][0]['id'],
-                            'price': PLAN_PRICE_MAPPING[new_plan.lower()],
-                        }],
-                        proration_behavior='none',
-                    )
-                    
-                    organization.plan = new_plan
-                    organization.save()
-                    
-                    return JsonResponse({
-                        'message': 'Plan will be downgraded at the start of next billing period',
-                        'redirect_url': f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}'
-                    })
+                organization.plan = new_plan
+                organization.save()
+                
+                return JsonResponse({
+                    'message': 'Plan will be changed at the start of next billing period',
+                    'redirect_url': f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}'
+                })
                     
             except stripe.error.StripeError as e:
                 print(f"Stripe error: {str(e)}")
@@ -1053,8 +1012,6 @@ def create_subscription(request):
     except Exception as e:
         print(f"Unexpected error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
-
-@csrf_exempt
 def stripe_webhook(request):
     """Handle Stripe webhook events."""
     payload = request.body
@@ -1148,6 +1105,7 @@ def handle_checkout_session_completed(session):
         print(f"Error updating organization: {str(e)}")
         raise e
 
+@csrf_exempt
 def handle_subscription_update(subscription):
     """Handle subscription update event."""
     try:
