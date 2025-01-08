@@ -962,12 +962,15 @@ def create_subscription(request):
                 if is_upgrade:
                     print(f"Processing upgrade from {current_plan} to {new_plan}")
                     # Create new subscription first
+                    # Calculate next billing cycle start (current time + 1 minute to ensure future)
+                    next_billing_cycle = int(datetime.now().timestamp()) + 60
+
                     new_subscription = stripe.Subscription.create(
                         customer=organization.stripe_customer_id,
                         items=[{'price': PLAN_PRICE_MAPPING[new_plan.lower()]}],
                         payment_behavior='default_incomplete',
                         proration_behavior='create_prorations',
-                        billing_cycle_anchor='now',
+                        billing_cycle_anchor=next_billing_cycle,
                     )
 
                     # Then create a checkout session for the proration
@@ -1186,7 +1189,7 @@ def handle_subscription_deleted(subscription):
     except Exception as e:
         print(f"Error in handle_subscription_deleted: {str(e)}")
         raise
-
+        
 @csrf_exempt
 @firebase_auth_required
 @require_http_methods(["DELETE"])
