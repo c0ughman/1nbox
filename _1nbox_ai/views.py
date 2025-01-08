@@ -1129,27 +1129,33 @@ def handle_checkout_session_completed(session):
         
         # Handle upgrade completion
         if session.metadata.get('is_upgrade') == 'true':
-            old_subscription_id = session.metadata.get('old_subscription_id')
             new_plan = session.metadata.get('new_plan')
             
-            if not old_subscription_id or not new_plan:
+            if not new_plan:
                 print("Missing required metadata for upgrade")
                 return
                 
             try:
-                # 1. Cancel and delete the old subscription immediately
-                if old_subscription_id:
-                    try:
-                        stripe.Subscription.delete(old_subscription_id)
-                        print(f"Successfully deleted old subscription: {old_subscription_id}")
-                    except Exception as e:
-                        print(f"Error deleting old subscription: {str(e)}")
+                # 1. Double-check and cleanup ANY existing subscriptions
+                all_subscriptions = stripe.Subscription.list(
+                    customer=organization.stripe_customer_id,
+                    status='all'
+                )
+                
+                for sub in all_subscriptions.data:
+                    if sub.status in ['active', 'past_due', 'trialing', 'incomplete']:
+                        try:
+                            stripe.Subscription.delete(sub.id)
+                            print(f"Cleaned up subscription during webhook: {sub.id}")
+                        except Exception as e:
+                            print(f"Error cleaning up subscription {sub.id}: {str(e)}")
 
                 # 2. Create new subscription
+                next_billing_cycle = int(datetime.now().timestamp()) + 60
                 new_subscription = stripe.Subscription.create(
                     customer=organization.stripe_customer_id,
                     items=[{'price': PLAN_PRICE_MAPPING[new_plan.lower()]}],
-                    billing_cycle_anchor=int(datetime.now().timestamp()) + 60,
+                    billing_cycle_anchor=next_billing_cycle,
                 )
 
                 # 3. Update organization record
@@ -1172,6 +1178,20 @@ def handle_checkout_session_completed(session):
                 print("Missing plan in session metadata")
                 return
                 
+            # Clean up any existing subscriptions first
+            all_subscriptions = stripe.Subscription.list(
+                customer=organization.stripe_customer_id,
+                status='all'
+            )
+            
+            for sub in all_subscriptions.data:
+                if sub.status in ['active', 'past_due', 'trialing', 'incomplete']:
+                    try:
+                        stripe.Subscription.delete(sub.id)
+                        print(f"Cleaned up subscription during normal creation: {sub.id}")
+                    except Exception as e:
+                        print(f"Error cleaning up subscription {sub.id}: {str(e)}")
+            
             organization.plan = plan
             organization.status = 'active'
             organization.stripe_subscription_id = session.subscription
