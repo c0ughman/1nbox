@@ -865,7 +865,6 @@ PLAN_PRICES = {
     'corporate': 32000   # $320.00
 }
 
-# Helper Functions
 def get_plan_from_price_id(price_id: str) -> str:
     """Get plan name from Stripe price ID."""
     return next(
@@ -880,16 +879,16 @@ def calculate_proration_amount(current_subscription: stripe.Subscription, new_pl
     Returns amount in cents.
     """
     try:
-        current_price_id = current_subscription['items']['data'][0].price.id
+        current_price_id = current_subscription['items']['data'][0]['price']['id']
         current_plan = get_plan_from_price_id(current_price_id)
         
         # Get prices in cents
-        current_price = int(PLAN_PRICES[current_plan])
-        new_price = int(PLAN_PRICES[new_plan])
+        current_price = PLAN_PRICES[current_plan]
+        new_price = PLAN_PRICES[new_plan]
         
         # Calculate remaining time in current period
-        current_period_end = int(current_subscription.current_period_end)
-        current_period_start = int(current_subscription.current_period_start)
+        current_period_end = current_subscription.current_period_end
+        current_period_start = current_subscription.current_period_start
         total_period = current_period_end - current_period_start
         remaining_time = current_period_end - int(datetime.now().timestamp())
         
@@ -902,13 +901,10 @@ def calculate_proration_amount(current_subscription: stripe.Subscription, new_pl
         print(f"Error calculating proration: {str(e)}")
         return 0
 
-# Main Views
 @csrf_exempt
 @require_http_methods(["POST"])
 def create_subscription(request):
-    """
-    Creates or updates a subscription, handling proration automatically.
-    """
+    """Creates or updates a subscription, handling proration automatically."""
     try:
         # Parse request data
         try:
@@ -922,7 +918,7 @@ def create_subscription(request):
                 }, status=400)
                 
             print(f"Processing subscription request: org={org_id}, plan={new_plan}")
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
         # Verify Firebase token
@@ -945,58 +941,50 @@ def create_subscription(request):
         except Organization.DoesNotExist:
             return JsonResponse({'error': 'Organization not found'}, status=404)
 
-        # Handle existing subscription if present
+        # Handle existing subscription
         if organization.stripe_subscription_id:
             try:
                 current_subscription = stripe.Subscription.retrieve(
                     organization.stripe_subscription_id
                 )
-                current_price_id = current_subscription['items']['data'][0].price.id
+                current_price_id = current_subscription['items']['data'][0]['price']['id']
                 current_plan = get_plan_from_price_id(current_price_id)
                 
                 # Determine if upgrade or downgrade
-                current_price = int(PLAN_PRICES[current_plan.lower()])
-                new_price = int(PLAN_PRICES[new_plan.lower()])
+                current_price = PLAN_PRICES[current_plan.lower()]
+                new_price = PLAN_PRICES[new_plan.lower()]
                 is_upgrade = new_price > current_price
                 
                 if is_upgrade:
                     print(f"Processing upgrade from {current_plan} to {new_plan}")
-                    # Create new subscription first
-                    # Calculate next billing cycle start (current time + 1 minute to ensure future)
-                    next_billing_cycle = int(datetime.now().timestamp()) + 60
-
-                    new_subscription = stripe.Subscription.create(
-                        customer=organization.stripe_customer_id,
-                        items=[{'price': PLAN_PRICE_MAPPING[new_plan.lower()]}],
-                        payment_behavior='default_incomplete',
-                        proration_behavior='create_prorations',
-                        billing_cycle_anchor=next_billing_cycle,
-                    )
-
-                    # Then create a checkout session for the proration
+                    # Calculate proration amount for upgrade
+                    proration_amount = calculate_proration_amount(current_subscription, new_plan)
+                    
+                    # Create checkout session for upgrade payment
                     checkout_session = stripe.checkout.Session.create(
                         customer=organization.stripe_customer_id,
                         payment_method_types=['card'],
-                        mode='setup',
-                        setup_intent_data={
-                            'metadata': {
-                                'subscription_id': new_subscription.id,
+                        mode='payment',
+                        line_items=[{
+                            'price_data': {
+                                'currency': 'usd',
+                                'product_data': {
+                                    'name': f'Upgrade to {new_plan.title()} Plan',
+                                    'description': 'Prorated amount for plan upgrade'
+                                },
+                                'unit_amount': proration_amount,
                             },
+                            'quantity': 1,
+                        }],
+                        metadata={
+                            'organization_id': str(org_id),
+                            'is_upgrade': 'true',
+                            'new_plan': new_plan,
+                            'old_subscription_id': organization.stripe_subscription_id
                         },
                         success_url=f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}',
                         cancel_url=f'https://1nbox.netlify.app/pages/main?canceled=true&org={org_id}'
                     )
-
-                    # Cancel old subscription
-                    stripe.Subscription.modify(
-                        organization.stripe_subscription_id,
-                        cancel_at_period_end=True
-                    )
-
-                    # Update organization record
-                    organization.stripe_subscription_id = new_subscription.id
-                    organization.plan = new_plan
-                    organization.save()
 
                     return JsonResponse({'checkout_url': checkout_session.url})
                 else:
@@ -1005,18 +993,18 @@ def create_subscription(request):
                     stripe.Subscription.modify(
                         organization.stripe_subscription_id,
                         items=[{
-                            'id': current_subscription['items']['data'][0].id,
+                            'id': current_subscription['items']['data'][0]['id'],
                             'price': PLAN_PRICE_MAPPING[new_plan.lower()],
                         }],
                         proration_behavior='none',
-                        billing_cycle_anchor='unchanged',
                     )
                     
                     organization.plan = new_plan
                     organization.save()
                     
                     return JsonResponse({
-                        'checkout_url': f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}'
+                        'message': 'Plan will be downgraded at the start of next billing period',
+                        'redirect_url': f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}'
                     })
                     
             except stripe.error.StripeError as e:
@@ -1041,7 +1029,7 @@ def create_subscription(request):
                 organization.stripe_customer_id = customer.id
                 organization.save()
 
-            # Create checkout session
+            # Create checkout session for new subscription
             checkout_session = stripe.checkout.Session.create(
                 customer=customer.id,
                 payment_method_types=['card'],
@@ -1082,40 +1070,22 @@ def stripe_webhook(request):
         print(f"Webhook Event Type: {event.type}")
 
         if event.type == 'checkout.session.completed':
-            session = event.data['object']
+            session = event.data.object
             handle_checkout_session_completed(session)
             
         elif event.type == 'customer.subscription.updated':
-            subscription = event.data['object']
+            subscription = event.data.object
             handle_subscription_update(subscription)
             
         elif event.type == 'customer.subscription.deleted':
-            subscription = event.data['object']
+            subscription = event.data.object
             handle_subscription_deleted(subscription)
-            
-        elif event.type == 'setup_intent.succeeded':
-            setup_intent = event.data['object']
-            handle_setup_intent_succeeded(setup_intent)
 
         return JsonResponse({'status': 'success'})
 
     except Exception as e:
         print(f"Error processing webhook: {str(e)}")
         return JsonResponse({'error': str(e)}, status=400)
-
-def handle_setup_intent_succeeded(setup_intent):
-    """Handle successful setup intent for subscription updates."""
-    if 'subscription_id' in setup_intent.metadata:
-        subscription_id = setup_intent.metadata['subscription_id']
-        try:
-            subscription = stripe.Subscription.modify(
-                subscription_id,
-                default_payment_method=setup_intent.payment_method,
-                payment_behavior='default_incomplete',
-            )
-            print(f"Updated subscription {subscription_id} with new payment method")
-        except Exception as e:
-            print(f"Error updating subscription with new payment method: {str(e)}")
 
 def handle_checkout_session_completed(session):
     """Handle completed checkout session."""
@@ -1127,42 +1097,30 @@ def handle_checkout_session_completed(session):
 
         organization = Organization.objects.get(id=org_id)
         
-        # Handle upgrade completion
+        # Handle upgrade payment completion
         if session.metadata.get('is_upgrade') == 'true':
             new_plan = session.metadata.get('new_plan')
+            old_subscription_id = session.metadata.get('old_subscription_id')
             
-            if not new_plan:
+            if not new_plan or not old_subscription_id:
                 print("Missing required metadata for upgrade")
                 return
                 
             try:
-                # 1. Double-check and cleanup ANY existing subscriptions
-                all_subscriptions = stripe.Subscription.list(
-                    customer=organization.stripe_customer_id,
-                    status='all'
-                )
+                # Cancel old subscription immediately
+                stripe.Subscription.delete(old_subscription_id)
                 
-                for sub in all_subscriptions.data:
-                    if sub.status in ['active', 'past_due', 'trialing', 'incomplete']:
-                        try:
-                            stripe.Subscription.delete(sub.id)
-                            print(f"Cleaned up subscription during webhook: {sub.id}")
-                        except Exception as e:
-                            print(f"Error cleaning up subscription {sub.id}: {str(e)}")
-
-                # 2. Create new subscription
-                next_billing_cycle = int(datetime.now().timestamp()) + 60
+                # Create new subscription
                 new_subscription = stripe.Subscription.create(
                     customer=organization.stripe_customer_id,
                     items=[{'price': PLAN_PRICE_MAPPING[new_plan.lower()]}],
-                    billing_cycle_anchor=next_billing_cycle,
+                    billing_cycle_anchor='now',
                 )
 
-                # 3. Update organization record
+                # Update organization record
                 organization.plan = new_plan
                 organization.status = 'active'
                 organization.stripe_subscription_id = new_subscription.id
-                organization.metadata = {}  # Clear temporary metadata
                 organization.save()
                 
                 print(f"Successfully completed upgrade to {new_plan} for organization {org_id}")
@@ -1178,20 +1136,6 @@ def handle_checkout_session_completed(session):
                 print("Missing plan in session metadata")
                 return
                 
-            # Clean up any existing subscriptions first
-            all_subscriptions = stripe.Subscription.list(
-                customer=organization.stripe_customer_id,
-                status='all'
-            )
-            
-            for sub in all_subscriptions.data:
-                if sub.status in ['active', 'past_due', 'trialing', 'incomplete']:
-                    try:
-                        stripe.Subscription.delete(sub.id)
-                        print(f"Cleaned up subscription during normal creation: {sub.id}")
-                    except Exception as e:
-                        print(f"Error cleaning up subscription {sub.id}: {str(e)}")
-            
             organization.plan = plan
             organization.status = 'active'
             organization.stripe_subscription_id = session.subscription
@@ -1204,6 +1148,7 @@ def handle_checkout_session_completed(session):
     except Exception as e:
         print(f"Error updating organization: {str(e)}")
         raise e
+
 def handle_subscription_update(subscription):
     """Handle subscription update event."""
     try:
@@ -1217,12 +1162,21 @@ def handle_subscription_update(subscription):
         try:
             organization = Organization.objects.get(id=org_id)
             
-            # Map Stripe Price ID to plan
-            price_id = subscription.items.data[0].price.id
+            # Get the first subscription item's price
+            subscription_items = subscription.get('items', {}).get('data', [])
+            if not subscription_items:
+                print(f"No items found in subscription: {subscription.id}")
+                return
+                
+            price_id = subscription_items[0].get('price', {}).get('id')
+            if not price_id:
+                print(f"No price ID found in subscription item")
+                return
+                
             plan = get_plan_from_price_id(price_id)
             
             organization.plan = plan
-            organization.status = 'active'
+            organization.status = subscription.status
             organization.stripe_subscription_id = subscription.id
             organization.save()
             
@@ -1254,7 +1208,8 @@ def handle_subscription_deleted(subscription):
     except Exception as e:
         print(f"Error in handle_subscription_deleted: {str(e)}")
         raise
-        
+
+
 @csrf_exempt
 @firebase_auth_required
 @require_http_methods(["DELETE"])
