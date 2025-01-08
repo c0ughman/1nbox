@@ -954,70 +954,24 @@ def create_subscription(request):
                 current_price_id = current_subscription['items']['data'][0].price.id
                 current_plan = get_plan_from_price_id(current_price_id)
                 
-                # Determine if upgrade or downgrade
-                current_price = int(PLAN_PRICES[current_plan.lower()])
-                new_price = int(PLAN_PRICES[new_plan.lower()])
-                is_upgrade = new_price > current_price
-                
-                if is_upgrade:
-                    print(f"Processing upgrade from {current_plan} to {new_plan}")
-                    # Create new subscription first
-                    # Calculate next billing cycle start (current time + 1 minute to ensure future)
-                    next_billing_cycle = int(datetime.now().timestamp()) + 60
-
-                    new_subscription = stripe.Subscription.create(
-                        customer=organization.stripe_customer_id,
-                        items=[{'price': PLAN_PRICE_MAPPING[new_plan.lower()]}],
-                        payment_behavior='default_incomplete',
-                        proration_behavior='create_prorations',
-                        billing_cycle_anchor=next_billing_cycle,
-                    )
-
-                    # Then create a checkout session for the proration
-                    checkout_session = stripe.checkout.Session.create(
-                        customer=organization.stripe_customer_id,
-                        payment_method_types=['card'],
-                        mode='setup',
-                        setup_intent_data={
-                            'metadata': {
-                                'subscription_id': new_subscription.id,
-                            },
-                        },
-                        success_url=f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}',
-                        cancel_url=f'https://1nbox.netlify.app/pages/main?canceled=true&org={org_id}'
-                    )
-
-                    # Cancel old subscription
-                    stripe.Subscription.modify(
-                        organization.stripe_subscription_id,
-                        cancel_at_period_end=True
-                    )
-
-                    # Update organization record
-                    organization.stripe_subscription_id = new_subscription.id
-                    organization.plan = new_plan
-                    organization.save()
-
-                    return JsonResponse({'checkout_url': checkout_session.url})
-                else:
-                    print(f"Processing downgrade from {current_plan} to {new_plan}")
-                    # For downgrades, schedule change for next period
-                    stripe.Subscription.modify(
-                        organization.stripe_subscription_id,
-                        items=[{
-                            'id': current_subscription['items']['data'][0].id,
-                            'price': PLAN_PRICE_MAPPING[new_plan.lower()],
-                        }],
-                        proration_behavior='none',
-                        billing_cycle_anchor='unchanged',
-                    )
+                print(f"Processing change from {current_plan} to {new_plan}")
+                #Schedule change for the next period
+                stripe.Subscription.modify(
+                    organization.stripe_subscription_id,
+                    items=[{
+                        'id': current_subscription['items']['data'][0].id,
+                        'price': PLAN_PRICE_MAPPING[new_plan.lower()],
+                    }],
+                    proration_behavior='none',
+                    billing_cycle_anchor='unchanged',
+                )
                     
-                    organization.plan = new_plan
-                    organization.save()
+                organization.plan = new_plan
+                organization.save()
                     
-                    return JsonResponse({
-                        'checkout_url': f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}'
-                    })
+                return JsonResponse({
+                    'checkout_url': f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}'
+                })
                     
             except stripe.error.StripeError as e:
                 print(f"Stripe error: {str(e)}")
