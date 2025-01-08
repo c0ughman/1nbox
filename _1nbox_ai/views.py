@@ -1119,26 +1119,71 @@ def handle_setup_intent_succeeded(setup_intent):
 
 def handle_checkout_session_completed(session):
     """Handle completed checkout session."""
-    org_id = session.metadata.get('organization_id')
-    plan = session.metadata.get('plan')
-    
-    if not org_id or not plan:
-        print("Missing org_id or plan in session metadata")
-        return
-        
     try:
+        org_id = session.metadata.get('organization_id')
+        if not org_id:
+            print("Missing org_id in session metadata")
+            return
+
         organization = Organization.objects.get(id=org_id)
-        organization.plan = plan
-        organization.status = 'active'
-        organization.stripe_subscription_id = session.subscription
-        organization.save()
         
-        print(f"Updated organization {org_id} to plan {plan}")
+        # Handle upgrade completion
+        if session.metadata.get('is_upgrade') == 'true':
+            old_subscription_id = session.metadata.get('old_subscription_id')
+            new_plan = session.metadata.get('new_plan')
+            
+            if not old_subscription_id or not new_plan:
+                print("Missing required metadata for upgrade")
+                return
+                
+            try:
+                # 1. Cancel and delete the old subscription immediately
+                if old_subscription_id:
+                    try:
+                        stripe.Subscription.delete(old_subscription_id)
+                        print(f"Successfully deleted old subscription: {old_subscription_id}")
+                    except Exception as e:
+                        print(f"Error deleting old subscription: {str(e)}")
+
+                # 2. Create new subscription
+                new_subscription = stripe.Subscription.create(
+                    customer=organization.stripe_customer_id,
+                    items=[{'price': PLAN_PRICE_MAPPING[new_plan.lower()]}],
+                    billing_cycle_anchor=int(datetime.now().timestamp()) + 60,
+                )
+
+                # 3. Update organization record
+                organization.plan = new_plan
+                organization.status = 'active'
+                organization.stripe_subscription_id = new_subscription.id
+                organization.metadata = {}  # Clear temporary metadata
+                organization.save()
+                
+                print(f"Successfully completed upgrade to {new_plan} for organization {org_id}")
+                
+            except Exception as e:
+                print(f"Error processing upgrade completion: {str(e)}")
+                raise e
+                
+        # Handle normal subscription creation
+        else:
+            plan = session.metadata.get('plan')
+            if not plan:
+                print("Missing plan in session metadata")
+                return
+                
+            organization.plan = plan
+            organization.status = 'active'
+            organization.stripe_subscription_id = session.subscription
+            organization.save()
+            
+            print(f"Updated organization {org_id} to plan {plan}")
+            
     except Organization.DoesNotExist:
         print(f"Organization not found: {org_id}")
     except Exception as e:
         print(f"Error updating organization: {str(e)}")
-
+        raise e
 def handle_subscription_update(subscription):
     """Handle subscription update event."""
     try:
