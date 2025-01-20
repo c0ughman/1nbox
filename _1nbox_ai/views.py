@@ -133,9 +133,8 @@ def get_user_organization_data(request):
             'error': 'User not found in database'
         }, status=404)
     except Exception as e:
-        return JsonResponse({
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 
 @csrf_exempt
@@ -174,10 +173,8 @@ def initial_signup(request):
         })
         
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @firebase_auth_required
 def get_user_data(request):
@@ -201,9 +198,8 @@ def get_user_data(request):
             'error': 'User not found in database'
         }, status=404)
     except Exception as e:
-        return JsonResponse({
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 @require_http_methods(["GET"])
@@ -269,14 +265,16 @@ def create_topic(request):
             )
             
         except Exception as e:
-            print(f"OJO - Couldn't create Topic: {e}")
+            print(f"Internal error: {str(e)}")  # For debugging in MVP
+            return JsonResponse({'error': 'An internal error occurred'}, status=500)
             
         return JsonResponse({'success': True, 'id': topic.id})
         
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 
 @csrf_exempt
@@ -357,10 +355,8 @@ def update_topic(request, topic_id):
             'error': 'Invalid JSON.'
         }, status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 @firebase_auth_required
@@ -406,10 +402,8 @@ def delete_topic(request, topic_id):
         })
 
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 
 
@@ -498,10 +492,8 @@ def update_team_member(request, user_id):
             'error': 'Invalid JSON'
         }, status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 @firebase_auth_required
@@ -567,10 +559,8 @@ def delete_team_member(request, user_id):
         })
 
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -598,10 +588,8 @@ def check_pending_invitation(request, organization_id):
         })
 
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 @firebase_auth_required
@@ -652,10 +640,8 @@ def join_team_member(request, organization_id):
             }, status=404)
 
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 def send_email(email, organization_name, organization_id):
     """
@@ -757,12 +743,9 @@ def invite_team_member(request):
             'error': 'Invalid JSON'
         }, status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
-# Update the view function
 @csrf_exempt
 def message_received(request):
     if request.method == 'POST':
@@ -773,40 +756,10 @@ def message_received(request):
             answer = generate_answer(topic, body, context)
             return HttpResponse(answer, status=200)
         except Exception as e:
-            print(f"A problem occurred: {e}")
-            return HttpResponse(f"A problem occurred: {e}", status=500)
+            print(f"Internal error: {str(e)}")  # For debugging in MVP
+            return HttpResponse("An internal error occurred", status=500)
     else:
         return HttpResponse("Only POST requests are allowed.", status=405)
-
-
-'''
-
-@csrf_exempt
-@require_http_methods(["GET"])
-def get_user_data(request, supabase_user_id):
-    try:
-        user = User.objects.get(id=id)
-
-        summaries_list = []
-        for topic in user.organization.topics.all():
-            if topic:
-                summaries_list.append(topic.summaries.first().final_summary)
-            else:
-                print("OJO - Missing a Topic here")
-        
-        user_data = {
-            'email': user.email,
-            'supabase_user_id': user.id,
-            'plan': user.organization.plan,
-            'topics': user.organization.topics.values_list('name', flat=True),
-            'summaries_list': summaries_list,
-        }
-        return JsonResponse(user_data)
-    except User.DoesNotExist:
-        return JsonResponse({'error': 'User not found'}, status=404)
-
-
-'''
 
 @csrf_exempt
 def sign_up(request):
@@ -817,7 +770,7 @@ def sign_up(request):
             
             email = request_data.get('email')
             
-            print(f"Extracted data: email={email}, user_id={user_id}")
+            print(f"Extracted data: email={email}")
             
             user, created = User.objects.get_or_create(email=email)
             
@@ -827,28 +780,16 @@ def sign_up(request):
                 print(f"New user created: {user.id}")
                 return JsonResponse({'success': True, 'user_id': user.id, 'message': 'User created successfully'}, status=201)
             else:
-                if user_id:
-                    user.email = email
+                user.email = email
                 user.save()
                 print(f"Existing user updated: {user.id}")
                 return JsonResponse({'success': True, 'user_id': user.id, 'message': 'User updated successfully'}, status=200)
         
         except Exception as e:
-            print(f"Error processing request: {str(e)}")
-            return JsonResponse({'error': str(e)}, status=500)
+            print(f"Internal error: {str(e)}")  # For debugging in MVP
+            return JsonResponse({'error': 'An internal error occurred'}, status=500)
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
-        
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.conf import settings
-from datetime import datetime
-from typing import Tuple, Dict, Any
-import stripe
-import json
-from .models import Organization, User
-from firebase_admin import auth
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -1018,8 +959,8 @@ def create_subscription(request):
         print(f"Stripe error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=400)
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 def stripe_webhook(request):
@@ -1181,10 +1122,8 @@ def delete_current_user(request):
         })
 
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 @firebase_auth_required
@@ -1232,10 +1171,8 @@ def update_current_user_name(request):
             'error': 'Invalid JSON'
         }, status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 @firebase_auth_required
@@ -1279,10 +1216,8 @@ def delete_organization(request, organization_id):
             }, status=404)
 
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 @firebase_auth_required
@@ -1346,10 +1281,8 @@ def update_organization_name(request, organization_id):
             'error': 'Invalid JSON'
         }, status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 @firebase_auth_required
@@ -1426,10 +1359,8 @@ def update_organization_plan(request, organization_id):
             'error': 'Invalid JSON'
         }, status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
 @require_http_methods(["GET"])
@@ -1473,13 +1404,13 @@ def get_pricing_organization_data(request):
             'error': 'User not found in database'
         }, status=404)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 
 # OLD 1NBOX RIP
+
+
 
 
 
