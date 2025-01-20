@@ -28,10 +28,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-9y#asx20a^uqj@r!k4v#1op2as7u+ssl#=w1wf3(gfp*f7%_h+'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['app-1nbox-ai-fb8295a32cce.herokuapp.com/', '127.0.0.1']
 
@@ -39,7 +39,7 @@ ALLOWED_HOSTS = ['app-1nbox-ai-fb8295a32cce.herokuapp.com/', '127.0.0.1']
 FIREBASE_CREDENTIALS = {
     "type": "service_account",
     "project_id": os.environ.get("FIREBASE_PROJECT_ID"),
-    "private_key_id": "434a44d010f92ce38f9a88a91288dbf67bae6331",
+    "private_key_id": os.environ.get("FIREBASE_PRIVATE_KEY_ID"),
     "private_key": os.environ.get("FIREBASE_PRIVATE_KEY").replace('\\n', '\n') if os.environ.get("FIREBASE_PRIVATE_KEY") else None,
     "client_email": os.environ.get("FIREBASE_CLIENT_EMAIL"),
     "client_id": os.environ.get("FIREBASE_CLIENT_ID"),
