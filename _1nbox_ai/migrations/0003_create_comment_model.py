@@ -4,7 +4,7 @@ from django.utils import timezone
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('_1nbox_ai', '0002_add_description_name_state_fields.py'),  # Adjust this to match your previous migration
+        ('_1nbox_ai', '0002_add_description_name_state_fields'),  # Adjust this to match your previous migration
     ]
 
     operations = [
