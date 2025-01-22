@@ -92,3 +92,20 @@ class Summary(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+
+class Comment(models.Model):
+    comment = models.TextField()
+    writer = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='comments'
+    )
+    position = models.IntegerField()
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Comment by {self.writer.email} at position {self.position}"
+    
+    class Meta:
+        ordering = ['position']
+
