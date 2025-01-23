@@ -1419,6 +1419,70 @@ def get_pricing_organization_data(request):
         print(f"Internal error: {str(e)}")  # For debugging in MVP
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["POST"])
+def add_comment(request):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        # Get current user
+        try:
+            current_user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Parse request data
+        data = json.loads(request.body)
+        comment_text = data.get('comment')
+        position = data.get('position')
+        writer_id = data.get('writer')
+        
+        # Validate required fields
+        if not all([comment_text, position, writer_id]):
+            return JsonResponse({
+                'success': False,
+                'error': 'comment, position, and writer are required fields'
+            }, status=400)
+
+        # Verify the writer_id matches the current user
+        if int(writer_id) != current_user.id:
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot create comments for other users'
+            }, status=403)
+
+        # Create the comment
+        comment = Comment.objects.create(
+            comment=comment_text,
+            position=position,
+            writer=current_user
+        )
+
+        return JsonResponse({
+            'success': True,
+            'comment': {
+                'id': comment.id,
+                'comment': comment.comment,
+                'position': comment.position,
+                'writer': current_user.name or current_user.email,
+                'created_at': comment.created_at
+            }
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 # OLD 1NBOX RIP
 
