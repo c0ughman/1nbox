@@ -58,6 +58,18 @@ def get_user_organization_data(request):
             'organization__topics__summaries'
         ).get(email=email)
         
+        # Fetch comments from users in the same organization
+        organization_comments = Comment.objects.filter(
+            writer__organization=current_user.organization
+        ).select_related('writer').order_by('position')
+        
+        # Build comments data
+        comments_data = [{
+            'position': comment.position,
+            'comment': comment.comment,
+            'writer': comment.writer.name,  # Only including writer name as requested
+        } for comment in organization_comments]
+        
         # Fetch all users in the same organization
         organization_users = User.objects.filter(
             organization=current_user.organization
@@ -119,11 +131,12 @@ def get_user_organization_data(request):
                 'plan': current_user.organization.plan,
                 'status': current_user.organization.status,
                 'created_at': current_user.organization.created_at,
-                'description': current_user.organization.description,  # Added organization description
+                'description': current_user.organization.description,
                 'stripe_customer_id': current_user.organization.stripe_customer_id,
                 'stripe_subscription_id': current_user.organization.stripe_subscription_id,
             },
-            'topics': topics_data
+            'topics': topics_data,
+            'comments': comments_data
         }
         
         return JsonResponse(response_data)
@@ -135,7 +148,6 @@ def get_user_organization_data(request):
     except Exception as e:
         print(f"Internal error: {str(e)}")  # For debugging in MVP
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
-
 
 @csrf_exempt
 @firebase_auth_required
