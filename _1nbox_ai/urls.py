@@ -45,6 +45,8 @@ urlpatterns = [
     path('update_organization/<int:organization_id>/name/', views.update_organization_name),
     path('update_organization/<int:organization_id>/plan/', views.update_organization_plan),
 
+    path('add_comment/', views.add_comment),
+
     path('get_organization_for_payment/', views.get_pricing_organization_data),
     path('subscriptions/create/', views.create_subscription),
     path('webhooks/stripe/', views.stripe_webhook),
