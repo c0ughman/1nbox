@@ -167,6 +167,7 @@ def initial_signup(request):
         user = User.objects.create(
             email=firebase_user['email'],
             role='admin',  # First user is admin
+            name=firebase_user['email'],
             organization=organization  # Link to the organization
         )
         
@@ -724,6 +725,7 @@ def invite_team_member(request):
         new_user = User.objects.create(
             email=new_member_email,
             organization=current_user.organization,
+            name=new_member_email,
             role='member',
             state='pending'
         )
