@@ -63,20 +63,6 @@ def get_user_organization_data(request):
             organization=current_user.organization
         ).select_related('organization')
         
-        # Fetch all comments from users in the organization
-        organization_comments = Comment.objects.filter(
-            writer__organization=current_user.organization
-        ).select_related('writer')
-        
-        # Build comments data
-        comments_data = [{
-            'comment': comment.comment,
-            'position': comment.position,
-            'writer': comment.writer.name
-            }
-        } for comment in organization_comments]
-        
-        
         # Build users data with additional fields
         users_data = [{
             'id': org_user.id,
@@ -137,8 +123,7 @@ def get_user_organization_data(request):
                 'stripe_customer_id': current_user.organization.stripe_customer_id,
                 'stripe_subscription_id': current_user.organization.stripe_subscription_id,
             },
-            'topics': topics_data,
-            'comments': comments_data
+            'topics': topics_data
         }
         
         return JsonResponse(response_data)
@@ -1424,6 +1409,9 @@ def get_pricing_organization_data(request):
 
 
 # OLD 1NBOX RIP
+
+
+
 
 
 
