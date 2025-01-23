@@ -76,6 +76,7 @@ def get_user_organization_data(request):
             }
         } for comment in organization_comments]
         
+        
         # Build users data with additional fields
         users_data = [{
             'id': org_user.id,
@@ -89,7 +90,7 @@ def get_user_organization_data(request):
         # Build topics data with their latest summaries
         topics_data = []
         for topic in current_user.organization.topics.all():
-            latest_summary = topic.summaries.first()
+            latest_summary = topic.summaries.first()  # Gets the latest summary due to Meta ordering
             topic_data = {
                 'id': topic.id,
                 'name': topic.name,
@@ -132,7 +133,7 @@ def get_user_organization_data(request):
                 'plan': current_user.organization.plan,
                 'status': current_user.organization.status,
                 'created_at': current_user.organization.created_at,
-                'description': current_user.organization.description,
+                'description': current_user.organization.description,  # Added organization description
                 'stripe_customer_id': current_user.organization.stripe_customer_id,
                 'stripe_subscription_id': current_user.organization.stripe_subscription_id,
             },
@@ -1423,6 +1424,14 @@ def get_pricing_organization_data(request):
 
 
 # OLD 1NBOX RIP
+
+
+
+
+
+
+
+
 
 
 
