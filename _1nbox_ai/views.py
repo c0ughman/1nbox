@@ -1486,6 +1486,205 @@ def add_comment(request):
         print(f"Internal error: {str(e)}")  # For debugging in MVP
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
+
+# views.py
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["POST"])
+def notify_mentioned_users(request):
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+        
+        try:
+            current_user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Get mention data
+        data = json.loads(request.body)
+        mentioned_emails = data.get('mentioned_emails', [])
+        comment_text = data.get('comment_text', '')
+        position = data.get('position')
+        
+        if not mentioned_emails or not comment_text:
+            return JsonResponse({
+                'success': False,
+                'error': 'Mentioned emails and comment text are required'
+            }, status=400)
+
+        # Send notification emails to mentioned users
+        notification_results = []
+        for mentioned_email in mentioned_emails:
+            # Skip if the mentioned user is the comment author
+            if mentioned_email == email:
+                continue
+                
+            # Check if mentioned user exists in the organization
+            try:
+                mentioned_user = User.objects.get(
+                    email=mentioned_email,
+                    organization=current_user.organization
+                )
+                
+                # Send notification email
+                email_success, email_result = send_mention_notification(
+                    to_email=mentioned_email,
+                    from_user=current_user.name or current_user.email,
+                    organization_name=current_user.organization.name,
+                    comment_text=comment_text,
+                    position=position
+                )
+                
+                notification_results.append({
+                    'email': mentioned_email,
+                    'success': email_success,
+                    'message': email_result if not email_success else 'Notification sent'
+                })
+                
+            except User.DoesNotExist:
+                notification_results.append({
+                    'email': mentioned_email,
+                    'success': False,
+                    'message': 'User not found in organization'
+                })
+
+        return JsonResponse({
+            'success': True,
+            'results': notification_results
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        print(f"Internal error: {str(e)}")
+        return JsonResponse({
+            'error': 'An internal error occurred'
+        }, status=500)
+
+def send_mention_notification(to_email, from_user, organization_name, comment_text, position):
+    try:
+        # Create the email HTML content
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>1nbox Mention Notification</title>
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    background-color: #F4FAF8;
+                    margin: 0;
+                    padding: 20px;
+                }}
+                .container {{
+                    background-color: white;
+                    border-radius: 20px;
+                    padding: 32px;
+                    width: 100%;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                }}
+                .header {{
+                    margin-bottom: 25px;
+                    text-align: center;
+                }}
+                h1 {{
+                    font-size: 28px;
+                    color: #2D4B48;
+                    margin: 0;
+                    margin-bottom: 10px;
+                    font-weight: 700;
+                }}
+                .subtitle {{
+                    color: #5C7A76;
+                    font-size: 17px;
+                    margin: 0;
+                    line-height: 1.5;
+                }}
+                .content {{
+                    margin-bottom: 30px;
+                    color: #5C7A76;
+                    font-size: 15px;
+                    line-height: 1.6;
+                }}
+                .comment-box {{
+                    background-color: #F4FAF8;
+                    padding: 16px;
+                    border-radius: 10px;
+                    margin: 20px 0;
+                }}
+                .button-container {{
+                    text-align: center;
+                    margin: 32px 0;
+                }}
+                .button {{
+                    display: inline-block;
+                    background-color: #0FD7D7;
+                    color: white;
+                    text-decoration: none;
+                    padding: 12px 24px;
+                    border-radius: 20px;
+                    font-size: 16px;
+                    font-weight: 500;
+                }}
+                .organization-badge {{
+                    display: inline-block;
+                    padding: 6px 12px;
+                    background-color: #F4FAF8;
+                    border-radius: 6px;
+                    color: #5C7A76;
+                    font-size: 15px;
+                    margin-top: 8px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>You've been mentioned in a comment</h1>
+                    <p class="subtitle">in</p>
+                    <div class="organization-badge">{organization_name}</div>
+                </div>
+                <div class="content">
+                    <p><strong>{from_user}</strong> mentioned you in a comment:</p>
+                    <div class="comment-box">
+                        {comment_text}
+                    </div>
+                </div>
+                <div class="button-container">
+                    <a href="https://app-1nbox-ai.web.app/home?position={position}" class="button">View Comment</a>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send the email using your existing email sending infrastructure
+        # This is a placeholder - replace with your actual email sending logic
+        send_email_result = send_email_with_template(
+            to_email=to_email,
+            subject=f"{from_user} mentioned you in a comment",
+            html_content=html_content
+        )
+        
+        return True, "Email sent successfully"
+        
+    except Exception as e:
+        return False, str(e)
+
+
 # OLD 1NBOX RIP
 
 
