@@ -556,11 +556,14 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
                        merge_threshold=2, min_articles=3, join_percentage=0.5,
                        final_merge_percentage=0.5, sentences_final_summary=3):
                            
-       # Get all organizations that are not inactive
-    active_organizations = Organization.objects.exclude(plan='inactive')       # Check for how we will handle inactive later
+    # Get all organizations that are not inactive
+    active_organizations = Organization.objects.exclude(plan='inactive')
     
     # Process topics for all active organizations
     for organization in active_organizations:
+        # Delete all comments from users in this organization
+        Comment.objects.filter(writer__organization=organization).delete()
+        
         for topic in organization.topics.all():
             process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
                          merge_threshold, min_articles, join_percentage,
