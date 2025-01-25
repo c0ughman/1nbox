@@ -1687,7 +1687,7 @@ def send_mention_notification(to_email, from_user, organization_name, comment_te
         </body>
         </html>
         """
-      logger.debug("HTML content generated successfully")
+        logger.debug("HTML content generated successfully")
         
         # Check if send_email_with_template exists and is callable
         if not hasattr(send_email_with_template, '__call__'):
