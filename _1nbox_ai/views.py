@@ -1521,9 +1521,6 @@ def notify_mentioned_users(request):
         # Send notification emails to mentioned users
         notification_results = []
         for mentioned_email in mentioned_emails:
-            # Skip if the mentioned user is the comment author
-            if mentioned_email == email:
-                continue
                 
             # Check if mentioned user exists in the organization
             try:
