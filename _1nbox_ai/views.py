@@ -1497,10 +1497,13 @@ def notify_mentioned_users(request):
         # Get the Firebase user from the decorator
         firebase_user = request.firebase_user
         email = firebase_user['email']
+        logger.info(f"Processing mention notifications for user: {email}")
         
         try:
             current_user = User.objects.get(email=email)
+            logger.debug(f"Found current user: {current_user.email} (ID: {current_user.id})")
         except User.DoesNotExist:
+            logger.error(f"User not found for email: {email}")
             return JsonResponse({
                 'success': False,
                 'error': 'User not found'
@@ -1512,7 +1515,12 @@ def notify_mentioned_users(request):
         comment_text = data.get('comment_text', '')
         position = data.get('position')
         
+        logger.info(f"Received mention data: {len(mentioned_emails)} mentions, position: {position}")
+        logger.debug(f"Mentioned emails: {mentioned_emails}")
+        logger.debug(f"Comment text: {comment_text}")
+        
         if not mentioned_emails or not comment_text:
+            logger.warning("Missing required data: emails or comment text")
             return JsonResponse({
                 'success': False,
                 'error': 'Mentioned emails and comment text are required'
@@ -1521,6 +1529,7 @@ def notify_mentioned_users(request):
         # Send notification emails to mentioned users
         notification_results = []
         for mentioned_email in mentioned_emails:
+            logger.info(f"Processing notification for: {mentioned_email}")
                 
             # Check if mentioned user exists in the organization
             try:
@@ -1528,8 +1537,10 @@ def notify_mentioned_users(request):
                     email=mentioned_email,
                     organization=current_user.organization
                 )
+                logger.debug(f"Found mentioned user in organization: {mentioned_user.email}")
                 
                 # Send notification email
+                logger.info(f"Attempting to send notification email to: {mentioned_email}")
                 email_success, email_result = send_mention_notification(
                     to_email=mentioned_email,
                     from_user=current_user.name or current_user.email,
@@ -1538,6 +1549,8 @@ def notify_mentioned_users(request):
                     position=position
                 )
                 
+                logger.info(f"Email send result for {mentioned_email}: success={email_success}, message={email_result}")
+                
                 notification_results.append({
                     'email': mentioned_email,
                     'success': email_success,
@@ -1545,30 +1558,37 @@ def notify_mentioned_users(request):
                 })
                 
             except User.DoesNotExist:
+                logger.warning(f"Mentioned user not found in organization: {mentioned_email}")
                 notification_results.append({
                     'email': mentioned_email,
                     'success': False,
                     'message': 'User not found in organization'
                 })
 
+        logger.info(f"Completed processing all mentions. Results: {notification_results}")
         return JsonResponse({
             'success': True,
             'results': notification_results
         })
         
     except json.JSONDecodeError:
+        logger.error("Invalid JSON in request body")
         return JsonResponse({
             'success': False,
             'error': 'Invalid JSON'
         }, status=400)
     except Exception as e:
-        print(f"Internal error: {str(e)}")
+        logger.error(f"Internal error in notify_mentioned_users: {str(e)}", exc_info=True)
         return JsonResponse({
             'error': 'An internal error occurred'
         }, status=500)
 
+
 def send_mention_notification(to_email, from_user, organization_name, comment_text, position):
     try:
+        logger.info(f"Preparing mention notification email for: {to_email}")
+        logger.debug(f"Email parameters - From: {from_user}, Org: {organization_name}, Position: {position}")
+        
         # Create the email HTML content
         html_content = f"""
         <!DOCTYPE html>
@@ -1667,18 +1687,26 @@ def send_mention_notification(to_email, from_user, organization_name, comment_te
         </body>
         </html>
         """
+      logger.debug("HTML content generated successfully")
         
+        # Check if send_email_with_template exists and is callable
+        if not hasattr(send_email_with_template, '__call__'):
+            logger.error("send_email_with_template is not defined or not callable")
+            return False, "Email sending function not properly configured"
+            
         # Send the email using your existing email sending infrastructure
-        # This is a placeholder - replace with your actual email sending logic
+        logger.info(f"Attempting to send email to {to_email}")
         send_email_result = send_email_with_template(
             to_email=to_email,
             subject=f"{from_user} mentioned you in a comment",
             html_content=html_content
         )
+        logger.info(f"Email sending completed with result: {send_email_result}")
         
         return True, "Email sent successfully"
         
     except Exception as e:
+        logger.error(f"Error sending mention notification email: {str(e)}", exc_info=True)
         return False, str(e)
 
 
