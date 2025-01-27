@@ -1486,6 +1486,108 @@ def add_comment(request):
         print(f"Internal error: {str(e)}")  # For debugging in MVP
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["POST"])
+def notify_mentioned_users(request):
+    """
+    Send email notifications to users mentioned in comments.
+    Expects JSON body with:
+    - mentioned_emails: list of emails of mentioned users
+    - comment_text: the comment content
+    - position: position/context of the comment
+    """
+    try:
+        # Get the Firebase user from the decorator
+        firebase_user = request.firebase_user
+        sender_email = firebase_user['email']
+        
+        # Get current user
+        try:
+            current_user = User.objects.get(email=sender_email)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            }, status=404)
+
+        # Parse request data
+        data = json.loads(request.body)
+        mentioned_emails = data.get('mentioned_emails', [])
+        comment_text = data.get('comment_text')
+        position = data.get('position')
+        
+        if not all([mentioned_emails, comment_text, position]):
+            return JsonResponse({
+                'success': False,
+                'error': 'mentioned_emails, comment_text, and position are required'
+            }, status=400)
+
+        # Verify all mentioned users are in the same organization
+        mentioned_users = User.objects.filter(
+            email__in=mentioned_emails,
+            organization=current_user.organization
+        )
+        
+        if len(mentioned_users) != len(mentioned_emails):
+            return JsonResponse({
+                'success': False,
+                'error': 'One or more mentioned users not found in your organization'
+            }, status=400)
+
+        # Send emails to mentioned users
+        sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+        
+        notification_results = []
+        for user in mentioned_users:
+            context = {
+                'recipient_name': user.name or user.email,
+                'sender_name': current_user.name or current_user.email,
+                'organization_name': current_user.organization.name,
+                'comment_text': comment_text,
+                'position': position,
+                'app_url': 'https://1nbox.netlify.app'  # Add the specific URL to the comment
+            }
+            
+            content = render_to_string('mention_notification.html', context)
+            
+            message = Mail(
+                from_email='news@1nbox-ai.com',
+                to_emails=user.email,
+                subject=f'{current_user.name or current_user.email} mentioned you in a comment on 1nbox',
+                html_content=content
+            )
+            
+            try:
+                response = sg.send(message)
+                notification_results.append({
+                    'email': user.email,
+                    'success': True,
+                    'status_code': response.status_code
+                })
+            except Exception as e:
+                notification_results.append({
+                    'email': user.email,
+                    'success': False,
+                    'error': str(e)
+                })
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Notifications sent',
+            'results': notification_results
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
+
+
 # OLD 1NBOX RIP
 
 
