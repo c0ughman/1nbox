@@ -1490,13 +1490,6 @@ def add_comment(request):
 @firebase_auth_required
 @require_http_methods(["POST"])
 def notify_mentioned_users(request):
-    """
-    Send email notifications to users mentioned in comments.
-    Expects JSON body with:
-    - mentioned_emails: list of emails of mentioned users
-    - comment_text: the comment content
-    - position: position/context of the comment
-    """
     try:
         # Get the Firebase user from the decorator
         firebase_user = request.firebase_user
@@ -1515,12 +1508,12 @@ def notify_mentioned_users(request):
         data = json.loads(request.body)
         mentioned_emails = data.get('mentioned_emails', [])
         comment_text = data.get('comment_text')
-        position = data.get('position')
+        article_title = data.get('article_title', 'Untitled Article')  # Get the article title from request
         
-        if not all([mentioned_emails, comment_text, position]):
+        if not all([mentioned_emails, comment_text]):
             return JsonResponse({
                 'success': False,
-                'error': 'mentioned_emails, comment_text, and position are required'
+                'error': 'mentioned_emails and comment_text are required'
             }, status=400)
 
         # Verify all mentioned users are in the same organization
@@ -1545,8 +1538,8 @@ def notify_mentioned_users(request):
                 'sender_name': current_user.name or current_user.email,
                 'organization_name': current_user.organization.name,
                 'comment_text': comment_text,
-                'position': position,
-                'app_url': 'https://1nbox.netlify.app'  # Add the specific URL to the comment
+                'article_title': article_title,  # Include article title in the context
+                'app_url': 'https://1nbox.netlify.app'
             }
             
             content = render_to_string('mention_notification.html', context)
@@ -1554,7 +1547,7 @@ def notify_mentioned_users(request):
             message = Mail(
                 from_email='news@1nbox-ai.com',
                 to_emails=user.email,
-                subject=f'{current_user.name or current_user.email} mentioned you in a comment on 1nbox',
+                subject=f'{current_user.name or current_user.email} mentioned you in a comment on "{article_title}" - 1nbox',
                 html_content=content
             )
             
