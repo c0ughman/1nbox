@@ -4,175 +4,67 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today in {% for topic in topics %}{{ topic.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</title>
-    <style>
-        /* Previous styles remain unchanged */
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            font-size: 16px;
-            margin: 0;
-            padding: 20px;
-            color: black;
-        }
-        .container {
-            max-width: 500px;
-            margin: 0 auto;
-            background-color: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        .header {
-            background-color: #2c5945;
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }
-        .header img {
-            margin-bottom: 10px;
-            height: 40px;
-            width: 45px;
-        }
-        .header h1 {
-            font-size: 18px;
-            margin: 0;
-        }
-        .powered-by {
-            font-size: 12px;
-            color: #ccc;
-            margin-top: 10px;
-        }
-        .news-list {
-            background-color: #2c5945;
-            color: white;
-            padding: 20px;
-        }
-        .news-item {
-            margin-bottom: 15px;
-        }
-        .world-news {
-            padding: 20px;
-        }
-        .world-news h2 {
-            font-size: 24px;
-            margin: 0 0 10px 0;
-            display: inline-block;
-            margin-right: 10px;
-        }
-        .news-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        .news-detail {
-            margin-bottom: 20px;
-        }
-        .ask-ai-link {
-            font-size: 14px;
-            font-weight: bold;
-            text-decoration: none;
-            color: white !important;
-            background-color: #2c5945;
-            padding: 5px 10px;
-            border-radius: 5px;
-            display: inline-block;
-            float: right;
-        }
-        .view-sources-link {
-            font-size: 14px;
-            font-weight: bold;
-            text-decoration: none;
-            color: #2c5945 !important;
-            padding: 5px 10px;
-            border-radius: 5px;
-            display: inline-block;
-            float: right;
-        }
-        .footer {
-            background-color: #FAFAFA;
-            color: gray;
-            padding: 20px;
-            text-align: left;
-            font-size: 12px;
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            line-height:1.5;
-        }
-        .footer a {
-            color: gray;
-            text-decoration: underline;
-        }
-        .footer .column {
-            width: 30%;
-        }
-    </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <img src="https://i.imgur.com/ss75uEe.png" alt="1nbox AI" width="40" height="40" style="display: block; margin: 0 auto 10px;">
-            <h1>Today in {% for topic in topics %}{{ topic.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</h1>
-            <div class="powered-by">Summarized from {{ total_number_of_articles }} articles</div>
+<body style="margin: 0; padding: 0; background-color: #F4FAF8; font-family: 'Roboto', Arial, sans-serif; line-height: 1.5; color: #333333;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+        <!-- Header -->
+        <div style="background-color: #F0F0F0; color: #2D4B48; padding: 32px 24px; text-align: center;">
+            <img src="https://i.imgur.com/ss75uEe.png" alt="1nbox AI" width="45" height="40" style="display: block; margin: 0 auto 16px;">
+            <h1 style="margin: 0; font-size: 24px; font-weight: 700; font-family: 'Roboto', Arial, sans-serif;">Today in {% for topic in topics %}{{ topic.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</h1>
+            <div style="font-size: 14px; color: #5C7A76; margin-top: 8px;">Summarized from {{ total_number_of_articles }} articles</div>
         </div>
 
-<div class="news-list">
-    {% for topic in topics %}
-        {% with latest_summary=topic.summaries.first %}
-            {% if latest_summary %}
-                {% for item in latest_summary.final_summary.summary %}
-                    <div class="news-item">• {{ item.title }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-    {% endfor %}
-</div>
+        <!-- Summary Section -->
+        <div style="background-color: #F0F0F0; color: #2D4B48; padding: 24px 32px;">
+            {% for topic in topics %}
+                {% with latest_summary=topic.summaries.first %}
+                    {% if latest_summary %}
+                        {% for item in latest_summary.final_summary.summary %}
+                            <div style="margin-bottom: 12px; font-size: 16px; font-weight: 600;">• {{ item.title }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            {% endfor %}
+        </div>
         
-{% if topics %}
-    {% for topic in topics %}
-        <div class="world-news">
-            <h2>{{ topic.name }}</h2>
-            <a href="https://www.1nbox-ai.com/chat?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="ask-ai-link">Ask AI</a>
-            <a href="https://www.1nbox-ai.com/sources?topic={{ topic.name }}&organization_id={{ user.organization.id }}" class="view-sources-link">View Sources</a>
-            
-            {% with latest_summary=topic.summaries.first %}
-                {% if latest_summary %}
-                    {% for item in latest_summary.final_summary.summary %}
+        <!-- Topics Section -->
+        {% if topics %}
+            {% for topic in topics %}
+                <div style="padding: 32px; border-bottom: 1px solid #F0F0F0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <h2 style="margin: 0; font-size: 20px; color: #2D4B48; font-weight: 700;">{{ topic.name }}</h2>
                         <div>
-                            <div class="news-title">{{ item.title }}</div>
-                            <div class="news-detail">{{ item.content | safe | linebreaksbr }}</div>
+                            <a href="https://1nbox.netlify.app/pages/main" style="font-size: 14px; text-decoration: none; color: #2D4B48; margin-left: 16px;">View Sources</a>
+                            <a href="https://1nbox.netlify.app/pages/main" style="font-size: 14px; text-decoration: none; color: #FFFFFF; background-color: #0FD7D7; padding: 8px 16px; border-radius: 999px; margin-left: 16px;">Ask AI</a>
                         </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-        </div>
-    {% endfor %}
-{% endif %}
+                    </div>
+                    
+                    {% with latest_summary=topic.summaries.first %}
+                        {% if latest_summary %}
+                            {% for item in latest_summary.final_summary.summary %}
+                                <div style="margin-bottom: 24px;">
+                                    <div style="font-size: 18px; font-weight: 700; color: #2D4B48; margin-bottom: 12px;">{{ item.title }}</div>
+                                    <div style="font-size: 16px; color: #5C7A76; line-height: 1.6; white-space: pre-line;">{{ item.content | safe | replace:"(.+?)(•)":"$1\n\n•" }}</div>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                </div>
+            {% endfor %}
+        {% endif %}
 
-        <div class="footer">
-            <div class="column">
-                <a href="https://www.1nbox-ai.com">1nbox AI News</a><br>
-                ©2024 1nbox AI<br>
-                Spain, Barcelona, 08034
+        <!-- Footer -->
+        <div style="background-color: #FAFAFA; padding: 24px 32px; display: flex; justify-content: space-between;">
+            <div style="font-size: 14px; color: #94A3B8;">
+                <a href="https://www.1nbox-ai.com" style="color: #94A3B8; text-decoration: underline; display: block; margin-bottom: 8px;">1nbox AI News</a>
+                <div style="margin-bottom: 8px;">©2024 1nbox AI</div>
+                <div>Spain, Barcelona, 08034</div>
             </div>
-            <div class="column">
-                <a href="mailto:news@1nbox-ai.com">Feedback</a><br>
-                <a href="https://www.1nbox-ai.com">Website</a>
-            </div>
-            <div class="column">
-                You're subscribed to 1nbox AI.<br>
-                <a href="#">Unsubscribe</a>
+            <div style="font-size: 14px; color: #94A3B8; text-align: right;">
+                <a href="mailto:news@1nbox-ai.com" style="color: #94A3B8; text-decoration: underline; display: block; margin-bottom: 8px;">Feedback</a>
+                <a href="#" style="color: #94A3B8; text-decoration: underline;">Unsubscribe</a>
             </div>
         </div>
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var newsDetails = document.querySelectorAll('.news-detail');
-            newsDetails.forEach(function(detail) {
-                detail.innerHTML = detail.innerHTML.replace(/\n\n/g, '<br><br>');
-            });
-        });
-    </script>
 </body>
 </html>
