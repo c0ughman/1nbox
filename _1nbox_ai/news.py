@@ -6,7 +6,7 @@ import re
 import os
 from openai import OpenAI
 from collections import Counter
-from .models import Topic, Organization, Summary
+from .models import Topic, Organization, Summary, Comment
 import json
 import ast
 import requests
