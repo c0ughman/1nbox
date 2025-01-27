@@ -1539,7 +1539,7 @@ def notify_mentioned_users(request):
                 'organization_name': current_user.organization.name,
                 'comment_text': comment_text,
                 'article_title': article_title,  # Include article title in the context
-                'app_url': 'https://1nbox.netlify.app'
+                'app_url': 'https://1nbox.netlify.app/pages/main'
             }
             
             content = render_to_string('mention_notification.html', context)
