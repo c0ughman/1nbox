@@ -1710,6 +1710,18 @@ def send_mention_notification(to_email, from_user, organization_name, comment_te
         return False, str(e)
 
 
+
+def send_email_with_template(to_email, subject, html_content):
+    sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+    message = Mail(
+        from_email='news@1nbox-ai.com',
+        to_emails=to_email,
+        subject=subject,
+        html_content=html_content
+    )
+    return sg.send(message)
+
+
 # OLD 1NBOX RIP
 
 
