@@ -29,7 +29,9 @@ INSIGNIFICANT_WORDS = set([
     'Pin', 'Post', 'Like', 'Subscribe', 'Stumble', 'Add', 'Brief', 'View', 'While', 'However', 'Country',
     'Even', 'Still', 'Monthly', 'Jan', 'Feb', 'Apr', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     'Miscellaneous', 'Out', 'We', 'Makes', 'Inc', 'Description', 'Connections', 'Wordle', 'Play', 'Mashable', 
-    'Mahjong', 'Earnings', 'Call', 'Transcript', 'Market', 'Tracker',
+    'Mahjong', 'Earnings', 'Call', 'Transcript', 'Market', 'Tracker', 'Business', 'Insider',
+    'Thu', 'Euractiv', 'Regulation'
+
 
 
 ])
