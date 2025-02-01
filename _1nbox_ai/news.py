@@ -312,12 +312,33 @@ def process_cluster_chunk(cluster, client, max_tokens):
     for sub_cluster in sub_clusters:
         sub_cluster_content = cluster_content + ''.join(sub_cluster)
         
-        prompt = ("You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
-                  "all the facts from each of the articles in a small but fact-dense summary "
-                  "including all the dates, names and key factors to provide full context on the events."
-                  "also, i want you to add the corresponding url next to every line you put in the summary in parentheses"
-                  "Finally, It is required to add a general summary of the cluster with 3-4 sentences about"
-                  "what is happening, the context and the overall big picture of the events in the articles. ")
+        prompt = ('''
+            
+        You are a News Facts Summarizer. Your task is to extract and organize key facts from multiple news articles about the same topic. Follow these requirements:
+
+1. Create a comprehensive fact list that includes:
+   - Dates and timestamps of events
+   - Full names and titles of all mentioned individuals
+   - Specific locations
+   - Numerical data and statistics
+   - Direct quotes from key figures
+   - Sequence of events in chronological order
+
+2. For each fact, include the source URL in parentheses at the end
+
+3. Write a context section (3-4 sentences) that:
+   - Explains the broader significance of these events
+   - Provides relevant historical background
+   - Identifies key stakeholders involved
+   - Highlights potential implications
+
+4. Remove any redundant facts from different sources while preserving all unique details
+
+5. Maintain a neutral, factual tone and avoid interpretative language
+
+Format your response with the context section first, followed by the chronological fact list.
+        
+        ''')
 
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -338,25 +359,50 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
 
     all_summaries = "\n\n".join(cluster_summaries)
 
-    prompt = (
-        "You are a News Overview Summarizer. I will provide you with a collection of news summaries, "
-        "and I want you to condense this into a JSON object containing a list of stories. "
-        "Limit it to 2-4 main stories, and add a miscellaneous one at the end if applicable. "
-        "Each story should have a title and content. "
-        "The title should be a concise and exciting headline that grabs the reader's attention and makes them want to read on. "
-        "It should partially explain the situation while leaving some curiosity. "
-        "The content must be a brief but complete summary of the story in text, "
-        "formatted with bulletpoints. "
-        "Each bulletpoint should be a key aspect of the story, and all bulletpoints should be part of a single text string. "
-        f"Generate the content using {sentences_final_summary} sentences per story to fully explain the situation. "
-        "Also give me three short questions that you could answer with the information in the summaries, to give users an idea of what to ask"
-        "Return your response in the following JSON structure: "
-        "{'summary': [{'title': 'Title 1', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, "
-        "{'title': 'Title 2', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, ...],"
-        "'questions': ['Question one?', 'Question two?', 'Question three?']}"
-        "Ensure each story's content is a single text string with bulletpoints separated by spaces or new lines."
-        "Make sure the questions are in that precise format, and expand properly upon the summaries."
-    )
+    prompt = (f'''
+
+      You are a News Overview Summarizer. Transform the provided news summaries into an engaging, user-friendly format following these guidelines:
+
+1. Structure the output as a JSON object containing:
+   - 2-4 main stories
+   - 1 optional "In Brief" section for miscellaneous news
+   - 3 related questions for user engagement
+
+2. For each story:
+   - Title: Create a compelling headline that:
+     • Uses active voice and strong verbs
+     • Includes key details (who/what/where)
+     • Creates curiosity without being clickbait
+     • Keeps under 12 words
+   
+   - Content: Structure as bullet points that:
+     • Start with the most impactful information
+     • Include specific numbers, names, and dates
+     • Provide context and background
+     • End with future implications
+     • Use {sentences_final_summary} sentences total
+     • Separate bullets with "\n\n"
+
+3. Generate questions that:
+   - Cover different aspects of the stories
+   - Can be answered using the provided information
+   - Encourage critical thinking
+
+Required JSON structure:
+{
+  "summary": [
+    {
+      "title": "Compelling Headline Here",
+      "content": "• Key fact with impact.\n\n• Important context.\n\n• Future implications."
+    }
+  ],
+  "questions": [
+    "Specific question about key details?",
+    "Question about broader implications?",
+    "Question connecting multiple aspects?"
+  ]
+}
+    ''')
 
 
     completion = client.chat.completions.create(
