@@ -10,6 +10,8 @@ from .models import Topic, Organization, Summary, Comment
 import json
 import ast
 import requests
+import logging
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 # List of insignificant words to exclude
@@ -31,10 +33,17 @@ INSIGNIFICANT_WORDS = set([
     'Miscellaneous', 'Out', 'We', 'Makes', 'Inc', 'Description', 'Connections', 'Wordle', 'Play', 'Mashable', 
     'Mahjong', 'Earnings', 'Call', 'Transcript', 'Market', 'Tracker', 'Business', 'Insider',
     'Thu', 'Euractiv', 'Regulation'
-
-
-
 ])
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('topic_processing.log'),
+        logging.StreamHandler()
+    ]
+)
 
 def get_publication_date(entry):
     if 'published_parsed' in entry:
@@ -259,29 +268,47 @@ def limit_cluster_content(cluster, max_tokens=100000):  # Reduced from 124000 to
         'articles': limited_articles
     }
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 def get_openai_response(cluster, max_tokens=4000):
-    openai_key = os.environ.get('OPENAI_KEY')
-    client = OpenAI(api_key=openai_key)
+    try:
+        openai_key = os.environ.get('OPENAI_KEY')
+        if not openai_key:
+            logging.error("OpenAI API key not found in environment variables")
+            return "Error: OpenAI API key not configured"
 
-    # Limit cluster content to 124000 tokens before processing
-    limited_cluster = limit_cluster_content(cluster, max_tokens=124000)
-    
-    # If the cluster was split due to high token count, process the second half separately
-    if len(limited_cluster['articles']) < len(cluster['articles']) // 2:
-        print("Processing second half of split cluster")
-        second_half_cluster = {
-            'common_words': cluster['common_words'],
-            'articles': cluster['articles'][len(cluster['articles']) // 2:]
-        }
-        second_half_limited = limit_cluster_content(second_half_cluster, max_tokens=124000)
+        client = OpenAI(api_key=openai_key)
+
+        # Handle extremely large clusters
+        if calculate_cluster_tokens(cluster) > 300000:  # If cluster is extremely large
+            logging.warning(f"Cluster size exceeds 300k tokens, truncating to newest articles")
+            cluster['articles'] = sorted(
+                cluster['articles'],
+                key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')),
+                reverse=True
+            )[:10]  # Keep only the 10 newest articles
+
+        # Limit cluster content to 124000 tokens before processing
+        limited_cluster = limit_cluster_content(cluster, max_tokens=124000)
         
-        # Process both halves and combine results
-        first_half_summary = process_cluster_chunk(limited_cluster, client, max_tokens)
-        second_half_summary = process_cluster_chunk(second_half_limited, client, max_tokens)
+        # Process in chunks if needed
+        if len(limited_cluster['articles']) < len(cluster['articles']) // 2:
+            logging.info("Processing large cluster in multiple chunks")
+            chunks = []
+            for i in range(0, len(cluster['articles']), 10):
+                chunk_cluster = {
+                    'common_words': cluster['common_words'],
+                    'articles': cluster['articles'][i:i+10]
+                }
+                chunk_limited = limit_cluster_content(chunk_cluster, max_tokens=124000)
+                chunks.append(process_cluster_chunk(chunk_limited, client, max_tokens))
+            
+            return "\n\n".join(chunks)
         
-        return f"{first_half_summary}\n\n{second_half_summary}"
-    
-    return process_cluster_chunk(limited_cluster, client, max_tokens)
+        return process_cluster_chunk(limited_cluster, client, max_tokens)
+
+    except Exception as e:
+        logging.error(f"Error in get_openai_response: {str(e)}")
+        raise  # Retry will handle this
 
 def process_cluster_chunk(cluster, client, max_tokens):
     cluster_content = f"Common words: {', '.join(cluster['common_words'])}\n\n"
@@ -463,14 +490,27 @@ def get_image_for_item(item, insignificant_words):
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                   merge_threshold=2, min_articles=3, join_percentage=0.5,
                   final_merge_percentage=0.5, sentences_final_summary=3):
-    print(f"RUNNING PROCESS TOPIC FOR --- {topic.name}!!!!!")
+    try:
+        logging.info(f"Starting processing for topic: {topic.name}")
 
-    if topic.sources:
-        
+        if not topic.sources:
+            logging.warning(f"Topic {topic.name} has no sources, skipping")
+            return
+
         all_articles = []
         for url in topic.sources:
-            all_articles.extend(get_articles_from_rss(url, days_back))
-    
+            try:
+                articles = get_articles_from_rss(url, days_back)
+                all_articles.extend(articles)
+                logging.info(f"Retrieved {len(articles)} articles from {url}")
+            except Exception as e:
+                logging.error(f"Error fetching RSS from {url}: {str(e)}")
+                continue  # Continue with other sources
+
+        if not all_articles:
+            logging.warning(f"No articles found for topic {topic.name}, skipping")
+            return
+
         # Count the number of articles
         number_of_articles = len(all_articles)
     
@@ -501,26 +541,29 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         # Print the clusters
         print_clusters(final_clusters)
         
-        # Get OpenAI summaries for each cluster
+        # Get OpenAI summaries for each cluster with retry
         cluster_summaries = {}
         for cluster in final_clusters:
-            key = ' '.join([word.capitalize() for word in cluster['common_words']])
-            summary = get_openai_response(cluster)
-            print(summary)
-            print("                       ")
-            print("                       ")
-            print("                       ")
-            cluster_summaries[key] = summary
-            
-        # Find this part in process_topic function
-        final_summary_json = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
-        print(final_summary_json)
-        final_summary_json = extract_braces_content(final_summary_json)
-        print(final_summary_json)
-        
-        # Parse the JSON
-        final_summary_data = json.loads(final_summary_json)
-        
+            try:
+                key = ' '.join([word.capitalize() for word in cluster['common_words']])
+                summary = get_openai_response(cluster)  # This now has built-in retry
+                cluster_summaries[key] = summary
+                logging.info(f"Generated summary for cluster: {key}")
+            except Exception as e:
+                logging.error(f"Failed to generate summary for cluster {key}: {str(e)}")
+                cluster_summaries[key] = "Error generating summary for this cluster"
+
+        try:
+            final_summary_json = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
+            final_summary_json = extract_braces_content(final_summary_json)
+            final_summary_data = json.loads(final_summary_json)
+        except Exception as e:
+            logging.error(f"Error generating final summary for {topic.name}: {str(e)}")
+            final_summary_data = {
+                "summary": [{"title": "Error", "content": "Failed to generate summary"}],
+                "questions": ["What happened?", "Why did it happen?", "What's next?"]
+            }
+
         # Extract questions before they get removed from final_summary_data
         questions = json.dumps(final_summary_data.get('questions', []))  # Convert list to JSON string
         
@@ -552,26 +595,41 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         print(f"SUMMARY for {topic.name} created:")
         print(final_summary_data)
 
-    else:
-        print("OJO - Topic has no sources")
+    except Exception as e:
+        logging.error(f"Critical error processing topic {topic.name}: {str(e)}")
+        return  # Skip this topic and continue with others
 
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                        merge_threshold=2, min_articles=3, join_percentage=0.5,
                        final_merge_percentage=0.5, sentences_final_summary=3):
-                           
-    # Get all organizations that are not inactive
-    active_organizations = Organization.objects.exclude(plan='inactive')
+    logging.info("Starting process_all_topics")
     
-    # Process topics for all active organizations
-    for organization in active_organizations:
-        # Delete all comments from users in this organization
-        Comment.objects.filter(writer__organization=organization).delete()
+    try:
+        active_organizations = Organization.objects.exclude(plan='inactive')
         
-        for topic in organization.topics.all():
-            process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
-                         merge_threshold, min_articles, join_percentage,
-                         final_merge_percentage, sentences_final_summary)
+        for organization in active_organizations:
+            logging.info(f"Processing organization: {organization.name}")
+            
+            try:
+                Comment.objects.filter(writer__organization=organization).delete()
+                logging.info(f"Deleted comments for organization: {organization.name}")
+            except Exception as e:
+                logging.error(f"Error deleting comments for {organization.name}: {str(e)}")
+            
+            for topic in organization.topics.all():
+                try:
+                    process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
+                                merge_threshold, min_articles, join_percentage,
+                                final_merge_percentage, sentences_final_summary)
+                except Exception as e:
+                    logging.error(f"Failed to process topic {topic.name}: {str(e)}")
+                    continue  # Continue with next topic
                 
+    except Exception as e:
+        logging.critical(f"Critical error in process_all_topics: {str(e)}")
+    finally:
+        logging.info("Finished process_all_topics")
+
 if __name__ == "__main__":
     # This block will not be executed when imported as a module
     process_all_topics()
