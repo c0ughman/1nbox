@@ -19,3 +19,4 @@ thinc
 hdbscan
 sendgrid
 firebase-admin
+tenacity
