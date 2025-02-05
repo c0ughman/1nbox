@@ -30,7 +30,7 @@ def generate_answer(topic, body, context):
             {"role": "system", "content": "You are a news assistant. Use the provided news of the day to answer the question concisely but completely. If you don't have the answer to the question in the provided information, say you can't answer the question."},
             {"role": "user", "content": f"These are today's news about the topic (The user has no access to these other than what you send): {cluster_summaries}\nThis is what the user received: {summary}"},
             *context_messages,
-            {"role": "user", "content": f"Question: {body}\n\nProvide a concise but complete. and refer to one article that has more information on the topic by referring a link, if there is no article that can help, do not provide a link."}
+            {"role": "user", "content": f"Question: {body}\n\nProvide a concise but complete answer and refer an article url (you must provide the link) with more information on the topic. if there is no article that can help, just answer the question without refering to an article."}
         ]
     )
 
