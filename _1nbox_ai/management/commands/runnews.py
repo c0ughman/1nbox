@@ -14,6 +14,7 @@ class Command(BaseCommand):
         parser.add_argument('--join_percentage', type=float, default=0.5, help='Percentage of matching words required to join clusters from misc')
         parser.add_argument('--final_merge_percentage', type=float, default=0.5, help='Percentage of matching words required or merge clusters')
         parser.add_argument('--sentences_final_summary', type=int, default=3, help='Amount of sentences per topic in the final summary')
+        parser.add_argument('--title_only', action='store_true', help='If set, clustering will only use article titles')
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('Starting news processing...'))
@@ -26,7 +27,8 @@ class Command(BaseCommand):
                 min_articles=options['min_articles'],
                 join_percentage=options['join_percentage'],
                 final_merge_percentage=options['final_merge_percentage'],
-                sentences_final_summary=options['sentences_final_summary']
+                sentences_final_summary=options['sentences_final_summary'],
+                title_only=options['title_only']
             )
             self.stdout.write(self.style.SUCCESS('News processing completed successfully.'))
         except Exception as e:
