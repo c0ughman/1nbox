@@ -79,21 +79,31 @@ def get_articles_from_rss(rss_url, days_back=1):
             print(f"Warning: Missing date for entry '{entry.title}'")
     return articles
 
-def extract_significant_words(text):
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    words = []
-    for sentence in sentences:
-        sentence_words = re.findall(r'\b[A-Z][a-z]{1,}\b', sentence)
-        words.extend(sentence_words[1:])  # Exclude the first word of each sentence
+def extract_significant_words(text, title_only=False):
+    """
+    Extract significant words from text, optionally only from title
+    Args:
+        text (str): Text to extract words from
+        title_only (bool): If True, treats the entire text as a title
+    """
+    if title_only:
+        # For titles, we want all capitalized words since titles have different grammar
+        words = re.findall(r'\b[A-Z][a-z]{1,}\b', text)
+    else:
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        words = []
+        for sentence in sentences:
+            sentence_words = re.findall(r'\b[A-Z][a-z]{1,}\b', sentence)
+            words.extend(sentence_words[1:])  # Exclude the first word of each sentence
     
     words = [word for word in words if word not in INSIGNIFICANT_WORDS]
-    
     return list(dict.fromkeys(words))
 
 def sort_words_by_rarity(word_list, word_counts):
     return sorted(word_list, key=lambda x: word_counts[x])
 
-def cluster_articles(articles, common_word_threshold, top_words_to_consider):
+def cluster_articles(articles, common_word_threshold, top_words_to_consider, title_only=False):
+
     clusters = []
     for article in articles:
         found_cluster = False
@@ -488,10 +498,11 @@ def get_image_for_item(item, insignificant_words):
 '''
     
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
-                  merge_threshold=2, min_articles=3, join_percentage=0.5,
-                  final_merge_percentage=0.5, sentences_final_summary=3):
+                 merge_threshold=2, min_articles=3, join_percentage=0.5,
+                 final_merge_percentage=0.5, sentences_final_summary=3, title_only=False):
     try:
         logging.info(f"Starting processing for topic: {topic.name}")
+        logging.info(f"Title-only mode: {title_only}")
 
         if not topic.sources:
             logging.warning(f"Topic {topic.name} has no sources, skipping")
@@ -505,40 +516,37 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                 logging.info(f"Retrieved {len(articles)} articles from {url}")
             except Exception as e:
                 logging.error(f"Error fetching RSS from {url}: {str(e)}")
-                continue  # Continue with other sources
+                continue
 
         if not all_articles:
             logging.warning(f"No articles found for topic {topic.name}, skipping")
             return
 
-        # Count the number of articles
         number_of_articles = len(all_articles)
     
         # Extract and count significant words
         word_counts = Counter()
         for article in all_articles:
-            title_words = extract_significant_words(article['title'])
-            content_words = extract_significant_words(article['content'])
-            article['significant_words'] = title_words + [w for w in content_words if w not in title_words]
+            if title_only:
+                article['significant_words'] = extract_significant_words(article['title'], title_only=True)
+            else:
+                title_words = extract_significant_words(article['title'], title_only=False)
+                content_words = extract_significant_words(article['content'], title_only=False)
+                article['significant_words'] = title_words + [w for w in content_words if w not in title_words]
             word_counts.update(article['significant_words'])
     
         # Sort words by rarity for each article
         for article in all_articles:
             article['significant_words'] = sort_words_by_rarity(article['significant_words'], word_counts)
     
-        # Cluster articles
-        clusters = cluster_articles(all_articles, common_word_threshold, top_words_to_consider)
+        # Cluster articles with title_only parameter
+        clusters = cluster_articles(all_articles, common_word_threshold, top_words_to_consider, title_only)
     
-        # Merge clusters based on merge_threshold
+        # Rest of the processing remains the same
         merged_clusters = merge_clusters(clusters, merge_threshold)
-    
-        # Apply minimum articles per cluster and reassign miscellaneous articles
         clusters_with_min_articles = apply_minimum_articles_and_reassign(merged_clusters, min_articles, join_percentage)
-    
-        # Merge clusters based on join_percentage
         final_clusters = merge_clusters_by_percentage(clusters_with_min_articles, final_merge_percentage)
     
-        # Print the clusters
         print_clusters(final_clusters)
         
         # Get OpenAI summaries for each cluster with retry
@@ -600,9 +608,10 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         return  # Skip this topic and continue with others
 
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
-                       merge_threshold=2, min_articles=3, join_percentage=0.5,
-                       final_merge_percentage=0.5, sentences_final_summary=3):
+                      merge_threshold=2, min_articles=3, join_percentage=0.5,
+                      final_merge_percentage=0.5, sentences_final_summary=3, title_only=False):
     logging.info("Starting process_all_topics")
+    logging.info(f"Title-only mode: {title_only}")
     
     try:
         active_organizations = Organization.objects.exclude(plan='inactive')
@@ -620,10 +629,10 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
                 try:
                     process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
                                 merge_threshold, min_articles, join_percentage,
-                                final_merge_percentage, sentences_final_summary)
+                                final_merge_percentage, sentences_final_summary, title_only)
                 except Exception as e:
                     logging.error(f"Failed to process topic {topic.name}: {str(e)}")
-                    continue  # Continue with next topic
+                    continue
                 
     except Exception as e:
         logging.critical(f"Critical error in process_all_topics: {str(e)}")
