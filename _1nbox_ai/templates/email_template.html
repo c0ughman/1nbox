@@ -31,11 +31,13 @@
         {% if topics %}
             {% for topic in topics %}
                 <div style="padding: 32px; border-bottom: 1px solid #F0F0F0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                        <h2 style="margin: 0; font-size: 20px; color: #2D4B48; font-weight: 700;">{{ topic.name }}</h2>
-                        <div>
-                            <a href="https://1nbox.netlify.app/pages/main" style="font-size: 14px; text-decoration: none; color: #2D4B48; margin-left: 16px;">View Sources</a>
-                            <a href="https://1nbox.netlify.app/pages/main" style="font-size: 14px; text-decoration: none; color: #FFFFFF; background-color: #0FD7D7; padding: 8px 16px; border-radius: 999px; margin-left: 16px;">Ask AI</a>
+                    <div style="margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h2 style="margin: 0; font-size: 20px; color: #2D4B48; font-weight: 700;">{{ topic.name }}</h2>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <a href="https://1nbox.netlify.app/pages/main" style="font-size: 14px; text-decoration: none; color: #2D4B48; white-space: nowrap;">View Sources</a>
+                                <a href="https://1nbox.netlify.app/pages/main" style="font-size: 14px; text-decoration: none; color: #FFFFFF; background-color: #0FD7D7; padding: 8px 16px; border-radius: 999px; white-space: nowrap;">Ask AI</a>
+                            </div>
                         </div>
                     </div>
                     
