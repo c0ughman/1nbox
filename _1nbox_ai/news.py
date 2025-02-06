@@ -79,14 +79,18 @@ def get_articles_from_rss(rss_url, days_back=1):
             print(f"Warning: Missing date for entry '{entry.title}'")
     return articles
 
-def extract_significant_words(text, title_only=False):
+def extract_significant_words(text, title_only=False, all_words=False):
     """
-    Extract significant words from text, optionally only from title
+    Extract significant words from text, with options for different extraction modes
     Args:
         text (str): Text to extract words from
         title_only (bool): If True, treats the entire text as a title
+        all_words (bool): If True, includes all words regardless of capitalization
     """
-    if title_only:
+    if all_words:
+        # For all words mode, we want any word with 2 or more characters
+        words = re.findall(r'\b[a-zA-Z]{2,}\b', text)
+    elif title_only:
         # For titles, we want all capitalized words since titles have different grammar
         words = re.findall(r'\b[A-Z][a-z]{1,}\b', text)
     else:
@@ -508,10 +512,11 @@ def get_image_for_item(item, insignificant_words):
     
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                  merge_threshold=2, min_articles=3, join_percentage=0.5,
-                 final_merge_percentage=0.5, sentences_final_summary=3, title_only=False):
+                 final_merge_percentage=0.5, sentences_final_summary=3, title_only=False, all_words=False):
     try:
         logging.info(f"Starting processing for topic: {topic.name}")
         logging.info(f"Title-only mode: {title_only}")
+        logging.info(f"All-words mode: {all_words}")
 
         if not topic.sources:
             logging.warning(f"Topic {topic.name} has no sources, skipping")
@@ -534,13 +539,13 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         number_of_articles = len(all_articles)
     
         # Extract and count significant words
-        word_counts = Counter()
+      word_counts = Counter()
         for article in all_articles:
             if title_only:
-                article['significant_words'] = extract_significant_words(article['title'], title_only=True)
+                article['significant_words'] = extract_significant_words(article['title'], title_only=True, all_words=all_words)
             else:
-                title_words = extract_significant_words(article['title'], title_only=False)
-                content_words = extract_significant_words(article['content'], title_only=False)
+                title_words = extract_significant_words(article['title'], title_only=False, all_words=all_words)
+                content_words = extract_significant_words(article['content'], title_only=False, all_words=all_words)
                 article['significant_words'] = title_words + [w for w in content_words if w not in title_words]
             word_counts.update(article['significant_words'])
     
@@ -623,9 +628,10 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
 
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                       merge_threshold=2, min_articles=3, join_percentage=0.5,
-                      final_merge_percentage=0.5, sentences_final_summary=3, title_only=False):
+                      final_merge_percentage=0.5, sentences_final_summary=3, title_only=False, all_words=False):
     logging.info("Starting process_all_topics")
     logging.info(f"Title-only mode: {title_only}")
+    logging.info(f"All-words mode: {all_words}")
     
     try:
         active_organizations = Organization.objects.exclude(plan='inactive')
