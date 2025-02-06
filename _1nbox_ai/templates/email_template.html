@@ -44,7 +44,7 @@
                             {% for item in latest_summary.final_summary.summary %}
                                 <div style="margin-bottom: 24px;">
                                     <div style="font-size: 18px; font-weight: 700; color: #2D4B48; margin-bottom: 12px;">{{ item.title }}</div>
-                                    <div style="font-size: 16px; color: #5C7A76; line-height: 1.6; white-space: pre-line;">{{ item.content | safe | replace:"(.+?)(•)":"$1\n\n•" }}</div>
+                                    <div style="font-size: 16px; color: #5C7A76; line-height: 1.6; white-space: pre-line;">{{ item.content | safe }}</div>
                                 </div>
                             {% endfor %}
                         {% endif %}
