@@ -13,6 +13,10 @@ import requests
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+import requests
+from contextlib import contextmanager
+import signal
+
 
 # List of insignificant words to exclude
 INSIGNIFICANT_WORDS = set([
@@ -60,24 +64,66 @@ def get_publication_date(entry):
         return None
 
 def get_articles_from_rss(rss_url, days_back=1):
-    feed = feedparser.parse(rss_url)
-    articles = []
-    cutoff_date = datetime.now(pytz.utc) - timedelta(days=days_back)
-    for entry in feed.entries:
-        pub_date = get_publication_date(entry)
-        if pub_date and pub_date >= cutoff_date:
-            favicon_url = f"https://www.google.com/s2/favicons?domain={rss_url}"
-            articles.append({
-                'title': entry.title,
-                'link': entry.link,
-                'published': str(pub_date),
-                'summary': entry.summary if 'summary' in entry else '',
-                'content': entry.content[0].value if 'content' in entry else entry.get('summary', ''),
-                'favicon': favicon_url
-            })
-        elif not pub_date:
-            print(f"Warning: Missing date for entry '{entry.title}'")
-    return articles
+    try:
+        # Add timeout to prevent hanging on slow responses
+        feed = feedparser.parse(rss_url, timeout=30)
+        
+        # Check if the feed parsing was successful
+        if hasattr(feed, 'bozo_exception'):
+            logging.error(f"Feed parsing error for {rss_url}: {feed.bozo_exception}")
+            return []
+            
+        articles = []
+        cutoff_date = datetime.now(pytz.utc) - timedelta(days=days_back)
+        
+        # Add feed validation
+        if not hasattr(feed, 'entries'):
+            logging.error(f"Invalid feed structure for {rss_url}")
+            return []
+            
+        for entry in feed.entries:
+            try:
+                pub_date = get_publication_date(entry)
+                if pub_date and pub_date >= cutoff_date:
+                    # Validate required fields
+                    if not hasattr(entry, 'title') or not hasattr(entry, 'link'):
+                        logging.warning(f"Missing required fields in entry from {rss_url}")
+                        continue
+                        
+                    favicon_url = f"https://www.google.com/s2/favicons?domain={rss_url}"
+                    
+                    # Safely get content with fallbacks
+                    content = ''
+                    if hasattr(entry, 'content') and entry.content:
+                        content = entry.content[0].value
+                    elif hasattr(entry, 'summary'):
+                        content = entry.summary
+                    
+                    articles.append({
+                        'title': entry.title,
+                        'link': entry.link,
+                        'published': str(pub_date),
+                        'summary': getattr(entry, 'summary', ''),
+                        'content': content,
+                        'favicon': favicon_url
+                    })
+                elif not pub_date:
+                    logging.warning(f"Missing date for entry '{entry.title}' in {rss_url}")
+            except Exception as e:
+                logging.error(f"Error processing entry in {rss_url}: {str(e)}")
+                continue
+                
+        return articles
+        
+    except requests.exceptions.Timeout:
+        logging.error(f"Timeout while fetching {rss_url}")
+        return []
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request error for {rss_url}: {str(e)}")
+        return []
+    except Exception as e:
+        logging.error(f"Unexpected error processing {rss_url}: {str(e)}")
+        return []
 
 def extract_significant_words(text, title_only=False, all_words=False):
     """
@@ -509,122 +555,201 @@ def get_image_for_item(item, insignificant_words):
     return None
 
 '''
+
+@contextmanager
+def timeout(seconds):
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"Timed out after {seconds} seconds")
+    
+    original_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+    
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, original_handler)
     
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                  merge_threshold=2, min_articles=3, join_percentage=0.5,
                  final_merge_percentage=0.5, sentences_final_summary=3, title_only=False, all_words=False):
+
     try:
         logging.info(f"Starting processing for topic: {topic.name}")
         logging.info(f"Title-only mode: {title_only}")
         logging.info(f"All-words mode: {all_words}")
 
+        # Validate topic configuration
         if not topic.sources:
             logging.warning(f"Topic {topic.name} has no sources, skipping")
             return
 
+        # Initialize article collection
         all_articles = []
+        failed_sources = []
+        successful_sources = []
+        
+        # Process each RSS source with timeout and error handling
         for url in topic.sources:
             try:
-                articles = get_articles_from_rss(url, days_back)
-                all_articles.extend(articles)
-                logging.info(f"Retrieved {len(articles)} articles from {url}")
+                with timeout(60):  # 60-second timeout per source
+                    articles = get_articles_from_rss(url, days_back)
+                    if articles:
+                        all_articles.extend(articles)
+                        successful_sources.append(url)
+                        logging.info(f"Successfully retrieved {len(articles)} articles from {url}")
+                    else:
+                        failed_sources.append((url, "No articles retrieved"))
+            except TimeoutError:
+                logging.error(f"Timeout processing source {url}")
+                failed_sources.append((url, "Timeout"))
+                continue
             except Exception as e:
                 logging.error(f"Error fetching RSS from {url}: {str(e)}")
+                failed_sources.append((url, str(e)))
                 continue
 
+        # Log source processing results
+        logging.info(f"Successfully processed {len(successful_sources)} sources for topic {topic.name}")
+        if failed_sources:
+            logging.warning(f"Failed sources for topic {topic.name}: {failed_sources}")
+
+        # Check if we have enough articles to proceed
         if not all_articles:
             logging.warning(f"No articles found for topic {topic.name}, skipping")
             return
 
         number_of_articles = len(all_articles)
-    
-        # Extract and count significant words
-        word_counts = Counter()
-        for article in all_articles:
-            if title_only:
-                article['significant_words'] = extract_significant_words(article['title'], title_only=True, all_words=all_words)
-            else:
-                title_words = extract_significant_words(article['title'], title_only=False, all_words=all_words)
-                content_words = extract_significant_words(article['content'], title_only=False, all_words=all_words)
-                article['significant_words'] = title_words + [w for w in content_words if w not in title_words]
-            word_counts.update(article['significant_words'])
-    
-        # Sort words by rarity for each article
-        for article in all_articles:
-            article['significant_words'] = sort_words_by_rarity(article['significant_words'], word_counts)
-    
-        # Cluster articles with title_only parameter
-        clusters = cluster_articles(all_articles, common_word_threshold, top_words_to_consider, title_only)
-    
-        # Rest of the processing remains the same
-        merged_clusters = merge_clusters(clusters, merge_threshold)
-        clusters_with_min_articles = apply_minimum_articles_and_reassign(merged_clusters, min_articles, join_percentage)
-        final_clusters = merge_clusters_by_percentage(clusters_with_min_articles, final_merge_percentage)
-    
-        print_clusters(final_clusters)
-        
-        # Get OpenAI summaries for each cluster with retry
-        cluster_summaries = {}
-        for cluster in final_clusters:
-            try:
-                key = ' '.join([word.capitalize() for word in cluster['common_words']])
-                summary = get_openai_response(cluster)  # This now has built-in retry
-                cluster_summaries[key] = summary
-                logging.info(f"Generated summary for cluster: {key}")
-            except Exception as e:
-                logging.error(f"Failed to generate summary for cluster {key}: {str(e)}")
-                cluster_summaries[key] = "Error generating summary for this cluster"
+        logging.info(f"Total articles collected: {number_of_articles}")
 
         try:
-            final_summary_json = get_final_summary(
-                list(cluster_summaries.values()), 
-                sentences_final_summary,
-                topic.prompt if topic.prompt else None
-            )
-            final_summary_json = extract_braces_content(final_summary_json)
-            final_summary_data = json.loads(final_summary_json)
-                
-        except Exception as e:
-            logging.error(f"Error generating final summary for {topic.name}: {str(e)}")
-            final_summary_data = {
-                "summary": [{"title": "Error", "content": "Failed to generate summary"}],
-                "questions": ["What happened?", "Why did it happen?", "What's next?"],
-            }
+            # Extract and count significant words with memory management
+            word_counts = Counter()
+            for article in all_articles:
+                try:
+                    if title_only:
+                        article['significant_words'] = extract_significant_words(
+                            article['title'], title_only=True, all_words=all_words
+                        )
+                    else:
+                        title_words = extract_significant_words(
+                            article['title'], title_only=False, all_words=all_words
+                        )
+                        content_words = extract_significant_words(
+                            article['content'], title_only=False, all_words=all_words
+                        )
+                        article['significant_words'] = title_words + [
+                            w for w in content_words if w not in title_words
+                        ]
+                    word_counts.update(article['significant_words'])
+                except Exception as e:
+                    logging.error(f"Error processing words for article {article.get('title', 'Unknown')}: {str(e)}")
+                    continue
 
-        # Extract questions before they get removed from final_summary_data
-        questions = json.dumps(final_summary_data.get('questions', []))  # Convert list to JSON string
-        
-        # Cleaning clusters so it doesent overwhelm everything in life
-        cleaned_data = []
-        for item in final_clusters:
-            cleaned_item = {
-                "articles": [
-                    {
-                        "title": article["title"],
-                        "link": article["link"],
-                        "favicon": article["favicon"]
-                    }
-                    for article in item.get("articles", [])
-                ],
-                "common_words": item.get("common_words", [])
-            }
-            cleaned_data.append(cleaned_item)
-        
-        # Create the summary with the questions field
-        new_summary = Summary.objects.create(
-            topic=topic,
-            final_summary=final_summary_data,
-            clusters=cleaned_data,
-            cluster_summaries=cluster_summaries,
-            number_of_articles=number_of_articles,
-            questions=questions  # Add this line to save the questions
-        )
-        print(f"SUMMARY for {topic.name} created:")
-        print(final_summary_data)
+            # Sort words by rarity for each article
+            for article in all_articles:
+                try:
+                    article['significant_words'] = sort_words_by_rarity(
+                        article['significant_words'], word_counts
+                    )
+                except Exception as e:
+                    logging.error(f"Error sorting words for article {article.get('title', 'Unknown')}: {str(e)}")
+                    continue
+
+            # Cluster articles with error handling
+            try:
+                clusters = cluster_articles(
+                    all_articles, common_word_threshold, top_words_to_consider, title_only
+                )
+                merged_clusters = merge_clusters(clusters, merge_threshold)
+                clusters_with_min_articles = apply_minimum_articles_and_reassign(
+                    merged_clusters, min_articles, join_percentage
+                )
+                final_clusters = merge_clusters_by_percentage(
+                    clusters_with_min_articles, final_merge_percentage
+                )
+
+                logging.info(f"Generated {len(final_clusters)} clusters for topic {topic.name}")
+                print_clusters(final_clusters)
+
+            except Exception as e:
+                logging.error(f"Error in clustering process for topic {topic.name}: {str(e)}")
+                return
+
+            # Generate summaries for each cluster with retry mechanism
+            cluster_summaries = {}
+            for cluster in final_clusters:
+                try:
+                    key = ' '.join([word.capitalize() for word in cluster['common_words']])
+                    summary = get_openai_response(cluster)  # This has built-in retry
+                    cluster_summaries[key] = summary
+                    logging.info(f"Generated summary for cluster: {key}")
+                except Exception as e:
+                    logging.error(f"Failed to generate summary for cluster {key}: {str(e)}")
+                    cluster_summaries[key] = "Error generating summary for this cluster"
+
+            # Generate final summary with error handling
+            try:
+                final_summary_json = get_final_summary(
+                    list(cluster_summaries.values()),
+                    sentences_final_summary,
+                    topic.prompt if topic.prompt else None
+                )
+                final_summary_json = extract_braces_content(final_summary_json)
+                final_summary_data = json.loads(final_summary_json)
+
+            except Exception as e:
+                logging.error(f"Error generating final summary for {topic.name}: {str(e)}")
+                final_summary_data = {
+                    "summary": [{"title": "Error", "content": "Failed to generate summary"}],
+                    "questions": ["What happened?", "Why did it happen?", "What's next?"],
+                }
+
+            # Extract questions and clean clusters
+            questions = json.dumps(final_summary_data.get('questions', []))
+
+            # Clean clusters to prevent overwhelming the database
+            cleaned_data = []
+            for item in final_clusters:
+                cleaned_item = {
+                    "articles": [
+                        {
+                            "title": article["title"],
+                            "link": article["link"],
+                            "favicon": article["favicon"]
+                        }
+                        for article in item.get("articles", [])
+                    ],
+                    "common_words": item.get("common_words", [])
+                }
+                cleaned_data.append(cleaned_item)
+
+            # Create the summary in the database with error handling
+            try:
+                new_summary = Summary.objects.create(
+                    topic=topic,
+                    final_summary=final_summary_data,
+                    clusters=cleaned_data,
+                    cluster_summaries=cluster_summaries,
+                    number_of_articles=number_of_articles,
+                    questions=questions
+                )
+                logging.info(f"Successfully created summary for topic {topic.name}")
+                print(f"SUMMARY for {topic.name} created:")
+                print(final_summary_data)
+
+            except Exception as e:
+                logging.error(f"Database error creating summary for {topic.name}: {str(e)}")
+                # Could implement a retry mechanism here if needed
+
+        except Exception as e:
+            logging.error(f"Error in main processing loop for topic {topic.name}: {str(e)}")
 
     except Exception as e:
         logging.error(f"Critical error processing topic {topic.name}: {str(e)}")
-        return  # Skip this topic and continue with others
+        # Could add notification system here for critical errors
+    finally:
+        logging.info(f"Finished processing topic: {topic.name}")
 
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                       merge_threshold=2, min_articles=3, join_percentage=0.5,
