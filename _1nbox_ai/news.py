@@ -65,8 +65,12 @@ def get_publication_date(entry):
 
 def get_articles_from_rss(rss_url, days_back=1):
     try:
-        # Add timeout to prevent hanging on slow responses
-        feed = feedparser.parse(rss_url, timeout=30)
+        # Use requests with timeout to fetch the feed
+        response = requests.get(rss_url, timeout=30)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        
+        # Parse the feed content
+        feed = feedparser.parse(response.content)
         
         # Check if the feed parsing was successful
         if hasattr(feed, 'bozo_exception'):
