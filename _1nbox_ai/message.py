@@ -36,11 +36,24 @@ def get_user_topics_summary(organization):
             if not latest_summary:
                 continue
 
-            # JSONField is already a Python dict/list, just access it directly
+            # Process the summary content
             if latest_summary.final_summary:
-                # Assuming the structure is {'summary': [...]}
                 if isinstance(latest_summary.final_summary, dict):
-                    latest_summary.final_summary = latest_summary.final_summary.get('summary', [])
+                    summary_data = latest_summary.final_summary.get('summary', [])
+                    
+                    # Process each summary item's content
+                    for item in summary_data:
+                        if 'content' in item:
+                            # Split content by bullet points
+                            parts = item['content'].split('•')
+                            # Add proper spacing and rejoin
+                            processed_content = parts[0]  # First part (before any bullets)
+                            for part in parts[1:]:  # Rest of the parts
+                                if part.strip():  # Only process non-empty parts
+                                    processed_content += '\n\n• ' + part.strip()
+                            item['content'] = processed_content
+                            
+                    latest_summary.final_summary = summary_data
             else:
                 latest_summary.final_summary = []
 
