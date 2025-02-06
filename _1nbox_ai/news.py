@@ -539,7 +539,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         number_of_articles = len(all_articles)
     
         # Extract and count significant words
-      word_counts = Counter()
+        word_counts = Counter()
         for article in all_articles:
             if title_only:
                 article['significant_words'] = extract_significant_words(article['title'], title_only=True, all_words=all_words)
