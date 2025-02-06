@@ -369,13 +369,13 @@ def process_cluster_chunk(cluster, client, max_tokens):
 
     return ' '.join(summaries)
 
-def get_final_summary(cluster_summaries, sentences_final_summary):
+def get_final_summary(cluster_summaries, sentences_final_summary, topic_prompt=None):
     openai_key = os.environ.get('OPENAI_KEY')
     client = OpenAI(api_key=openai_key)
 
     all_summaries = "\n\n".join(cluster_summaries)
 
-    prompt = (
+    base_prompt = (
         "You are a News Overview Summarizer. I will provide you with a collection of news summaries, "
         "and I want you to condense this into a JSON object containing a list of stories. "
         "Limit it to 2-4 main stories, and add a miscellaneous one at the end if applicable. "
@@ -386,22 +386,31 @@ def get_final_summary(cluster_summaries, sentences_final_summary):
         "formatted with bulletpoints. "
         "Each bulletpoint should be a key aspect of the story, and all bulletpoints should be part of a single text string. "
         f"Generate the content using {sentences_final_summary} sentences per story to fully explain the situation. "
-        "Also give me three short questions that you could answer with the information in the summaries, to give users an idea of what to ask"
-        "Return your response in the following JSON structure: "
-        "{'summary': [{'title': 'Title 1', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, "
-        "{'title': 'Title 2', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, ...],"
-        "'questions': ['Question one?', 'Question two?', 'Question three?']}"
-        "Ensure each story's content is a single text string with bulletpoints separated by spaces or new lines."
-        "Make sure the questions are in that precise format, and expand properly upon the summaries."
     )
 
+    if topic_prompt:
+        base_prompt += (
+            f"\n\nAdditional instructions from the topic owner: {topic_prompt}\n"
+            "Please incorporate these instructions into your summary generation."
+        )
+
+    base_prompt += (
+        "\nAlso give me three short questions that you could answer with the information in the summaries, to give users an idea of what to ask"
+        "\nReturn your response in the following JSON structure: "
+        "{'summary': [{'title': 'Title 1', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, "
+        "{'title': 'Title 2', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, ...],"
+        "'questions': ['Question one?', 'Question two?', 'Question three?'],"
+        "'prompt': 'Original topic prompt if provided'}"
+        "\nEnsure each story's content is a single text string with bulletpoints separated by spaces or new lines."
+        "\nMake sure the questions are in that precise format, and expand properly upon the summaries."
+    )
 
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         max_tokens=5000,
         temperature=0.125,
         messages=[
-            {"role": "system", "content": prompt},
+            {"role": "system", "content": base_prompt},
             {"role": "user", "content": all_summaries}
         ]
     )
@@ -562,14 +571,19 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                 cluster_summaries[key] = "Error generating summary for this cluster"
 
         try:
-            final_summary_json = get_final_summary(list(cluster_summaries.values()), sentences_final_summary)
+            final_summary_json = get_final_summary(
+                list(cluster_summaries.values()), 
+                sentences_final_summary,
+                topic.prompt if topic.prompt else None
+            )
             final_summary_json = extract_braces_content(final_summary_json)
             final_summary_data = json.loads(final_summary_json)
+                
         except Exception as e:
             logging.error(f"Error generating final summary for {topic.name}: {str(e)}")
             final_summary_data = {
                 "summary": [{"title": "Error", "content": "Failed to generate summary"}],
-                "questions": ["What happened?", "Why did it happen?", "What's next?"]
+                "questions": ["What happened?", "Why did it happen?", "What's next?"],
             }
 
         # Extract questions before they get removed from final_summary_data
