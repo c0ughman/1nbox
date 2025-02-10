@@ -152,7 +152,7 @@ def extract_significant_words(text, title_only=False, all_words=False):
 def sort_words_by_rarity(word_list, word_counts):
     return sorted(word_list, key=lambda x: word_counts[x])
 
-def cluster_articles(articles, common_word_threshold=1, top_words_to_consider=4):
+def cluster_articles(articles, common_word_threshold=1, top_words_to_consider=4, title_only=False):
     """Simplified clustering with limits"""
     clusters = []
     articles = sorted(articles, key=lambda x: x['published'], reverse=True)[:100]  # Limit to 100 newest
@@ -160,21 +160,29 @@ def cluster_articles(articles, common_word_threshold=1, top_words_to_consider=4)
     for article in articles:
         matched = False
         for cluster in clusters:
-            if len(set(article['significant_words'][:top_words_to_consider]) 
-                   & set(cluster['common_words'])) >= common_word_threshold:
+            # Use title_only to adjust the comparison logic
+            if title_only:
+                common_words = set(article['title'][:top_words_to_consider]) & set(cluster['common_words'])
+            else:
+                common_words = set(article['significant_words'][:top_words_to_consider]) & set(cluster['common_words'])
+            
+            if len(common_words) >= common_word_threshold:
                 cluster['articles'].append(article)
                 matched = True
                 break
+                
         if not matched:
             clusters.append({
                 'common_words': article['significant_words'][:top_words_to_consider],
                 'articles': [article]
             })
+        
         # Early exit if growing too large
         if len(clusters) > 15:  
             break
+            
     return clusters[:10]  # Never return more than 10 clusters
-
+    
 def merge_clusters(clusters, merge_threshold):
     merged = True
     while merged:
