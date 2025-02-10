@@ -14,6 +14,8 @@ import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 from concurrent.futures import ThreadPoolExecutor
 import signal
+from contextlib import contextmanager
+
 
 
 # Precompiled regex patterns
