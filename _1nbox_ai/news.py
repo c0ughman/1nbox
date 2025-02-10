@@ -37,7 +37,7 @@ INSIGNIFICANT_WORDS = set([
     'Miscellaneous', 'Out', 'We', 'Makes', 'Inc', 'Description', 'Connections', 'Wordle', 'Play', 'Mashable', 
     'Mahjong', 'Earnings', 'Call', 'Transcript', 'Market', 'Tracker', 'Business', 'Insider',
     'Thu', 'Euractiv', 'Regulation', 'Today', 'Best', 'Your', 'Early', 'How', 'Report', 'Top', 'Billion', 'Watch',
-    'Here'
+    'Here', 'Buy', 'Day'
 ])
 
 # Set up logging
