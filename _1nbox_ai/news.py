@@ -13,6 +13,8 @@ import requests
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 from concurrent.futures import ThreadPoolExecutor
+import signal
+
 
 # Precompiled regex patterns
 WORD_PATTERN = re.compile(r'\b[A-Z][a-z]{2,}\b')  # Minimum 3 letters
@@ -571,9 +573,17 @@ def timeout(seconds):
         signal.signal(signal.SIGALRM, original_handler) 
 
 def process_clusters_parallel(clusters):
-    """Process clusters using ThreadPoolExecutor"""
+    """Process clusters using ThreadPoolExecutor with error handling"""
+    results = []
     with ThreadPoolExecutor(max_workers=3) as executor:
-        return list(executor.map(get_openai_response, clusters))
+        futures = {executor.submit(get_openai_response, cluster): cluster for cluster in clusters}
+        for future in futures:
+            try:
+                results.append(future.result())
+            except Exception as e:
+                logging.error(f"Error processing cluster: {str(e)}")
+                results.append("Error generating summary for this cluster")
+    return results
 
     
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
