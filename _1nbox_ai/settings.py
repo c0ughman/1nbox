@@ -65,9 +65,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -99,7 +99,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://1nbox-ai.com",
     "https://www.1nbox-ai.com",
     "https://1nbox.netlify.app",
-    "https://nbox-ai-bb518.firebaseapp.com"
+    "https://nbox-ai-bb518.firebaseapp.com",
+    
 ]
 
 # Add these settings
@@ -217,7 +218,6 @@ CSRF_TRUSTED_ORIGINS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com',
                         'https://uploads.stripe.com',
                         'https://editor.weweb.io',
                         'https://1nbox.netlify.app',
-                        'https://nbox-ai-bb518.firebaseapp.com'
                         ]
 
 django_heroku.settings(locals())
