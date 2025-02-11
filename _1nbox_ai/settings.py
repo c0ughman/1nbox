@@ -216,7 +216,8 @@ CSRF_TRUSTED_ORIGINS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com',
                         'https://terminal.stripe.com',
                         'https://uploads.stripe.com',
                         'https://editor.weweb.io',
-                        'https://1nbox.netlify.app'
+                        'https://1nbox.netlify.app',
+                        'https://nbox-ai-bb518.firebaseapp.com'
                         ]
 
 django_heroku.settings(locals())
