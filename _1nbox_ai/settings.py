@@ -95,6 +95,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = '_1nbox_ai.wsgi.application'
 
+CORS_ALLOW_ALL_ORIGINS = True # TEMPORARY
+
 CORS_ALLOWED_ORIGINS = [
     "https://1nbox-ai.com",
     "https://www.1nbox-ai.com",
