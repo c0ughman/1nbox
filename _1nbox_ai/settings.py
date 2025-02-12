@@ -33,7 +33,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['app-1nbox-ai-fb8295a32cce.herokuapp.com/', '127.0.0.1']
+ALLOWED_HOSTS = ['app-1nbox-ai-fb8295a32cce.herokuapp.com/', '127.0.0.1',"https://nbox-ai-bb518.firebaseapp.com"]
 
 # FIREBASE
 FIREBASE_CREDENTIALS = {
