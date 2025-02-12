@@ -99,8 +99,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://1nbox-ai.com",
     "https://www.1nbox-ai.com",
     "https://1nbox.netlify.app",
-    "https://nbox-ai-bb518.firebaseapp.com",
-    "https://www.googleapis.com",
+    "https://nbox-ai-bb518.firebaseapp.com"
 ]
 
 # Add these settings
