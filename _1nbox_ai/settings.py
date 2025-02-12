@@ -35,6 +35,11 @@ DEBUG = False
 
 ALLOWED_HOSTS = ['app-1nbox-ai-fb8295a32cce.herokuapp.com/', '127.0.0.1',"https://nbox-ai-bb518.firebaseapp.com"]
 
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SECURE = True
+
 # FIREBASE
 FIREBASE_CREDENTIALS = {
     "type": "service_account",
