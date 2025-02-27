@@ -775,6 +775,18 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
                 logging.info(f"Deleted comments for organization: {organization.name}")
             except Exception as e:
                 logging.error(f"Error deleting comments for {organization.name}: {str(e)}")
+
+            try:
+                seven_days_ago = datetime.now(pytz.utc) - timedelta(days=7)
+                old_summaries = Summary.objects.filter(
+                    topic__organization=organization,
+                    created_at__lt=seven_days_ago
+                )
+                deletion_count = old_summaries.count()
+                old_summaries.delete()
+                logging.info(f"Deleted {deletion_count} summaries older than 7 days for organization: {organization.name}")
+            except Exception as e:
+                logging.error(f"Error deleting old summaries for {organization.name}: {str(e)}")
             
             for topic in organization.topics.all():
                 try:
