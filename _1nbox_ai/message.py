@@ -85,14 +85,19 @@ def send_email(user, subject, content):
         return False, str(e)
 
 def send_summaries():
-    # We'll get the current UTC time once
+    """
+    Main function to process and send summaries for all active organizations.
+    """
+    logging.info("==== Starting send_summaries ====")
+
+    # Get current UTC time
     now_utc = datetime.now(pytz.utc)
-    
-    # Iterate over organizations
+    logging.info(f"Current UTC Time: {now_utc.strftime('%Y-%m-%d %H:%M:%S')}")
+
     for organization in Organization.objects.exclude(plan="inactive"):
-        # 1) Check if local time == summary_time
+        # 1) Check if summary_time and timezone are available
         if not organization.summary_time or not organization.summary_timezone:
-            # If we can’t do a time check, skip
+            logging.warning(f"Skipping {organization.name} - Missing summary_time or timezone.")
             continue
 
         try:
@@ -105,22 +110,25 @@ def send_summaries():
                 day=local_now.day,
                 hour=organization.summary_time.hour,
                 minute=organization.summary_time.minute,
+                second=0,  # Explicitly setting seconds to 0
                 tzinfo=org_tz
             )
 
-            # If local time is within ~1 minute of summary_time, proceed
-            diff_seconds = abs((local_now - org_summary_today).total_seconds())
-            if diff_seconds > 60:
-                continue  # skip if not the correct time
+            # Compare ONLY hours and minutes (ignore seconds)
+            if local_now.hour != org_summary_today.hour or local_now.minute != org_summary_today.minute:
+                logging.info(f"❌ Skipping {organization.name} - Time did not match (Expected {org_summary_today.strftime('%H:%M')}, Got {local_now.strftime('%H:%M')})")
+                continue
+
+            logging.info(f"✅ Time Matched for {organization.name} - Proceeding with email sending.")
 
         except Exception as e:
-            logging.error(f"Time zone check error for organization {organization.name}: {str(e)}")
+            logging.error(f"❌ Time zone check error for {organization.name}: {str(e)}")
             continue
 
         # 2) If we get here, we want to send the email summary to that org’s users
         topics = get_user_topics_summary(organization)
         if not topics:
-            logging.warning(f"No topics found for organization {organization.name}")
+            logging.warning(f"❌ No topics found for organization {organization.name}. Skipping email.")
             continue
             
         total_number_of_articles = sum(
@@ -128,10 +136,14 @@ def send_summaries():
             for t in topics 
             if t.summaries.first()
         )
-        
+
         topic_names = [t.name for t in topics]
-        
         users = organization.users.filter(send_email=True)
+
+        if not users:
+            logging.warning(f"❌ No users opted to receive emails in {organization.name}. Skipping email.")
+            continue
+
         for user in users:
             context = {
                 'user': user,
@@ -145,10 +157,13 @@ def send_summaries():
                 f"Today in {', '.join(topic_names)}",
                 email_content
             )
+
             if success:
-                print(f"Email sent to {user.email} with status code: {result}")
+                logging.info(f"✅ Email sent to {user.email} with status code: {result}")
             else:
-                logging.error(f"Failed to send email to {user.email}. Error: {result}")
+                logging.error(f"❌ Failed to send email to {user.email}. Error: {result}")
+
+    logging.info("==== Finished send_summaries ====")
 
 if __name__ == "__main__":
     send_summaries()
