@@ -1142,51 +1142,56 @@ def delete_current_user(request):
 @csrf_exempt
 @firebase_auth_required
 @require_http_methods(["PUT", "PATCH"])
-def update_current_user_name(request):
+def update_member_current(request):
+    """
+    Updates fields (like name, send_email) on the currently logged-in user.
+    """
     try:
-        # Get the Firebase user from the decorator
         firebase_user = request.firebase_user
         email = firebase_user['email']
-        
-        # Parse request data
+
+        # Parse the incoming JSON
         data = json.loads(request.body)
-        new_name = data.get('name')
-        
-        if not new_name:
-            return JsonResponse({
-                'success': False,
-                'error': 'Name is required'
-            }, status=400)
 
-        # Get and update the user
-        try:
-            user = User.objects.get(email=email)
+        # Get the current user from your DB
+        user = User.objects.get(email=email)
+
+        # If 'name' is in the request, update it
+        new_name = data.get('name', None)
+        if new_name is not None:
             user.name = new_name
-            user.save()
-            
-            return JsonResponse({
-                'success': True,
-                'message': 'Name updated successfully',
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'name': user.name
-                }
-            })
-        except User.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': 'User not found'
-            }, status=404)
 
+        # If 'send_email' is in the request, update it
+        new_send_email = data.get('send_email', None)
+        if new_send_email is not None:
+            user.send_email = new_send_email
+
+        user.save()
+
+        return JsonResponse({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'send_email': user.send_email
+            }
+        })
+
+    except User.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'User not found'
+        }, status=404)
     except json.JSONDecodeError:
         return JsonResponse({
             'success': False,
             'error': 'Invalid JSON'
         }, status=400)
     except Exception as e:
-        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        print(f"Internal error: {str(e)}")  # For debugging
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
+
 
 @csrf_exempt
 @firebase_auth_required
@@ -1297,6 +1302,142 @@ def update_organization_name(request, organization_id):
     except Exception as e:
         print(f"Internal error: {str(e)}")  # For debugging in MVP
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["PUT", "PATCH"])
+def update_organization_description(request, organization_id):
+    """
+    Updates the 'description' field for an organization.
+    """
+    try:
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+
+        # Check user role
+        user = User.objects.get(email=email)
+        if user.role != 'admin':
+            return JsonResponse({
+                'success': False,
+                'error': 'Only admin users can update organization details'
+            }, status=403)
+
+        data = json.loads(request.body)
+        new_description = data.get('description', None)
+
+        if new_description is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'description is required'
+            }, status=400)
+
+        organization = Organization.objects.get(
+            id=organization_id,
+            users__email=email  # ensures the user is in that org
+        )
+        organization.description = new_description
+        organization.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Organization description updated',
+            'organization': {
+                'id': organization.id,
+                'name': organization.name,
+                'description': organization.description
+            }
+        })
+    except Organization.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Organization not found or access denied'
+        }, status=404)
+    except User.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'User not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        print(f"Internal error: {str(e)}")
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
+
+
+@csrf_exempt
+@firebase_auth_required
+@require_http_methods(["PUT", "PATCH"])
+def update_organization_summary_schedule(request, organization_id):
+    """
+    Updates the 'summary_time' and 'summary_timezone' fields for an organization.
+    """
+    try:
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+
+        # Check user role
+        user = User.objects.get(email=email)
+        if user.role != 'admin':
+            return JsonResponse({
+                'success': False,
+                'error': 'Only admin users can update organization details'
+            }, status=403)
+
+        data = json.loads(request.body)
+        summary_time = data.get('summary_time', None)
+        summary_timezone = data.get('summary_timezone', None)
+
+        # Validate the presence of at least summary_time
+        if summary_time is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'summary_time is required'
+            }, status=400)
+
+        # Retrieve the organization
+        organization = Organization.objects.get(
+            id=organization_id,
+            users__email=email
+        )
+
+        # Update fields
+        organization.summary_time = summary_time
+        organization.summary_timezone = summary_timezone
+        organization.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Organization summary schedule updated',
+            'organization': {
+                'id': organization.id,
+                'name': organization.name,
+                'summary_time': str(organization.summary_time),
+                'summary_timezone': organization.summary_timezone
+            }
+        })
+    except Organization.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Organization not found or access denied'
+        }, status=404)
+    except User.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'User not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        print(f"Internal error: {str(e)}")
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
+
+
 
 @csrf_exempt
 @firebase_auth_required
