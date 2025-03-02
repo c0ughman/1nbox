@@ -117,7 +117,7 @@ def send_summaries():
         topic_names = [topic.name for topic in topics]
         
         # Process all users in the organization
-        users = organization.users.all()
+        users = organization.users.filter(send_email=True)
         for user in users:
             # Prepare email context
             context = {
