@@ -121,6 +121,7 @@ def get_user_organization_data(request):
                 'id': current_user.id,
                 'email': current_user.email,
                 'name': current_user.name,
+                'send_email': current_user.send_email,
                 'state': current_user.state,
                 'role': current_user.role,
                 'joined_at': current_user.joined_at,
