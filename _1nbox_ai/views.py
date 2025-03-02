@@ -172,6 +172,7 @@ def initial_signup(request):
             email=firebase_user['email'],
             role='admin',  # First user is admin
             name=firebase_user['email'],
+            send_email=True,
             organization=organization  # Link to the organization
         )
         
@@ -731,6 +732,7 @@ def invite_team_member(request):
             organization=current_user.organization,
             name=new_member_email,
             role='member',
+            send_email=True,
             state='pending'
         )
         
