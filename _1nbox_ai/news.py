@@ -425,42 +425,84 @@ def process_cluster_chunk(cluster, client, max_tokens):
 
     return ' '.join(summaries)
 
-def get_final_summary(cluster_summaries, sentences_final_summary, topic_prompt=None):
+def get_final_summary(
+    cluster_summaries,
+    sentences_final_summary,
+    topic_prompt=None,
+    organization_description=""
+):
+    """
+    Generates a final JSON-based summary of all cluster_summaries. Now includes
+    extra instructions: for each story, the AI should decide if there is any 
+    meaningful insight for the organization (based on organization_description).
+    If so, append a line at the end of that story with 'Insight:'.
+    """
+
+    import os
+    import json
+    from openai import OpenAI
+    
     openai_key = os.environ.get('OPENAI_KEY')
+    if not openai_key:
+        raise ValueError("OpenAI API key not found in environment variables.")
+
     client = OpenAI(api_key=openai_key)
 
+    # Combine all cluster-summaries text into one big string
     all_summaries = "\n\n".join(cluster_summaries)
 
+    # Base prompt for the AI
     base_prompt = (
         "You are a News Overview Summarizer. I will provide you with a collection of news summaries, "
-        "and I want you to condense this into a JSON object containing a list of stories. "
+        "and I want you to condense them into a JSON object containing a list of stories. "
         "Limit it to 2-4 main stories, and add a miscellaneous one at the end if applicable. "
         "Each story should have a title and content. "
-        "The title should be a concise and exciting headline that grabs the reader's attention and makes them want to read on. "
-        "It should partially explain the situation while leaving some curiosity. "
-        "The content must be a brief but complete summary of the story in text, "
-        "formatted with bulletpoints. "
+        "The title should be a concise, attention-grabbing headline. "
+        "It should partially explain the situation but still spark curiosity. "
+        "The content must be a brief but complete summary of the story, formatted with bulletpoints. "
         "Each bulletpoint should be a key aspect of the story, and all bulletpoints should be part of a single text string. "
         f"Generate the content using {sentences_final_summary} sentences per story to fully explain the situation. "
     )
 
+    # If there's a custom 'topic_prompt', fold it in
     if topic_prompt:
         base_prompt += (
             f"\n\nAdditional instructions from the topic owner: {topic_prompt}\n"
             "Please incorporate these instructions into your summary generation."
         )
 
+    # ---------------- NEW PART FOR ORGANIZATION INSIGHT ----------------
+    if organization_description:
+        base_prompt += (
+            f"\n\nHere is the organization's description:\n"
+            f"\"{organization_description}\"\n"
+            "While writing each story, carefully check if the story might contain any valuable insight"
+            "for the organization's needs, goals, or possible risks/opportunities. If you find such an insight, "
+            "add a final line at the end of that story's content:\n\n"
+            "Insight: [Your insight text]\n\n"
+            "However, if there is no truly useful insight or relevant takeaway for this organization, "
+            "do not include the 'Insight:' line at all."
+        )
+    # --------------------------------------------------------------------
+
+    # We also keep the instructions for final JSON structure
     base_prompt += (
-        "\nAlso give me three short questions that you could answer with the information in the summaries, to give users an idea of what to ask"
-        "\nReturn your response in the following JSON structure: "
-        "{'summary': [{'title': 'Title 1', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, "
-        "{'title': 'Title 2', 'content': '• Bulletpoint 1.\n\n• Bulletpoint 2.\n\n• Bulletpoint 3.'}, ...],"
-        "'questions': ['Question one?', 'Question two?', 'Question three?'],"
-        "'prompt': 'Original topic prompt if provided'}"
-        "\nEnsure each story's content is a single text string with bulletpoints separated by spaces or new lines."
-        "\nMake sure the questions are in that precise format, and expand properly upon the summaries."
+        "\nAlso give me three short questions that a user could ask based on these summaries, "
+        "to inspire further inquiry.\n"
+        "Return your response in the following JSON structure exactly:\n"
+        "{'summary': [\n"
+        "    {'title': 'Title 1', 'content': '• Bulletpoint 1.\\n\\n• Bulletpoint 2.\\n\\n• Bulletpoint 3.'},\n"
+        "    {'title': 'Title 2', 'content': '• Bulletpoint 1.\\n\\n• Bulletpoint 2.\\n\\n• Bulletpoint 3.'},\n"
+        "    ...\n"
+        "],\n"
+        "'questions': ['Question one?', 'Question two?', 'Question three?'],\n"
+        "'prompt': 'Original topic prompt if provided'\n"
+        "}\n"
+        "Make sure the 'summary' is 2-4 items (plus possibly a 'miscellaneous'), each with a single 'content' string containing bulletpoints.\n"
+        "Expand and refine the 'questions' to reflect the content in the stories."
     )
 
+    # Create the chat completion
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         max_tokens=5000,
@@ -470,8 +512,9 @@ def get_final_summary(cluster_summaries, sentences_final_summary, topic_prompt=N
             {"role": "user", "content": all_summaries}
         ]
     )
-    
+
     return completion.choices[0].message.content
+
 
 def extract_braces_content(s):
     start_index = s.find('{')
@@ -699,7 +742,8 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                 final_summary_json = get_final_summary(
                     list(cluster_summaries.values()),
                     sentences_final_summary,
-                    topic.prompt if topic.prompt else None
+                    topic.prompt if topic.prompt else None,
+                    topic.organization.description if topic.organization.description else ""
                 )
                 final_summary_json = extract_braces_content(final_summary_json)
                 final_summary_data = json.loads(final_summary_json)
