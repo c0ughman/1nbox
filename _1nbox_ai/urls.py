@@ -40,7 +40,9 @@ urlpatterns = [
     path('get_user_organization_data/', views.get_user_organization_data),
 
     path('delete_member/current/', views.delete_current_user),
-    path('update_member/current/', views.update_current_user_name),
+    path('update_member/current/', views.update_member_current),
+    path('update_organization/<int:organization_id>/description/', views.update_organization_description),
+    path('update_organization/<int:organization_id>/summary_schedule/', views.update_organization_summary_schedule),    
     path('delete_organization/<int:organization_id>/', views.delete_organization),
     path('update_organization/<int:organization_id>/name/', views.update_organization_name),
     path('update_organization/<int:organization_id>/plan/', views.update_organization_plan),
