@@ -763,45 +763,83 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
     logging.info("Starting process_all_topics")
     logging.info(f"Title-only mode: {title_only}")
     logging.info(f"All-words mode: {all_words}")
+
+    # 1) Grab all active organizations.
+    all_orgs = Organization.objects.exclude(plan='inactive')
     
-    try:
-        active_organizations = Organization.objects.exclude(plan='inactive')
-        
-        for organization in active_organizations:
-            logging.info(f"Processing organization: {organization.name}")
-            
-            try:
-                Comment.objects.filter(writer__organization=organization).delete()
-                logging.info(f"Deleted comments for organization: {organization.name}")
-            except Exception as e:
-                logging.error(f"Error deleting comments for {organization.name}: {str(e)}")
+    # 2) Build a list of organizations whose local time is exactly 30 min behind their summary_time
+    #    (meaning "summary_time minus 30 min" is effectively 'right now').
+    valid_org_ids = []
+    now_utc = datetime.now(pytz.utc)
 
-            try:
-                seven_days_ago = datetime.now(pytz.utc) - timedelta(days=7)
-                old_summaries = Summary.objects.filter(
-                    topic__organization=organization,
-                    created_at__lt=seven_days_ago
-                )
-                deletion_count = old_summaries.count()
-                old_summaries.delete()
-                logging.info(f"Deleted {deletion_count} summaries older than 7 days for organization: {organization.name}")
-            except Exception as e:
-                logging.error(f"Error deleting old summaries for {organization.name}: {str(e)}")
-            
-            for topic in organization.topics.all():
-                try:
-                    process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
-                                merge_threshold, min_articles, join_percentage,
-                                final_merge_percentage, sentences_final_summary, title_only)
-                except Exception as e:
-                    logging.error(f"Failed to process topic {topic.name}: {str(e)}")
-                    continue
-                
-    except Exception as e:
-        logging.critical(f"Critical error in process_all_topics: {str(e)}")
-    finally:
-        logging.info("Finished process_all_topics")
+    for org in all_orgs:
+        # If org lacks summary_time or timezone, skip it
+        if not org.summary_time or not org.summary_timezone:
+            continue
 
+        try:
+            # Convert current UTC time => org’s local time
+            org_tz = pytz.timezone(org.summary_timezone)
+            local_now = now_utc.astimezone(org_tz)
+
+            # Build a datetime for *today* at org.summary_time in local timezone
+            # e.g. summary_time=01:00 => local datetime is (year, month, day, 01, 00)
+            org_summary_today = datetime(
+                year=local_now.year,
+                month=local_now.month,
+                day=local_now.day,
+                hour=org.summary_time.hour,
+                minute=org.summary_time.minute,
+                tzinfo=org_tz
+            )
+
+            # 30 minutes before summary_time
+            run_time = org_summary_today - timedelta(minutes=30)
+
+            # See if local_now is within ~60s of run_time
+            diff_seconds = abs((local_now - run_time).total_seconds())
+            if diff_seconds <= 60:
+                valid_org_ids.append(org.id)
+
+        except Exception as e:
+            logging.error(f"Time zone check error for org {org.name}: {str(e)}")
+
+    # 3) Restrict to those organizations that are exactly 30 minutes away from summary_time
+    active_organizations = all_orgs.filter(id__in=valid_org_ids)
+
+    # === Everything below is your normal aggregator logic ===
+    for organization in active_organizations:
+        logging.info(f"Processing organization: {organization.name}")
+        try:
+            Comment.objects.filter(writer__organization=organization).delete()
+            logging.info(f"Deleted comments for organization: {organization.name}")
+        except Exception as e:
+            logging.error(f"Error deleting comments for {organization.name}: {str(e)}")
+
+        try:
+            seven_days_ago = datetime.now(pytz.utc) - timedelta(days=7)
+            old_summaries = Summary.objects.filter(
+                topic__organization=organization,
+                created_at__lt=seven_days_ago
+            )
+            deletion_count = old_summaries.count()
+            old_summaries.delete()
+            logging.info(f"Deleted {deletion_count} summaries older than 7 days for organization: {organization.name}")
+        except Exception as e:
+            logging.error(f"Error deleting old summaries for {organization.name}: {str(e)}")
+
+        # Now process each topic for this org:
+        for topic in organization.topics.all():
+            try:
+                process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
+                              merge_threshold, min_articles, join_percentage,
+                              final_merge_percentage, sentences_final_summary, title_only, all_words)
+            except Exception as e:
+                logging.error(f"Failed to process topic {topic.name}: {str(e)}")
+                continue
+
+    logging.info("Finished process_all_topics")
+
+# If run directly:
 if __name__ == "__main__":
-    # This block will not be executed when imported as a module
     process_all_topics()
