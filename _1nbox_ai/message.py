@@ -9,8 +9,9 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from .models import Topic, User, Summary, Organization
 
+# Configure Logging
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
@@ -83,6 +84,9 @@ def send_email(user, subject, content):
     except Exception as e:
         logging.error(f"Failed to send email to {user.email}: {str(e)}")
         return False, str(e)
+
+sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+sg = SendGridAPIClient(sendgrid_api_key)
 
 def send_summaries():
     """
