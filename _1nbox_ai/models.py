@@ -16,6 +16,8 @@ class Organization(models.Model):
         ],
         default='active'
     )
+    summary_time = models.TimeField(blank=True, null=True)  # Store just the time
+    summary_timezone = models.CharField(max_length=50, blank=True, null=True)  # Store timezone like "UTC", "America/New_York"
     stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
     stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
@@ -30,6 +32,7 @@ class User(models.Model):
     email = models.CharField(max_length=255, unique=True)
     name = models.CharField(max_length=255, blank=True, null=True)  # Added name field
     state = models.CharField(max_length=255, blank=True, null=True)  # Added state field
+    send_email = models.BooleanField(default=False)  # Added send_email field
     joined_at = models.DateTimeField(default=timezone.now)
     role = models.CharField(
         max_length=50,
@@ -102,10 +105,9 @@ class Comment(models.Model):
     )
     position = models.IntegerField()
     created_at = models.DateTimeField(default=timezone.now)
-
+    
     def __str__(self):
         return f"Comment by {self.writer.email} at position {self.position}"
     
     class Meta:
         ordering = ['position']
-
