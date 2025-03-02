@@ -800,6 +800,8 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         # Could add notification system here for critical errors
     finally:
         logging.info(f"Finished processing topic: {topic.name}")
+
+
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                       merge_threshold=2, min_articles=3, join_percentage=0.5,
                       final_merge_percentage=0.5, sentences_final_summary=3, title_only=False, all_words=False):
@@ -808,7 +810,7 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
     
     # Get the current UTC time
     now_utc = datetime.now(pytz.utc)
-    logging.info(f"Current UTC Time: {now_utc.strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info(f"Current UTC Time: {now_utc.strftime('%H:%M')}")  # ⬅️ Only logs HH:MM
 
     valid_org_ids = []
     all_orgs = Organization.objects.exclude(plan='inactive')
@@ -828,38 +830,26 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
                 logging.error(f"Invalid summary_time for {org.name}: {org.summary_time}")
                 continue
 
-            # Construct a datetime object for today at summary_time
-            org_summary_today = datetime(
-                year=local_now.year,
-                month=local_now.month,
-                day=local_now.day,
-                hour=org.summary_time.hour,
-                minute=org.summary_time.minute,
-                second=0,  # Explicitly setting seconds to 0
-                tzinfo=org_tz
-            )
+            # Compute expected run time (30 minutes before summary_time)
+            expected_hour = org.summary_time.hour
+            expected_minute = org.summary_time.minute - 30  # Subtract 30 minutes
+            
+            if expected_minute < 0:  # Handle cases where subtraction moves to the previous hour
+                expected_hour -= 1
+                expected_minute += 60
 
-            # Compute target run time (30 minutes before summary_time)
-            run_time = org_summary_today - timedelta(minutes=30)
-
-            # Ensure run_time is still within today's date
-            if run_time.day != local_now.day:
-                run_time = run_time.replace(year=local_now.year, month=local_now.month, day=local_now.day)
-
-            # Log the comparison
+            # Log the comparison (HH:MM format only)
             logging.info(
-                f"Org: {org.name} | Local Now: {local_now.strftime('%Y-%m-%d %H:%M:%S')} "
-                f"| Summary Time: {org_summary_today.strftime('%Y-%m-%d %H:%M:%S')} "
-                f"| Run Time (Expected): {run_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                f"Org: {org.name} | Local Now: {local_now.strftime('%H:%M')} "
+                f"| Expected Run Time: {expected_hour:02d}:{expected_minute:02d}"
             )
 
-            # Check if local_now is within ±60 seconds of run_time
-            diff_seconds = abs((local_now - run_time).total_seconds())
-            if diff_seconds <= 60:
+            # Compare only the hours and minutes
+            if local_now.hour == expected_hour and local_now.minute == expected_minute:
                 logging.info(f"✅ Running process for {org.name} (Time Matched)")
                 valid_org_ids.append(org.id)
             else:
-                logging.info(f"❌ Skipping {org.name} - Time did not match (Diff: {diff_seconds} seconds)")
+                logging.info(f"❌ Skipping {org.name} - Time did not match (Local Now: {local_now.strftime('%H:%M')}, Expected: {expected_hour:02d}:{expected_minute:02d})")
 
         except Exception as e:
             logging.error(f"❌ Time zone check error for {org.name}: {str(e)}")
