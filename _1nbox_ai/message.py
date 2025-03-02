@@ -1,19 +1,19 @@
 import os
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+import pytz
+
 from django.template.loader import render_to_string
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from .models import Topic, User, Summary, Organization
 
-# Set up logging
 logging.basicConfig(
     level=logging.ERROR,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# SendGrid setup
 sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
 sg = SendGridAPIClient(sendgrid_api_key)
 
@@ -41,23 +41,20 @@ def get_user_topics_summary(organization):
                 if isinstance(latest_summary.final_summary, dict):
                     summary_data = latest_summary.final_summary.get('summary', [])
                     
-                    # Process each summary item's content
+                    # Reformat bulletpoints
                     for item in summary_data:
                         if 'content' in item:
-                            # Split content by bullet points
                             parts = item['content'].split('•')
-                            # Add proper spacing and rejoin
-                            processed_content = parts[0]  # First part (before any bullets)
-                            for part in parts[1:]:  # Rest of the parts
-                                if part.strip():  # Only process non-empty parts
+                            processed_content = parts[0]
+                            for part in parts[1:]:
+                                if part.strip():
                                     processed_content += '\n\n• ' + part.strip()
                             item['content'] = processed_content
-                            
                     latest_summary.final_summary = summary_data
             else:
                 latest_summary.final_summary = []
 
-            # Filter out summaries containing negative keywords if specified
+            # Filter out negative keywords if needed
             if topic.negative_keywords:
                 negative_list = [word.strip().lower() for word in topic.negative_keywords.split(",")]
                 latest_summary.final_summary = [
@@ -73,10 +70,6 @@ def get_user_topics_summary(organization):
     return topic_list
 
 def send_email(user, subject, content):
-    """
-    Send an email using SendGrid.
-    Returns a tuple of (success, result).
-    """
     message = Mail(
         from_email='news@1nbox-ai.com',
         to_emails=user.email,
@@ -92,50 +85,66 @@ def send_email(user, subject, content):
         return False, str(e)
 
 def send_summaries():
-    """
-    Main function to process and send summaries for all active organizations.
-    """
-    current_time = datetime.now().timestamp()
+    # We'll get the current UTC time once
+    now_utc = datetime.now(pytz.utc)
     
-    # Process all organizations that are paying
+    # Iterate over organizations
     for organization in Organization.objects.exclude(plan="inactive"):
-        # Get the topics for the organization
+        # 1) Check if local time == summary_time
+        if not organization.summary_time or not organization.summary_timezone:
+            # If we can’t do a time check, skip
+            continue
+
+        try:
+            org_tz = pytz.timezone(organization.summary_timezone)
+            local_now = now_utc.astimezone(org_tz)
+
+            org_summary_today = datetime(
+                year=local_now.year,
+                month=local_now.month,
+                day=local_now.day,
+                hour=organization.summary_time.hour,
+                minute=organization.summary_time.minute,
+                tzinfo=org_tz
+            )
+
+            # If local time is within ~1 minute of summary_time, proceed
+            diff_seconds = abs((local_now - org_summary_today).total_seconds())
+            if diff_seconds > 60:
+                continue  # skip if not the correct time
+
+        except Exception as e:
+            logging.error(f"Time zone check error for organization {organization.name}: {str(e)}")
+            continue
+
+        # 2) If we get here, we want to send the email summary to that org’s users
         topics = get_user_topics_summary(organization)
-        
         if not topics:
             logging.warning(f"No topics found for organization {organization.name}")
             continue
             
-        # Calculate total number of articles
         total_number_of_articles = sum(
-            topic.summaries.first().number_of_articles 
-            for topic in topics 
-            if topic.summaries.first()
+            t.summaries.first().number_of_articles 
+            for t in topics 
+            if t.summaries.first()
         )
         
-        # Get topic names for email subject
-        topic_names = [topic.name for topic in topics]
+        topic_names = [t.name for t in topics]
         
-        # Process all users in the organization
         users = organization.users.filter(send_email=True)
         for user in users:
-            # Prepare email context
             context = {
                 'user': user,
                 'topics': topics,
                 'total_number_of_articles': total_number_of_articles,
             }
-    
-            # Generate email content from template
             email_content = render_to_string('email_template.html', context)
-    
-            # Send the email
+
             success, result = send_email(
                 user,
                 f"Today in {', '.join(topic_names)}",
                 email_content
             )
-            
             if success:
                 print(f"Email sent to {user.email} with status code: {result}")
             else:
