@@ -1104,7 +1104,6 @@ def handle_subscription_deleted(subscription):
     except Exception as e:
         print(f"Error in handle_subscription_deleted: {str(e)}")
         raise
-        
 @csrf_exempt
 @firebase_auth_required
 @require_http_methods(["DELETE"])
@@ -1123,8 +1122,16 @@ def delete_current_user(request):
                 'error': 'User not found'
             }, status=404)
 
+        # Check if this user is the only user in the organization
+        organization = user.organization
+        if organization.users.count() == 1:
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot delete the last user in the organization'
+            }, status=400)
+
+        # Attempt to delete the user from Firebase
         try:
-            # First try to delete the user from Firebase
             user_to_delete = auth.get_user_by_email(email)
             auth.delete_user(user_to_delete.uid)
             print(f"Successfully deleted user {email} from Firebase")
@@ -1133,7 +1140,7 @@ def delete_current_user(request):
         except Exception as e:
             print(f"Error deleting user from Firebase: {str(e)}")
 
-        # Delete the user from your database
+        # Now delete the user from your database
         user.delete()
 
         return JsonResponse({
@@ -1142,7 +1149,7 @@ def delete_current_user(request):
         })
 
     except Exception as e:
-        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        print(f"Internal error: {str(e)}")  # For debugging
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
 @csrf_exempt
@@ -1207,7 +1214,7 @@ def delete_organization(request, organization_id):
         # Get the Firebase user from the decorator
         firebase_user = request.firebase_user
         email = firebase_user['email']
-        
+
         # Check if user exists and is admin
         try:
             user = User.objects.get(email=email)
@@ -1222,28 +1229,52 @@ def delete_organization(request, organization_id):
                 'error': 'User not found'
             }, status=404)
 
-        # Get and delete the organization
+        # Get the organization
         try:
             organization = Organization.objects.get(
                 id=organization_id,
-                users__email=email  # Ensures user belongs to this organization
+                users__email=email  # Ensures the admin user belongs to this organization
             )
-            organization.delete()
-            
-            return JsonResponse({
-                'success': True,
-                'message': 'Organization deleted successfully'
-            })
         except Organization.DoesNotExist:
             return JsonResponse({
                 'success': False,
                 'error': 'Organization not found or access denied'
             }, status=404)
 
-    except Exception as e:
-        print(f"Internal error: {str(e)}")  # For debugging in MVP
-        return JsonResponse({'error': 'An internal error occurred'}, status=500)
+        # 1. Delete all users in this organization from Firebase and from DB
+        org_users = organization.users.all()
+        for org_user in org_users:
+            try:
+                user_to_delete = auth.get_user_by_email(org_user.email)
+                auth.delete_user(user_to_delete.uid)
+                print(f"Successfully deleted user {org_user.email} from Firebase")
+            except auth.UserNotFoundError:
+                print(f"User {org_user.email} not found in Firebase - continuing with database deletion")
+            except Exception as e:
+                print(f"Error deleting user {org_user.email} from Firebase: {str(e)}")
 
+            # Delete from DB
+            org_user.delete()
+
+        # 2. If there's a Stripe subscription, delete it
+        if organization.stripe_subscription_id:
+            try:
+                stripe.Subscription.delete(organization.stripe_subscription_id)
+                print(f"Successfully deleted Stripe subscription {organization.stripe_subscription_id}")
+            except Exception as e:
+                print(f"Error deleting Stripe subscription: {str(e)}")
+
+        # 3. Delete the organization from the database
+        organization.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Organization and related data deleted successfully'
+        })
+
+    except Exception as e:
+        print(f"Internal error: {str(e)}")  # For debugging
+        return JsonResponse({'error': 'An internal error occurred'}, status=500)
 @csrf_exempt
 @firebase_auth_required
 @require_http_methods(["PUT", "PATCH"])
