@@ -473,6 +473,7 @@ def get_final_summary(
 
     # ---------------- NEW PART FOR ORGANIZATION INSIGHT ----------------
     if organization_description:
+        print("THERE IS AN ORGANIZATION DESCRIPTION!")
         base_prompt += (
             f"\n\nHere is the organization's description:\n"
             f"\"{organization_description}\"\n"
