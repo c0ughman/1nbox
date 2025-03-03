@@ -141,7 +141,7 @@ def extract_significant_words(text, title_only=False, all_words=False):
     """
     if all_words:
         # For all words mode, we want any word with 2 or more characters
-        words = re.findall(r'\b[a-zA-Z]{2,}\b', text)
+        words = re.findall(r'\b[a-zA-Z]{3,}\b', text)
     elif title_only:
         # For titles, we want all capitalized words since titles have different grammar
         words = re.findall(r'\b[A-Z][a-z]{1,}\b', text)
@@ -477,8 +477,8 @@ def get_final_summary(
         base_prompt += (
             f"\n\nHere is the organization's description:\n"
             f"\"{organization_description}\"\n"
-            "While writing each story, carefully check if the story might contain any valuable insight"
-            "for the organization's needs, goals, or possible risks/opportunities. If you find such an insight, "
+            "While writing each story, use the information to come up with a valuable insight or takeaway relevant to"
+            "the organization's needs, goals, or possible risks/opportunities. Relating the insight to the organization, "
             "add a final line at the end of that story's content:\n\n"
             "Insight: [Your insight text]\n\n"
             "However, if there is no truly useful insight or relevant takeaway for this organization, "
