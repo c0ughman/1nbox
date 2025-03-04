@@ -432,111 +432,110 @@ def get_final_summary(
     organization_description=""
 ):
     """
-    Generates a final JSON-based summary of all cluster_summaries. Now includes
-    extra instructions: for each story, the AI should decide if there is any 
-    meaningful insight for the organization (based on organization_description).
-    If so, append a line at the end of that story with 'Insight:'.
+    Generates a final JSON-based summary of all cluster_summaries.  
+    If organization_description is present, instructs GPT to add an 'Insight:' line 
+    at the end of a story's content if relevant to that organization.  
+    Returns the raw text from GPT (you typically parse it with extract_braces_content, then json.loads).
     """
-
     import os
     import json
+    import logging
     from openai import OpenAI
-    
+
+    logging.info("Preparing to get final summary from GPT for all cluster summaries")
+
     openai_key = os.environ.get('OPENAI_KEY')
     if not openai_key:
         raise ValueError("OpenAI API key not found in environment variables.")
 
+    # Initialize the OpenAI client
     client = OpenAI(api_key=openai_key)
 
-    # Combine all cluster-summaries text into one big string
+    # Combine cluster summaries into one string for GPT
     all_summaries = "\n\n".join(cluster_summaries)
 
-    # Base prompt for the AI
+    # Base prompt telling GPT how to structure the final JSON:
     base_prompt = (
-        "You are a News Overview Summarizer. I will provide you with a collection of news summaries, "
-        "and I want you to condense them into a JSON object containing a list of stories. "
-        "Limit it to 2-4 main stories, and add a miscellaneous one at the end if applicable. "
-        "Each story should have a title and content. "
-        "The title should be a concise, attention-grabbing headline. "
-        "It should partially explain the situation but still spark curiosity. "
-        "The content must be a brief but complete summary of the story, formatted with bulletpoints. "
-        "Each bulletpoint should be a key aspect of the story, and all bulletpoints should be part of a single text string. "
-        f"Generate the content using {sentences_final_summary} sentences per story to fully explain the situation. "
+        "You are a News Overview Summarizer. I will provide you with a collection of news article summaries, "
+        "and I want you to condense them into a single JSON object with the exact structure shown below. "
+        "Your entire output must be valid JSON and use double quotes for all keys and string values, "
+        "with no extra text or code blocks outside the JSON.\n\n"
+
+        "You must produce between 2 and 4 main stories (plus a 'miscellaneous' one if needed), each with two properties:\n"
+        "1. \"title\": A concise headline that partially explains the situation but remains attention-grabbing.\n"
+        "2. \"content\": A concise, bullet-pointed summary (one bullet per key aspect) in a single string, with each bullet "
+        "   separated by two newlines (\\n\\n). Use about "
+        f"{sentences_final_summary} sentences total per story to fully explain the situation.\n\n"
+
+        "Also produce exactly three short questions a user might naturally ask about these stories.\n\n"
+
+        "Return your output in valid JSON (no code fences, no single quotes) with the structure:\n"
+        "{\n"
+        "  \"summary\": [\n"
+        "    {\n"
+        "      \"title\": \"Title 1\",\n"
+        "      \"content\": \"• Bulletpoint 1.\\n\\n• Bulletpoint 2.\\n\\n• Bulletpoint 3.\"\n"
+        "    },\n"
+        "    {\n"
+        "      \"title\": \"Title 2\",\n"
+        "      \"content\": \"• Bulletpoint 1.\\n\\n• Bulletpoint 2.\\n\\n• Bulletpoint 3.\"\n"
+        "    }\n"
+        "  ],\n"
+        "  \"questions\": [\n"
+        "    \"Question one?\",\n"
+        "    \"Question two?\",\n"
+        "    \"Question three?\"\n"
+        "  ],\n"
+        "  \"prompt\": \"Original topic prompt here (or empty if none)\"\n"
+        "}\n\n"
+
+        "Important:\n"
+        "1. All strings and keys must use double quotes.\n"
+        "2. There must be no trailing commas or extra fields.\n"
+        "3. Do not wrap your JSON in any code fences.\n"
+        "4. No single quotes in the JSON.\n\n"
     )
 
-    # If there's a custom 'topic_prompt', fold it in
+    # If there's a custom topic prompt, fold it in
     if topic_prompt:
         base_prompt += (
-            f"\n\nAdditional instructions from the topic owner: {topic_prompt}\n"
-            "Please incorporate these instructions into your summary generation."
+            "Additional instructions from the topic owner:\n"
+            f"{topic_prompt}\n\n"
+            "Please incorporate these instructions into your summary.\n"
         )
 
-    # ---------------- NEW PART FOR ORGANIZATION INSIGHT ----------------
+    # If there's an organization description, instruct GPT to add an 'Insight:' line if relevant
     if organization_description:
-        print("THERE IS AN ORGANIZATION DESCRIPTION!")
+        logging.info("Organization description provided; instructing GPT to generate insights.")
         base_prompt += (
-            f"\n\nHere is the organization's description:\n"
-            f"\"{organization_description}\"\n"
-            "While writing each story, use the information to come up with a valuable insight or takeaway relevant to"
-            "the organization's needs, goals, or possible risks/opportunities. Relating the insight to the organization, "
-            "add a final line at the end of that story's content:\n\n"
-            "Insight: [Your insight text]\n\n"
-            "However, if there is no truly useful insight or relevant takeaway for this organization, "
-            "do not include the 'Insight:' line at all."
+            "Organization Description:\n"
+            f"\"{organization_description}\"\n\n"
+            "If there's a relevant insight or recommended action for this organization, add a final line to that story's content:\n"
+            "Insight: [Your one-sentence insight]\n\n"
+            "If there's no relevant insight, do not include the 'Insight:' line at all.\n\n"
         )
-    # --------------------------------------------------------------------
 
-    # We also keep the instructions for final JSON structure
+    # Append the user-provided cluster summaries
     base_prompt += (
-        "\nAlso give me three short questions that a user could ask based on these summaries, "
-        "to inspire further inquiry.\n"
-        "Return your response in the following JSON structure exactly:\n"
-        "{'summary': [\n"
-        "    {'title': 'Title 1', 'content': '• Bulletpoint 1.\\n\\n• Bulletpoint 2.\\n\\n• Bulletpoint 3.'},\n"
-        "    {'title': 'Title 2', 'content': '• Bulletpoint 1.\\n\\n• Bulletpoint 2.\\n\\n• Bulletpoint 3.'},\n"
-        "    ...\n"
-        "],\n"
-        "'questions': ['Question one?', 'Question two?', 'Question three?'],\n"
-        "'prompt': 'Original topic prompt if provided'\n"
-        "}\n"
-        "Make sure the 'summary' is 2-4 items (plus possibly a 'miscellaneous'), each with a single 'content' string containing bulletpoints.\n"
-        "Expand and refine the 'questions' to reflect the content in the stories."
+        "Now here are the combined article summaries:\n"
+        f"{all_summaries}\n\n"
+        "Make sure you follow the JSON structure exactly."
     )
 
-    # Create the chat completion
+    logging.debug("Sending final summary prompt to OpenAI...")
+
+    # Call the GPT API
     completion = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o-mini",  # Adjust model if needed
         max_tokens=5000,
         temperature=0.125,
         messages=[
-            {"role": "system", "content": base_prompt},
-            {"role": "user", "content": all_summaries}
+            {"role": "system", "content": base_prompt}
         ]
     )
 
     return completion.choices[0].message.content
 
-
-def extract_braces_content(s):
-    start_index = s.find('{')
-    end_index = s.rfind('}')
-        
-    if start_index == -1 or end_index == -1:
-        # If there is no '{' or '}', return an empty string or handle as needed
-        return ""
-        
-    # Include the end_index in the slice by adding 1
-    return s[start_index:end_index + 1]
-
-def parse_input(input_string):
-    # Safely evaluate the string to a dictionary
-    data = ast.literal_eval(input_string)
-    
-    # Extract the summary and questions
-    summary = data.get('summary', '')
-    questions = data.get('questions', [])
-    
-    return summary, questions
 
 
 # WIKIMEDIA STUFF HERE
