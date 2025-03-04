@@ -536,74 +536,27 @@ def get_final_summary(
 
     return completion.choices[0].message.content
 
-
-
-# WIKIMEDIA STUFF HERE
-'''
-def extract_capitalized_words(text, insignificant_words):
-    words = re.findall(r'\b[A-Z][a-z]+\b', text)
-    return [word for word in words if word not in insignificant_words and len(word) > 1]
-
-def get_sorted_unique_words(words):
-    word_counts = Counter(words)
-    return sorted(word_counts, key=word_counts.get, reverse=True)
-
-def get_wikimedia_image(search_terms):
-    base_url = "https://commons.wikimedia.org/w/api.php"
-    params = {
-        "action": "query",
-        "format": "json",
-        "list": "search",
-        "srsearch": f"{' '.join(search_terms)} filetype:bitmap",
-        "srnamespace": "6",
-        "srlimit": "1"
-    }
-    
-    response = requests.get(base_url, params=params)
-    data = response.json()
-    
-    if data["query"]["search"]:
-        file_name = data["query"]["search"][0]["title"]
-        image_info_params = {
-            "action": "query",
-            "format": "json",
-            "prop": "imageinfo",
-            "iiprop": "url",
-            "titles": file_name
-        }
-        image_info_response = requests.get(base_url, params=image_info_params)
-        image_data = image_info_response.json()
+def extract_braces_content(s):
+    start_index = s.find('{')
+    end_index = s.rfind('}')
         
-        pages = image_data["query"]["pages"]
-        for page in pages.values():
-            if "imageinfo" in page:
-                return page["imageinfo"][0]["url"]
-    
-    return None
+    if start_index == -1 or end_index == -1:
+        # If there is no '{' or '}', return an empty string or handle as needed
+        return ""
+        
+    # Include the end_index in the slice by adding 1
+    return s[start_index:end_index + 1]
 
-def get_image_for_item(item, insignificant_words):
-    words = extract_capitalized_words(item['title'] + ' ' + item['content'], insignificant_words)
-    sorted_words = get_sorted_unique_words(words)
+def parse_input(input_string):
+    # Safely evaluate the string to a dictionary
+    data = ast.literal_eval(input_string)
     
-    # Get top 5 common words
-    top_5_words = sorted_words[:5]
+    # Extract the summary and questions
+    summary = data.get('summary', '')
+    questions = data.get('questions', [])
     
-    # Search for 4 most common, then 3, then 2
-    for i in range(min(4, len(sorted_words)), 1, -1):
-        search_terms = sorted_words[:i]
-        image_url = get_wikimedia_image(search_terms)
-        if image_url:
-            # Check if at least two of the top 5 words are present in the file name
-            matching_words = [word for word in top_5_words if word.lower() in image_url.lower()]
-            if len(matching_words) >= 3:
-                print(f"Found image for terms: {' '.join(search_terms)}")
-                print(f"Image URL: {image_url}")
-                print(f"Matching words in filename: {', '.join(matching_words)}")
-                return image_url
-    
-    return None
+    return summary, questions
 
-'''
 
 @contextmanager
 def timeout(seconds):
