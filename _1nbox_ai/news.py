@@ -698,8 +698,18 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                     topic.prompt if topic.prompt else None,
                     topic.organization.description if topic.organization.description else ""
                 )
+
+                logging.info("----------- LOGGING SHIT -----------")
+                logging.info(f"Organization description: {topic.organization.description}")
+                logging.info(f"Raw OpenAI response: {final_summary_json}")
+
                 final_summary_json = extract_braces_content(final_summary_json)
+
+                logging.info(f"After extracting braces: {final_summary_json}")
+
                 final_summary_data = json.loads(final_summary_json)
+
+                logging.info(f"Parsed summary JSON: {json.dumps(final_summary_data, indent=2)}")
 
             except Exception as e:
                 logging.error(f"Error generating final summary for {topic.name}: {str(e)}")
