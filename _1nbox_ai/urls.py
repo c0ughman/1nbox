@@ -50,6 +50,7 @@ urlpatterns = [
     path('add_comment/', views.add_comment),
     path('notify_mentioned_users/', views.notify_mentioned_users),
 
+    path('get_bubbles/', views.get_bubbles),
 
     path('get_organization_for_payment/', views.get_pricing_organization_data),
     path('subscriptions/create/', views.create_subscription),
