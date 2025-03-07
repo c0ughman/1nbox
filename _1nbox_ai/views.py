@@ -1761,6 +1761,7 @@ def notify_mentioned_users(request):
         print(f"Internal error: {str(e)}")  # For debugging in MVP
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
+@csrf_exempt
 def get_bubbles(request):
     """
     Example view that receives a JSON POST with:
