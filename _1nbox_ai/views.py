@@ -23,6 +23,9 @@ from django.template.loader import render_to_string
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
+from .bubbles import process_feeds_and_cluster
+
+
 def firebase_auth_required(view_func):
     @wraps(view_func)
     def wrapped_view(request, *args, **kwargs):
@@ -1757,6 +1760,72 @@ def notify_mentioned_users(request):
     except Exception as e:
         print(f"Internal error: {str(e)}")  # For debugging in MVP
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
+
+def get_bubbles(request):
+    """
+    Example view that receives a JSON POST with:
+    {
+      "rss_urls": ["http://...", "http://..."],
+      "days_back": 2,
+      "common_word_threshold": 2,
+      "top_words_to_consider": 3,
+      "merge_threshold": 2,
+      "min_articles": 3,
+      "join_percentage": 0.5,
+      "final_merge_percentage": 0.5,
+      "title_only": false,
+      "all_words": false
+    }
+
+    Returns JSON containing:
+    {
+      "clusters": [...],
+      "failed_sources": [...]
+    }
+    """
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            rss_urls = data.get("rss_urls", [])
+            if not rss_urls:
+                return JsonResponse({"error": "No 'rss_urls' provided."}, status=400)
+
+            # Extract parameters or set defaults
+            days_back = data.get("days_back", 1)
+            common_word_threshold = data.get("common_word_threshold", 2)
+            top_words_to_consider = data.get("top_words_to_consider", 3)
+            merge_threshold = data.get("merge_threshold", 2)
+            min_articles = data.get("min_articles", 3)
+            join_percentage = data.get("join_percentage", 0.5)
+            final_merge_percentage = data.get("final_merge_percentage", 0.5)
+            title_only = data.get("title_only", False)
+            all_words = data.get("all_words", False)
+
+            # Call the clustering workflow
+            result = process_feeds_and_cluster(
+                rss_urls=rss_urls,
+                days_back=days_back,
+                common_word_threshold=common_word_threshold,
+                top_words_to_consider=top_words_to_consider,
+                merge_threshold=merge_threshold,
+                min_articles=min_articles,
+                join_percentage=join_percentage,
+                final_merge_percentage=final_merge_percentage,
+                title_only=title_only,
+                all_words=all_words
+            )
+
+            return JsonResponse(result, safe=False, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON."}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Only POST method is allowed."}, status=405)
+
+
+
 
 
 # OLD 1NBOX RIP
