@@ -6,8 +6,6 @@ from datetime import datetime, timedelta
 import logging
 from collections import Counter
 import concurrent.futures
-from contextlib import contextmanager
-import signal
 
 # ---------------------------------------------
 #   Logging Configuration (Optional)
@@ -19,27 +17,6 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-
-# ---------------------------------------------
-#   Global Timeout Context Manager
-# ---------------------------------------------
-@contextmanager
-def timeout(seconds):
-    """
-    Raises TimeoutError if the block inside this
-    context manager runs longer than `seconds`.
-    """
-    def timeout_handler(signum, frame):
-        raise TimeoutError(f"Timed out after {seconds} seconds")
-    
-    original_handler = signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(seconds)
-    
-    try:
-        yield
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, original_handler)
 
 # ---------------------------------------------
 #   Functions for RSS Fetching and Article Processing
@@ -67,6 +44,7 @@ def get_articles_from_rss(rss_url, days_back=1):
       title, link, published, summary, content, favicon
     """
     try:
+        # Timeout for the HTTP request, so we don't get stuck
         response = requests.get(rss_url, timeout=15)
         response.raise_for_status()
         feed = feedparser.parse(response.content)
@@ -112,6 +90,7 @@ def get_articles_from_rss(rss_url, days_back=1):
                 continue
 
         return articles
+
     except requests.exceptions.Timeout:
         logging.error(f"Timeout while fetching {rss_url}")
         return []
@@ -133,12 +112,11 @@ def fetch_rss_parallel(urls, days_back):
 
     def fetch_single_url(url):
         try:
-            with timeout(30):  # 30-second timeout per source
-                articles = get_articles_from_rss(url, days_back)
-                return (url, articles, None)
-        except TimeoutError:
-            return (url, None, "Timeout")
+            # Removed the 'with timeout(30):' usage
+            articles = get_articles_from_rss(url, days_back)
+            return (url, articles, None)
         except Exception as e:
+            # We'll catch timeouts or other exceptions here
             return (url, None, str(e))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -178,39 +156,29 @@ def extract_significant_words(text, title_only=False, all_words=False):
         return []
 
     if all_words:
-        # Extract all words >= 3 letters, ignoring case
         words = re.findall(r'\b[a-zA-Z]{3,}\b', text)
-        # Convert them all to title-case or keep them lower? We'll keep them as found.
-        # But typically you'd standardize them, e.g. `word.lower()`.
-        # For clustering, do whatever works best for your needs:
-        # words = [w.lower() for w in words]
     elif title_only:
-        # Extract only "TitleCased" words (first letter uppercase, rest lowercase)
         words = re.findall(r'\b[A-Z][a-z]{1,}\b', text)
     else:
-        # A rough approach: for each sentence, extract capitalized words (excluding first word if it's capitalized).
+        # A rough approach: for each sentence, extract capitalized words 
+        # (excluding first word if it's capitalized).
         sentences = re.split(r'(?<=[.!?])\s+', text)
         words = []
         for sentence in sentences:
             sentence_words = re.findall(r'\b[A-Z][a-z]{1,}\b', sentence)
             if sentence_words:
-                # Skip the first word in each sentence if it's capitalized
                 words.extend(sentence_words[1:])
     
-    # Remove 'INSIGNIFICANT_WORDS'
     words = [word for word in words if word not in INSIGNIFICANT_WORDS]
-    # Remove duplicates but preserve order
     return list(dict.fromkeys(words))
 
 def sort_words_by_rarity(word_list, word_counts):
-    """
-    Sort words so that the rarest words (lowest counts) appear first.
-    """
+    """Sort words so that the rarest words appear first."""
     return sorted(word_list, key=lambda x: word_counts[x])
 
 def cluster_articles(articles, common_word_threshold, top_words_to_consider):
     """
-    Initial pass at clustering articles. Two articles join the same cluster if they share
+    Basic pass at clustering articles. Two articles join the same cluster if they share
     at least `common_word_threshold` words among their top `top_words_to_consider` words.
     """
     clusters = []
@@ -220,7 +188,7 @@ def cluster_articles(articles, common_word_threshold, top_words_to_consider):
             common_words = set(article['significant_words'][:top_words_to_consider]) & set(cluster['common_words'])
             if len(common_words) >= common_word_threshold:
                 cluster['articles'].append(article)
-                # Update the cluster's common words to the intersection
+                # Update cluster's common words
                 cluster['common_words'] = list(
                     set(cluster['common_words']) & set(article['significant_words'][:top_words_to_consider])
                 )
@@ -234,9 +202,7 @@ def cluster_articles(articles, common_word_threshold, top_words_to_consider):
     return clusters
 
 def merge_clusters(clusters, merge_threshold):
-    """
-    Merge any clusters that share at least `merge_threshold` words in common.
-    """
+    """Merge any clusters that share >= `merge_threshold` words."""
     merged = True
     while merged:
         merged = False
@@ -256,23 +222,20 @@ def merge_clusters(clusters, merge_threshold):
                 else:
                     j += 1
             if merged:
-                # Restart merging process from the beginning
                 break
             i += 1
     return clusters
 
 def calculate_match_percentage(words1, words2):
-    """
-    Calculate ratio of common words / number of words in words1.
-    """
+    """Compute ratio: (common words) / (words1 length)."""
     common_words = set(words1) & set(words2)
     return len(common_words) / len(words1) if words1 else 0
 
 def apply_minimum_articles_and_reassign(clusters, min_articles, join_percentage):
     """
-    Any cluster with < `min_articles` articles is considered 'Miscellaneous'.
-    Then we try to reassign those articles to other valid clusters if they match
-    above `join_percentage`, otherwise they stay in 'Miscellaneous'.
+    If a cluster has fewer than `min_articles`, it's "Miscellaneous".
+    Then attempt to reassign those articles to existing clusters if
+    they match above `join_percentage`. If not, they remain in "Miscellaneous".
     """
     miscellaneous_cluster = {'common_words': ['Miscellaneous'], 'articles': []}
     valid_clusters = []
@@ -283,7 +246,6 @@ def apply_minimum_articles_and_reassign(clusters, min_articles, join_percentage)
         else:
             miscellaneous_cluster['articles'].extend(cluster['articles'])
 
-    # Try to reassign from misc to existing clusters
     reassigned_articles = []
     for article in miscellaneous_cluster['articles']:
         for cluster in valid_clusters:
@@ -297,7 +259,8 @@ def apply_minimum_articles_and_reassign(clusters, min_articles, join_percentage)
                 break
 
     miscellaneous_cluster['articles'] = [
-        a for a in miscellaneous_cluster['articles'] if a not in reassigned_articles
+        a for a in miscellaneous_cluster['articles']
+        if a not in reassigned_articles
     ]
     if miscellaneous_cluster['articles']:
         valid_clusters.append(miscellaneous_cluster)
@@ -305,9 +268,7 @@ def apply_minimum_articles_and_reassign(clusters, min_articles, join_percentage)
     return valid_clusters
 
 def merge_clusters_by_percentage(clusters, join_percentage):
-    """
-    Merge clusters if they match each other above `join_percentage`.
-    """
+    """Merge clusters if they match each other above `join_percentage`."""
     merged = True
     while merged:
         merged = False
@@ -359,7 +320,7 @@ def process_feeds_and_cluster(
       1. Fetches articles from all `rss_urls` in parallel
       2. Extracts significant words for each article
       3. Clusters articles based on common words
-      4. Returns `cleaned_data` (a list of cluster dicts with articles + common_words)
+      4. Returns a dict with "clusters" + "failed_sources"
     """
     # 1. Fetch RSS feeds in parallel
     all_articles, successful_sources, failed_sources = fetch_rss_parallel(rss_urls, days_back)
@@ -374,16 +335,16 @@ def process_feeds_and_cluster(
     logging.info(f"Total articles collected: {len(all_articles)}")
     
     # 2. Extract significant words
+    from collections import Counter
     word_counts = Counter()
 
     def extract_words_for_article(article):
-        # Decide how to get significant_words
         if title_only:
             sig_words = extract_significant_words(article['title'], title_only=True, all_words=all_words)
         else:
             title_words = extract_significant_words(article['title'], title_only=False, all_words=all_words)
             content_words = extract_significant_words(article['content'], title_only=False, all_words=all_words)
-            # Combine them, ensuring we don't double-count the same word in the same article
+            # Combine them, no duplicates
             sig_words = title_words + [w for w in content_words if w not in title_words]
         return (article, sig_words)
 
@@ -404,24 +365,24 @@ def process_feeds_and_cluster(
         if 'significant_words' in article:
             article['significant_words'] = sort_words_by_rarity(article['significant_words'], word_counts)
 
-    # 4. Perform clustering
+    # 4. Clustering
     try:
         clusters = cluster_articles(all_articles, common_word_threshold, top_words_to_consider)
         clusters = merge_clusters(clusters, merge_threshold)
         clusters = apply_minimum_articles_and_reassign(clusters, min_articles, join_percentage)
         clusters = merge_clusters_by_percentage(clusters, final_merge_percentage)
 
-        # 5. Build the final cleaned_data structure
+        # 5. Build final cleaned_data structure
         cleaned_data = []
         for cluster in clusters:
             cluster_dict = {
                 "articles": [
                     {
-                        "title": article["title"],
-                        "link": article["link"],
-                        "favicon": article["favicon"],
+                        "title": art["title"],
+                        "link": art["link"],
+                        "favicon": art["favicon"],
                     }
-                    for article in cluster.get("articles", [])
+                    for art in cluster.get("articles", [])
                 ],
                 "common_words": cluster.get("common_words", [])
             }
@@ -439,3 +400,4 @@ def process_feeds_and_cluster(
             "failed_sources": failed_sources,
             "error": str(e)
         }
+
