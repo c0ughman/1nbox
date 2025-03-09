@@ -508,14 +508,16 @@ def get_final_summary(
     if organization_description:
         logging.info("Organization description provided; instructing GPT to generate insights.")
         base_prompt += (
-            "If there’s a relevant insight or recommended  action for this organization specifically, "
+            "If there’s a relevant insight or recommended action for this organization specifically: "
+            f"{organization_description}"
+
             "you MUST add a final line to that story's content in this format:\n"
             "\n"
-            "**Insight:** [Your one-sentence insight]\n"
+            "Insight: [Your one-sentence insight]\n"
             "\n"
-            "🚨 This is required: Every story must include an 'Insight:' line, even if you have to infer a general takeaway."
-            " If you cannot find a strong organization-specific insight, provide a strategic or industry-wide insight."
-            "Tie it back to the organization and its specific needs and opportunities whenever possible."
+            "The insight must be a piece of information related to the story that would help the bussiness described"
+            "In achieving their goals, or preventing or mitigating possible threats, support the business with relevant information."
+            "Tie it back to the organization and its specific needs and opportunities."
         )
 
     # Append the user-provided cluster summaries
