@@ -133,7 +133,7 @@ def cluster_articles(articles, min_articles_per_cluster):
     
     return clusters
 
-def process_and_cluster_articles(rss_urls, days_back=1, common_word_threshold=2, top_words_to_consider=3, merge_threshold=2, min_articles=2, join_percentage=0.5, final_merge_percentage=0.5, title_only=False, all_words=False):
+def process_and_cluster_articles(rss_urls, days_back=1, min_articles_per_cluster=2, common_word_threshold=2, top_words_to_consider=3, merge_threshold=2, min_articles=2, join_percentage=0.5, final_merge_percentage=0.5, title_only=False, all_words=False):
     all_articles = fetch_rss_parallel(rss_urls, days_back)
     return cluster_articles(all_articles, min_articles_per_cluster)
 
