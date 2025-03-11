@@ -94,44 +94,24 @@ def cluster_articles(articles, min_articles_per_cluster):
     """Cluster articles hierarchically based on common capitalized words."""
     ranked_words = rank_common_words(articles)
     clusters = []
-    unclustered_articles = set(articles)
-    
+    unclustered_articles = list(articles)  # FIXED: Use list instead of set
+
     for word, count in ranked_words:
         cluster = {"word": word, "articles": [], "subclusters": []}
-        
-        for article in list(unclustered_articles):
+
+        for article in unclustered_articles[:]:  # Iterate over a copy of the list
             if word in extract_capitalized_words(article['title']):
                 cluster["articles"].append(article)
-                unclustered_articles.remove(article)
-                
+                unclustered_articles.remove(article)  # Remove from list
+
         if len(cluster["articles"]) >= min_articles_per_cluster:
             clusters.append(cluster)
-    
+
     if unclustered_articles:
-        clusters.append({"word": "Miscellaneous", "articles": list(unclustered_articles), "subclusters": []})
-    
-    for cluster in clusters:
-        ranked_subwords = rank_common_words(cluster["articles"])
-        subclusters = []
-        unclustered_articles = set(cluster["articles"])
-        
-        for subword, count in ranked_subwords:
-            subcluster = {"word": subword, "articles": [], "subclusters": []}
-            
-            for article in list(unclustered_articles):
-                if subword in extract_capitalized_words(article['title']):
-                    subcluster["articles"].append(article)
-                    unclustered_articles.remove(article)
-                    
-            if len(subcluster["articles"]) >= min_articles_per_cluster:
-                subclusters.append(subcluster)
-        
-        if unclustered_articles:
-            subclusters.append({"word": "Miscellaneous", "articles": list(unclustered_articles), "subclusters": []})
-        
-        cluster["subclusters"] = subclusters
-    
+        clusters.append({"word": "Miscellaneous", "articles": unclustered_articles, "subclusters": []})
+
     return clusters
+
 
 def process_and_cluster_articles(rss_urls, days_back=1, min_articles_per_cluster=2, common_word_threshold=2, top_words_to_consider=3, merge_threshold=2, min_articles=2, join_percentage=0.5, final_merge_percentage=0.5, title_only=False, all_words=False):
     all_articles = fetch_rss_parallel(rss_urls, days_back)
