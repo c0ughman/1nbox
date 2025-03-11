@@ -138,7 +138,7 @@ def process_and_cluster_articles(rss_urls, days_back=1, min_articles_per_cluster
     all_articles = fetch_rss_parallel(rss_urls, days_back)
     return cluster_articles(all_articles, min_articles_per_cluster)
 
-def generate_clustered_json(rss_urls, days_back=1, min_articles_per_cluster=2):
+def process_feeds_and_cluster(rss_urls, days_back=1, min_articles_per_cluster=2):
     """Generate a JSON structure from clustered articles."""
     clustered_data = process_and_cluster_articles(rss_urls, days_back, min_articles_per_cluster)
     return json.dumps({"clusters": clustered_data}, indent=4)
