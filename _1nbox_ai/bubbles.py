@@ -133,8 +133,18 @@ def cluster_articles(articles, min_articles_per_cluster):
     
     return clusters
 
-def process_and_cluster_articles(rss_urls, days_back=1, min_articles_per_cluster=2):
-    """Fetch articles and apply hierarchical clustering."""
+def process_and_cluster_articles(
+    rss_urls,
+    days_back=1,
+    common_word_threshold=2,      # not currently used
+    top_words_to_consider=3,      # not currently used
+    merge_threshold=2,            # not currently used
+    min_articles=2,               # used for min_articles_per_cluster
+    join_percentage=0.5,          # not currently used
+    final_merge_percentage=0.5,   # not currently used
+    title_only=False,             # not currently used
+    all_words=False               # not currently used
+):    """Fetch articles and apply hierarchical clustering."""
     all_articles = fetch_rss_parallel(rss_urls, days_back)
     return cluster_articles(all_articles, min_articles_per_cluster)
 
