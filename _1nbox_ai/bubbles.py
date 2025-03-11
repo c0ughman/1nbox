@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import logging
 from collections import Counter
 import concurrent.futures
+from bs4 import BeautifulSoup
 
 # ---------------------------------------------
 #   Logging Configuration (Optional)
@@ -28,7 +29,6 @@ def get_publication_date(entry):
     elif 'updated_parsed' in entry:
         return datetime(*entry.updated_parsed[:6], tzinfo=pytz.utc)
     elif 'published' in entry:
-        # This format may vary in real feeds, so you may need more robust checks
         return datetime.strptime(entry.published, '%a, %d %b %Y %H:%M:%S %Z')
     elif 'updated' in entry:
         return datetime.strptime(entry.updated, '%a, %d %b %Y %H:%M:%S %Z')
@@ -37,6 +37,25 @@ def get_publication_date(entry):
     else:
         return None
 
+def extract_links_from_description(description):
+    """Extracts all links and corresponding text from an article's description."""
+    extracted_articles = []
+    if description:
+        soup = BeautifulSoup(description, 'html.parser')
+        for link in soup.find_all('a', href=True):
+            title = link.text.strip()
+            href = link['href'].strip()
+            if title and href:
+                extracted_articles.append({
+                    'title': title,
+                    'link': href,
+                    'published': None,
+                    'summary': '',
+                    'content': '',
+                    'favicon': f"https://www.google.com/s2/favicons?domain={href}",
+                })
+    return extracted_articles
+
 def get_articles_from_rss(rss_url, days_back=1):
     """
     Fetch articles from a single RSS URL. 
@@ -44,7 +63,6 @@ def get_articles_from_rss(rss_url, days_back=1):
       title, link, published, summary, content, favicon
     """
     try:
-        # Timeout for the HTTP request, so we don't get stuck
         response = requests.get(rss_url, timeout=15)
         response.raise_for_status()
         feed = feedparser.parse(response.content)
@@ -77,14 +95,21 @@ def get_articles_from_rss(rss_url, days_back=1):
                 elif hasattr(entry, 'summary'):
                     content = entry.summary
 
-                articles.append({
+                main_article = {
                     'title': entry.title,
                     'link': entry.link,
                     'published': str(pub_date),
                     'summary': getattr(entry, 'summary', ''),
                     'content': content,
                     'favicon': favicon_url,
-                })
+                }
+                articles.append(main_article)
+                
+                # Extract additional articles from description
+                if hasattr(entry, 'description'):
+                    additional_articles = extract_links_from_description(entry.description)
+                    articles.extend(additional_articles)
+
             except Exception as e:
                 logging.error(f"Error processing entry in {rss_url}: {str(e)}")
                 continue
@@ -112,11 +137,9 @@ def fetch_rss_parallel(urls, days_back):
 
     def fetch_single_url(url):
         try:
-            # Removed the 'with timeout(30):' usage
             articles = get_articles_from_rss(url, days_back)
             return (url, articles, None)
         except Exception as e:
-            # We'll catch timeouts or other exceptions here
             return (url, None, str(e))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
