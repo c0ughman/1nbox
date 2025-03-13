@@ -970,9 +970,10 @@ def create_subscription(request):
                 mode='subscription',
                 success_url=f'https://1nbox.netlify.app/pages/main?success=true&org={org_id}&plan={new_plan}',
                 cancel_url=f'https://1nbox.netlify.app/pages/main?canceled=true&org={org_id}',
+                allow_promotion_codes=True,
                 metadata={
                     'organization_id': str(org_id),
-                    'plan': new_plan
+                    'plan': new_plan,
                 }
             )
 
