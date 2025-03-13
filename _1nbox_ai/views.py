@@ -818,9 +818,9 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 # Configuration Constants
 PLAN_PRICE_MAPPING = {
-    'core': 'price_1Qb4GKCHpOkAgMGGcMaNiN9L',
-    'executive': 'price_1Qb4GvCHpOkAgMGGSJRK8ZVH',
-    'corporate': 'price_1Qb4I2CHpOkAgMGGFBbRBl0J'
+    'core': 'price_1R2KmCCHpOkAgMGGNEi6B4qs',
+    'executive': 'price_1R2Kn2CHpOkAgMGGQVkvs6R1',
+    'corporate': 'price_1R2KncCHpOkAgMGGbKEeu25O'
 }
 
 PLAN_PRICES = {
