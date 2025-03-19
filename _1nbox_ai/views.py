@@ -167,7 +167,9 @@ def initial_signup(request):
         organization = Organization.objects.create(
             name=data.get('organization_name', f"{firebase_user['email']}'s Organization"),
             plan='free',
-            status='active'
+            status='active',
+            summary_time='8:00:00',
+            summary_timezone='America/New_York'
         )
         
         # Then create the user
