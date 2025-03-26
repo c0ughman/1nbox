@@ -539,7 +539,9 @@ def get_final_summary(
             "Insight: [Your one-sentence insight]\n"
             "\n"
             "The insight must be a piece of information related to the story that would help the bussiness described"
-            "In achieving their goals, or preventing or mitigating possible threats, support the business with relevant information."
+            "in achieving their goals, or preventing or mitigating possible threats, support the business with relevant information."
+            "Try to come up with a relevant insight for at least half of the stories if possible."
+            "The insight can be relevant economically, strategically, an opportunnity, a threat or other"
             "Tie it back to the organization and its specific needs and opportunities."
         )
 
