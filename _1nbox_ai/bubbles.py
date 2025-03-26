@@ -105,10 +105,19 @@ def get_articles_from_rss(rss_url, days_back=1):
                 }
                 articles.append(main_article)
                 
-                # Extract additional articles from description
-                if hasattr(entry, 'description'):
+                # Only extract additional articles from description if the link is from news.google.com
+                if "news.google.com" in entry.link and hasattr(entry, 'description'):
                     additional_articles = extract_links_from_description(entry.description)
-                    articles.extend(additional_articles)
+
+                    # Filter out articles whose anchor text contains "View Full Coverage on Google News"
+                    filtered_articles = []
+                    for article_dict in additional_articles:
+                        if "View Full Coverage on Google News" in article_dict.get('title', ''):
+                            # Skip this link
+                            continue
+                        filtered_articles.append(article_dict)
+
+                    articles.extend(filtered_articles)
 
             except Exception as e:
                 logging.error(f"Error processing entry in {rss_url}: {str(e)}")
