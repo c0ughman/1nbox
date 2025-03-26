@@ -65,71 +65,94 @@ def get_publication_date(entry):
     else:
         return None
 
+def extract_links_from_description(description):
+    """Extracts all links and corresponding text from an article's description."""
+    extracted_articles = []
+    if description:
+        soup = BeautifulSoup(description, 'html.parser')
+        for link in soup.find_all('a', href=True):
+            title = link.text.strip()
+            href = link['href'].strip()
+            if title and href:
+                extracted_articles.append({
+                    'title': title,
+                    'link': href,
+                    'published': None,
+                    'summary': '',
+                    'content': '',
+                    'favicon': f"https://www.google.com/s2/favicons?domain={href}",
+                })
+    return extracted_articles
+
 def get_articles_from_rss(rss_url, days_back=1):
+    """
+    Fetch articles from a single RSS URL. 
+    Returns a list of article dicts with keys:
+      title, link, published, summary, content, favicon
+    """
     try:
-        # Use requests with timeout to fetch the feed
-        response = requests.get(rss_url, timeout=30)
-        response.raise_for_status()  # Raise an exception for bad status codes
-        
-        # Parse the feed content
+        response = requests.get(rss_url, timeout=15)
+        response.raise_for_status()
         feed = feedparser.parse(response.content)
-        
-        # Check if the feed parsing was successful
+
         if hasattr(feed, 'bozo_exception'):
             logging.error(f"Feed parsing error for {rss_url}: {feed.bozo_exception}")
             return []
-            
-        articles = []
-        cutoff_date = datetime.now(pytz.utc) - timedelta(days=days_back)
-        
-        # Add feed validation
+
         if not hasattr(feed, 'entries'):
-            logging.error(f"Invalid feed structure for {rss_url}")
+            logging.error(f"No entries found in feed for {rss_url}")
             return []
-            
+
+        cutoff_date = datetime.now(pytz.utc) - timedelta(days=days_back)
+        articles = []
+
         for entry in feed.entries:
             try:
                 pub_date = get_publication_date(entry)
-                if pub_date and pub_date >= cutoff_date:
-                    # Validate required fields
-                    if not hasattr(entry, 'title') or not hasattr(entry, 'link'):
-                        logging.warning(f"Missing required fields in entry from {rss_url}")
-                        continue
-                        
-                    favicon_url = f"https://www.google.com/s2/favicons?domain={rss_url}"
-                    
-                    # Safely get content with fallbacks
-                    content = ''
-                    if hasattr(entry, 'content') and entry.content:
-                        content = entry.content[0].value
-                    elif hasattr(entry, 'summary'):
-                        content = entry.summary
-                    
-                    articles.append({
-                        'title': entry.title,
-                        'link': entry.link,
-                        'published': str(pub_date),
-                        'summary': getattr(entry, 'summary', ''),
-                        'content': content,
-                        'favicon': favicon_url
-                    })
-                elif not pub_date:
-                    logging.warning(f"Missing date for entry '{entry.title}' in {rss_url}")
+                if not pub_date or pub_date < cutoff_date:
+                    continue
+
+                if not hasattr(entry, 'title') or not hasattr(entry, 'link'):
+                    continue
+
+                favicon_url = f"https://www.google.com/s2/favicons?domain={rss_url}"
+
+                content = ""
+                if hasattr(entry, 'content') and entry.content:
+                    content = entry.content[0].value
+                elif hasattr(entry, 'summary'):
+                    content = entry.summary
+
+                main_article = {
+                    'title': entry.title,
+                    'link': entry.link,
+                    'published': str(pub_date),
+                    'summary': getattr(entry, 'summary', ''),
+                    'content': content,
+                    'favicon': favicon_url,
+                }
+                articles.append(main_article)
+                
+                # Only extract additional articles from description if the link is from news.google.com
+                if "news.google.com" in entry.link and hasattr(entry, 'description'):
+                    additional_articles = extract_links_from_description(entry.description)
+
+                    # Filter out articles whose anchor text contains "View Full Coverage on Google News"
+                    filtered_articles = []
+                    for article_dict in additional_articles:
+                        if "View Full Coverage on Google News" in article_dict.get('title', ''):
+                            # Skip this link
+                            continue
+                        filtered_articles.append(article_dict)
+
+                    articles.extend(filtered_articles)
+
             except Exception as e:
                 logging.error(f"Error processing entry in {rss_url}: {str(e)}")
                 continue
-                
+
         return articles
-        
-    except requests.exceptions.Timeout:
-        logging.error(f"Timeout while fetching {rss_url}")
-        return []
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Request error for {rss_url}: {str(e)}")
-        return []
-    except Exception as e:
-        logging.error(f"Unexpected error processing {rss_url}: {str(e)}")
-        return []
+
 
 def extract_significant_words(text, title_only=False, all_words=False):
     """
