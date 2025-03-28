@@ -91,10 +91,14 @@ def get_articles_from_rss(rss_url, days_back=1):
       title, link, published, summary, content, favicon
     """
     try:
+        # Use requests with timeout to fetch the feed
         response = requests.get(rss_url, timeout=15)
         response.raise_for_status()
+        
+        # Parse the feed content
         feed = feedparser.parse(response.content)
 
+        # Check for parsing errors
         if hasattr(feed, 'bozo_exception'):
             logging.error(f"Feed parsing error for {rss_url}: {feed.bozo_exception}")
             return []
@@ -132,18 +136,16 @@ def get_articles_from_rss(rss_url, days_back=1):
                     'favicon': favicon_url,
                 }
                 articles.append(main_article)
-                
-                # Only extract additional articles from description if the link is from news.google.com
+
+                # Extract additional articles from Google News description
                 if "news.google.com" in entry.link and hasattr(entry, 'description'):
                     additional_articles = extract_links_from_description(entry.description)
 
-                    # Filter out articles whose anchor text contains "View Full Coverage on Google News"
-                    filtered_articles = []
-                    for article_dict in additional_articles:
-                        if "View Full Coverage on Google News" in article_dict.get('title', ''):
-                            # Skip this link
-                            continue
-                        filtered_articles.append(article_dict)
+                    # Filter out unhelpful links
+                    filtered_articles = [
+                        article_dict for article_dict in additional_articles
+                        if "View Full Coverage on Google News" not in article_dict.get('title', '')
+                    ]
 
                     articles.extend(filtered_articles)
 
@@ -152,6 +154,17 @@ def get_articles_from_rss(rss_url, days_back=1):
                 continue
 
         return articles
+
+    except requests.exceptions.Timeout:
+        logging.error(f"Timeout while fetching {rss_url}")
+        return []
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request error for {rss_url}: {str(e)}")
+        return []
+    except Exception as e:
+        logging.error(f"Unexpected error fetching RSS from {rss_url}: {str(e)}")
+        return []
+
 
 
 def extract_significant_words(text, title_only=False, all_words=False):
