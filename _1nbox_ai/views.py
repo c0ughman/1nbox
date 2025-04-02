@@ -161,24 +161,28 @@ def get_user_organization_data(request):
 def initial_signup(request):
     try:
         data = json.loads(request.body)
-        firebase_user = request.firebase_user  # This comes from the decorator
+        firebase_user = request.firebase_user  # from the decorator
         
-        # First, create an organization with default free plan
+        # Grab the description from the incoming JSON
+        description = data.get('description', '')
+
+        # Example: store description on the Organization model
+        # (Make sure you've added a `description` field on Organization or handle it as needed)
         organization = Organization.objects.create(
             name=data.get('organization_name', f"{firebase_user['email']}'s Organization"),
             plan='free',
             status='active',
             summary_time='8:00:00',
-            summary_timezone='America/New_York'
+            summary_timezone='America/New_York',
+            description=description  # assuming your Organization model has description
         )
         
-        # Then create the user
         user = User.objects.create(
             email=firebase_user['email'],
-            role='admin',  # First user is admin
+            role='admin',
             name=firebase_user['email'],
             send_email=True,
-            organization=organization  # Link to the organization
+            organization=organization
         )
         
         return JsonResponse({
@@ -190,14 +194,16 @@ def initial_signup(request):
                 'organization': {
                     'id': organization.id,
                     'name': organization.name,
-                    'plan': organization.plan
+                    'plan': organization.plan,
+                    'description': organization.description,  # if you want to return it
                 }
             }
         })
         
     except Exception as e:
-        print(f"Internal error: {str(e)}")  # For debugging in MVP
+        print(f"Internal error: {str(e)}")  # For debugging
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
+
 
 @firebase_auth_required
 def get_user_data(request):
@@ -1833,13 +1839,6 @@ def get_bubbles(request):
 
 
 # OLD 1NBOX RIP
-
-
-
-
-
-
-
 
 
 
