@@ -164,7 +164,7 @@ def initial_signup(request):
         firebase_user = request.firebase_user  # from the decorator
         
         # Grab the description from the incoming JSON
-        description = data.get('description', '')
+        description = data.get('organization_description', '')
 
         # Example: store description on the Organization model
         # (Make sure you've added a `description` field on Organization or handle it as needed)
