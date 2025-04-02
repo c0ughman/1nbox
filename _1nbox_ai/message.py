@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime, timedelta, time
 import pytz
+import random
 
 from django.template.loader import render_to_string
 from sendgrid import SendGridAPIClient
@@ -156,9 +157,11 @@ def send_summaries():
             }
             email_content = render_to_string('email_template.html', context)
 
+            reading_time = random.randint(2, 5)
+            
             success, result = send_email(
                 user,
-                f"Today in {', '.join(topic_names)}",
+                f"Your Daily Edge ({reading_time} min)",
                 email_content
             )
 
