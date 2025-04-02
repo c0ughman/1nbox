@@ -157,7 +157,7 @@ def send_summaries():
             }
             email_content = render_to_string('email_template.html', context)
 
-            reading_time = random.randint(2, 5)
+            reading_time = max(1, len(topics))  # At least 1 minute, 1 minute per topic
             
             success, result = send_email(
                 user,
