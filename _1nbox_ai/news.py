@@ -4,6 +4,10 @@ import pytz
 from django.core.management.base import BaseCommand
 import re
 import os
+# ADDED FOR TIMING DECORATOR
+import functools
+import time as pytime
+
 from openai import OpenAI
 from collections import Counter
 from .models import Topic, Organization, Summary, Comment
@@ -16,7 +20,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 import requests
 from contextlib import contextmanager
 import signal
-
 
 # List of insignificant words to exclude
 INSIGNIFICANT_WORDS = set([
@@ -51,6 +54,18 @@ logging.basicConfig(
     ]
 )
 
+# DECORATOR TO MEASURE EXECUTION TIME
+def measure_execution_time(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = pytime.time()
+        result = func(*args, **kwargs)
+        elapsed = pytime.time() - start_time
+        logging.info(f"Function '{func.__name__}' took {elapsed:.2f} seconds to complete.")
+        return result
+    return wrapper
+
+@measure_execution_time
 def get_publication_date(entry):
     if 'published_parsed' in entry:
         return datetime(*entry.published_parsed[:6], tzinfo=pytz.utc)
@@ -65,10 +80,12 @@ def get_publication_date(entry):
     else:
         return None
 
+@measure_execution_time
 def extract_links_from_description(description):
     """Extracts all links and corresponding text from an article's description."""
     extracted_articles = []
     if description:
+        from bs4 import BeautifulSoup  # Import here if not present at top
         soup = BeautifulSoup(description, 'html.parser')
         for link in soup.find_all('a', href=True):
             title = link.text.strip()
@@ -84,6 +101,7 @@ def extract_links_from_description(description):
                 })
     return extracted_articles
 
+@measure_execution_time
 def get_articles_from_rss(rss_url, days_back=1):
     """
     Fetch articles from a single RSS URL. 
@@ -165,8 +183,7 @@ def get_articles_from_rss(rss_url, days_back=1):
         logging.error(f"Unexpected error fetching RSS from {rss_url}: {str(e)}")
         return []
 
-
-
+@measure_execution_time
 def extract_significant_words(text, title_only=False, all_words=False):
     """
     Extract significant words from text, with options for different extraction modes
@@ -191,11 +208,12 @@ def extract_significant_words(text, title_only=False, all_words=False):
     words = [word for word in words if word not in INSIGNIFICANT_WORDS]
     return list(dict.fromkeys(words))
 
+@measure_execution_time
 def sort_words_by_rarity(word_list, word_counts):
     return sorted(word_list, key=lambda x: word_counts[x])
 
+@measure_execution_time
 def cluster_articles(articles, common_word_threshold, top_words_to_consider, title_only=False):
-
     clusters = []
     for article in articles:
         found_cluster = False
@@ -213,6 +231,7 @@ def cluster_articles(articles, common_word_threshold, top_words_to_consider, tit
             })
     return clusters
 
+@measure_execution_time
 def merge_clusters(clusters, merge_threshold):
     merged = True
     while merged:
@@ -233,10 +252,12 @@ def merge_clusters(clusters, merge_threshold):
                 break
     return clusters
 
+@measure_execution_time
 def calculate_match_percentage(words1, words2):
     common_words = set(words1) & set(words2)
     return len(common_words) / len(words1) if words1 else 0
 
+@measure_execution_time
 def apply_minimum_articles_and_reassign(clusters, min_articles, join_percentage):
     miscellaneous_cluster = {'common_words': ['Miscellaneous'], 'articles': []}
     valid_clusters = []
@@ -265,6 +286,7 @@ def apply_minimum_articles_and_reassign(clusters, min_articles, join_percentage)
 
     return valid_clusters
 
+@measure_execution_time
 def merge_clusters_by_percentage(clusters, join_percentage):
     merged = True
     while merged:
@@ -287,6 +309,7 @@ def merge_clusters_by_percentage(clusters, join_percentage):
                 break
     return clusters
 
+@measure_execution_time
 def print_clusters(clusters):
     for i, cluster in enumerate(clusters):
         print(f"CLUSTER {i+1} {{{', '.join(cluster['common_words'])}}}")
@@ -297,9 +320,11 @@ def print_clusters(clusters):
             print()
         print()
 
+@measure_execution_time
 def estimate_tokens(text):
     return len(text.split())
 
+@measure_execution_time
 def calculate_cluster_tokens(cluster):
     total_tokens = 0
     for article in cluster['articles']:
@@ -308,6 +333,7 @@ def calculate_cluster_tokens(cluster):
         total_tokens += estimate_tokens(article['content'])
     return total_tokens
 
+@measure_execution_time
 def limit_cluster_content(cluster, max_tokens=100000):  # Reduced from 124000 to 100000
     """
     Limits cluster content to stay within token limits while preserving the most recent articles.
@@ -371,6 +397,7 @@ def limit_cluster_content(cluster, max_tokens=100000):  # Reduced from 124000 to
     }
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+@measure_execution_time
 def get_openai_response(cluster, max_tokens=4000):
     try:
         openai_key = os.environ.get('OPENAI_KEY')
@@ -412,6 +439,7 @@ def get_openai_response(cluster, max_tokens=4000):
         logging.error(f"Error in get_openai_response: {str(e)}")
         raise  # Retry will handle this
 
+@measure_execution_time
 def process_cluster_chunk(cluster, client, max_tokens):
     cluster_content = f"Common words: {', '.join(cluster['common_words'])}\n\n"
     current_tokens = 0
@@ -461,6 +489,7 @@ def process_cluster_chunk(cluster, client, max_tokens):
 
     return ' '.join(summaries)
 
+@measure_execution_time
 def get_final_summary(
     cluster_summaries,
     sentences_final_summary,
@@ -579,6 +608,7 @@ def get_final_summary(
 
     return completion.choices[0].message.content
 
+@measure_execution_time
 def extract_braces_content(s):
     start_index = s.find('{')
     end_index = s.rfind('}')
@@ -590,6 +620,7 @@ def extract_braces_content(s):
     # Include the end_index in the slice by adding 1
     return s[start_index:end_index + 1]
 
+@measure_execution_time
 def parse_input(input_string):
     # Safely evaluate the string to a dictionary
     data = ast.literal_eval(input_string)
@@ -600,8 +631,8 @@ def parse_input(input_string):
     
     return summary, questions
 
-
 @contextmanager
+@measure_execution_time
 def timeout(seconds):
     def timeout_handler(signum, frame):
         raise TimeoutError(f"Timed out after {seconds} seconds")
@@ -614,7 +645,8 @@ def timeout(seconds):
     finally:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, original_handler)
-    
+
+@measure_execution_time
 def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
                  merge_threshold=2, min_articles=3, join_percentage=0.5,
                  final_merge_percentage=0.5, sentences_final_summary=3, title_only=False, all_words=False):
@@ -807,7 +839,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
     finally:
         logging.info(f"Finished processing topic: {topic.name}")
 
-
+@measure_execution_time
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                       merge_threshold=2, min_articles=3, join_percentage=0.5,
                       final_merge_percentage=0.5, sentences_final_summary=3, title_only=False, all_words=False):
@@ -831,7 +863,7 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
             org_tz = pytz.timezone(org.summary_timezone)
             local_now = now_utc.astimezone(org_tz)
 
-            # Ensure summary_time is a valid `time` object
+            # Ensure summary_time is a valid time object
             if not isinstance(org.summary_time, time):
                 logging.error(f"Invalid summary_time for {org.name}: {org.summary_time}")
                 continue
