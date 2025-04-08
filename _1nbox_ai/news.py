@@ -756,26 +756,24 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                 logging.info(f"Generated {len(final_clusters)} clusters for topic {topic.name}")
                 print_clusters(final_clusters)
 
+
             except Exception as e:
                 logging.error(f"Error in clustering process for topic {topic.name}: {str(e)}")
                 return
 
-            # Generate summaries for each cluster with retry mechanism
-            cluster_summaries = {}
-            for cluster in final_clusters:
-                try:
-                    key = ' '.join([word.capitalize() for word in cluster['common_words']])
-                    summary = get_openai_response(cluster)  # This has built-in retry
-                    cluster_summaries[key] = summary
-                    logging.info(f"Generated summary for cluster: {key}")
-                except Exception as e:
-                    logging.error(f"Failed to generate summary for cluster {key}: {str(e)}")
-                    cluster_summaries[key] = "Error generating summary for this cluster"
+            cluster_summaries = [
+                f"Cluster with common words: {', '.join(cluster['common_words'])}\n\n" +
+                "\n\n".join(
+                    f"Title: {article['title']}\nURL: {article['link']}\nSummary: {article.get('summary', '')}"
+                    for article in cluster['articles']
+                )
+                for cluster in final_clusters
+            ]
 
             # Generate final summary with error handling
             try:
                 final_summary_json = get_final_summary(
-                    list(cluster_summaries.values()),
+                    cluster_summaries,
                     sentences_final_summary,
                     topic.prompt if topic.prompt else None,
                     topic.organization.description if topic.organization.description else ""
