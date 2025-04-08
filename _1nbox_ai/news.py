@@ -1,6 +1,3 @@
-Below is the entire script with a simple timing decorator applied to each function. At the end of the script (in the `if __name__ == "__main__":` section), it prints the accumulated total time spent in each function.
-
-```python
 import feedparser
 from datetime import datetime, timedelta, time
 import pytz
@@ -945,4 +942,3 @@ if __name__ == "__main__":
     print("\n========= TOTAL TIME SPENT PER FUNCTION =========")
     for func_name, total_time in function_times.items():
         logging.info(f"{func_name}: {total_time:.4f} seconds")
-```
