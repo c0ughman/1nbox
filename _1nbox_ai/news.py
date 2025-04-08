@@ -1,6 +1,6 @@
 import feedparser
-from datetime import datetime, timedelta, time
-import pytz
+from datetime import datetime, timedelta, time as datetime_time
+import time
 from django.core.management.base import BaseCommand
 import re
 import os
@@ -870,7 +870,7 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
             local_now = now_utc.astimezone(org_tz)
 
             # Ensure summary_time is a valid `time` object
-            if not isinstance(org.summary_time, time):
+            if not isinstance(org.summary_time, datetime_time):
                 logging.error(f"Invalid summary_time for {org.name}: {org.summary_time}")
                 continue
 
