@@ -17,7 +17,6 @@ from bs4 import BeautifulSoup
 import requests
 from contextlib import contextmanager
 import signal
-import time
 
 # List of insignificant words to exclude
 INSIGNIFICANT_WORDS = set([
