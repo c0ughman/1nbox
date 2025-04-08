@@ -934,11 +934,14 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
 
     logging.info("==== Finished process_all_topics ====")
 
+    # Log total time per function
+    logging.info("\n========= TOTAL TIME SPENT PER FUNCTION =========")
+    for func_name, total_time in function_times.items():
+        logging.info(f"{func_name}: {total_time:.4f} seconds")
+
+
 ###############################################################################
 # Main section: run process_all_topics, then log function times
 ###############################################################################
 if __name__ == "__main__":
     process_all_topics()
-    print("\n========= TOTAL TIME SPENT PER FUNCTION =========")
-    for func_name, total_time in function_times.items():
-        logging.info(f"{func_name}: {total_time:.4f} seconds")
