@@ -20,3 +20,4 @@ hdbscan
 sendgrid
 firebase-admin
 tenacity
+google
