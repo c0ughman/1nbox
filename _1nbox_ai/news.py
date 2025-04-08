@@ -14,6 +14,7 @@ import requests
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 from bs4 import BeautifulSoup 
+from google import genai
 
 import requests
 from contextlib import contextmanager
@@ -505,29 +506,22 @@ def get_final_summary(
     organization_description=""
 ):
     """
-    Generates a final JSON-based summary of all cluster_summaries.  
-    If organization_description is present, instructs GPT to add an 'Insight:' line 
+    Generates a final JSON-based summary of all cluster_summaries using Gemini API.  
+    If organization_description is present, instructs Gemini to add an 'Insight:' line 
     at the end of a story's content if relevant to that organization.  
-    Returns the raw text from GPT (you typically parse it with extract_braces_content, then json.loads).
+    Returns the raw text response from Gemini (you typically parse it with extract_braces_content, then json.loads).
     """
-    import os
-    import json
-    import logging
-    from openai import OpenAI
+    logging.info("Preparing to get final summary from Gemini for all cluster summaries")
 
-    logging.info("Preparing to get final summary from GPT for all cluster summaries")
+    gemini_key = os.environ.get('GEMINI_KEY')
+    if not gemini_key:
+        raise ValueError("Gemini API key not found in environment variables.")
 
-    openai_key = os.environ.get('OPENAI_KEY')
-    if not openai_key:
-        raise ValueError("OpenAI API key not found in environment variables.")
+    genai.configure(api_key=gemini_key)
+    model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
-    # Initialize the OpenAI client
-    client = OpenAI(api_key=openai_key)
-
-    # Combine cluster summaries into one string for GPT
     all_summaries = "\n\n".join(cluster_summaries)
 
-    # Base prompt telling GPT how to structure the final JSON:
     base_prompt = (
         "You are a News Overview Summarizer. I will provide you with a collection of news article summaries, "
         "and I want you to condense them into a single JSON object with the exact structure shown below. "
@@ -547,11 +541,11 @@ def get_final_summary(
         "  \"summary\": [\n"
         "    {\n"
         "      \"title\": \"Title 1\",\n"
-        "      \"content\": \"• Bulletpoint 1.\\n\\n• Bulletpoint 2.\\n\\n• Bulletpoint 3.\"\n"
+        "      \"content\": \"\u2022 Bulletpoint 1.\\n\\n\u2022 Bulletpoint 2.\\n\\n\u2022 Bulletpoint 3.\"\n"
         "    },\n"
         "    {\n"
         "      \"title\": \"Title 2\",\n"
-        "      \"content\": \"• Bulletpoint 1.\\n\\n• Bulletpoint 2.\\n\\n• Bulletpoint 3.\"\n"
+        "      \"content\": \"\u2022 Bulletpoint 1.\\n\\n\u2022 Bulletpoint 2.\\n\\n\u2022 Bulletpoint 3.\"\n"
         "    }\n"
         "  ],\n"
         "  \"questions\": [\n"
@@ -569,7 +563,6 @@ def get_final_summary(
         "4. No single quotes in the JSON.\n\n"
     )
 
-    # If there's a custom topic prompt, fold it in
     if topic_prompt:
         base_prompt += (
             "Additional instructions from the topic owner:\n"
@@ -577,9 +570,8 @@ def get_final_summary(
             "Please incorporate these instructions into your summary.\n"
         )
 
-    # If there's an organization description, instruct GPT to add an 'Insight:' line if relevant
     if organization_description:
-        logging.info("Organization description provided; instructing GPT to generate insights.")
+        logging.info("Organization description provided; instructing Gemini to generate insights.")
         base_prompt += (
             "If there’s a relevant insight or recommended action for this organization specifically: "
             f"{organization_description}"
@@ -587,33 +579,24 @@ def get_final_summary(
             "\n"
             "Insight: [Your one-sentence insight]\n"
             "\n"
-            "The insight must be a piece of information related to the story that would help the bussiness described"
+            "The insight must be a piece of information related to the story that would help the business described"
             "in achieving their goals, or preventing or mitigating possible threats, support the business with relevant information."
             "Try to come up with a relevant insight for at least half of the stories if possible."
-            "The insight can be relevant economically, strategically, an opportunnity, a threat or other"
+            "The insight can be relevant economically, strategically, an opportunity, a threat or other."
             "Tie it back to the organization and its specific needs and opportunities."
         )
 
-    # Append the user-provided cluster summaries
     base_prompt += (
         "Now here are the combined article summaries:\n"
         f"{all_summaries}\n\n"
         "Make sure you follow the JSON structure exactly."
     )
 
-    logging.debug("Sending final summary prompt to OpenAI...")
+    logging.debug("Sending final summary prompt to Gemini...")
 
-    # Call the GPT API
-    completion = client.chat.completions.create(
-        model="gpt-4o-mini",  # Adjust model if needed
-        max_tokens=5000,
-        temperature=0.125,
-        messages=[
-            {"role": "system", "content": base_prompt}
-        ]
-    )
+    response = model.generate_content(base_prompt)
+    return response.text
 
-    return completion.choices[0].message.content
 
 @time_function
 def extract_braces_content(s):
