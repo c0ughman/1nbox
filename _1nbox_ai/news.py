@@ -4,22 +4,19 @@ import pytz
 from django.core.management.base import BaseCommand
 import re
 import os
-# ADDED FOR TIMING DECORATOR
 import functools
 import time as pytime
-
-from openai import OpenAI
-from collections import Counter
-from .models import Topic, Organization, Summary, Comment
+import logging
 import json
 import ast
 import requests
-import logging
+from collections import Counter
+from bs4 import BeautifulSoup   # <-- ADDED HERE
 from tenacity import retry, stop_after_attempt, wait_exponential
-
-import requests
 from contextlib import contextmanager
 import signal
+
+from .models import Topic, Organization, Summary, Comment
 
 # List of insignificant words to exclude
 INSIGNIFICANT_WORDS = set([
@@ -44,17 +41,17 @@ INSIGNIFICANT_WORDS = set([
     'Off', 'Save', 'Now', 'Video', 'Quarter', 'Since', 'Aims', 'Set', 'Stocks', 'These', 'Market', 'Million', 'Deal', 'Billion', 
 ])
 
-# Set up logging
+# Set up logging with force=True to override other configs
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('topic_processing.log'),
         logging.StreamHandler()
-    ]
+    ],
+    force=True  # <-- Ensures this config is used, so time logs show in terminal
 )
 
-# DECORATOR TO MEASURE EXECUTION TIME
 def measure_execution_time(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -85,7 +82,6 @@ def extract_links_from_description(description):
     """Extracts all links and corresponding text from an article's description."""
     extracted_articles = []
     if description:
-        from bs4 import BeautifulSoup  # Import here if not present at top
         soup = BeautifulSoup(description, 'html.parser')
         for link in soup.find_all('a', href=True):
             title = link.text.strip()
@@ -109,14 +105,11 @@ def get_articles_from_rss(rss_url, days_back=1):
       title, link, published, summary, content, favicon
     """
     try:
-        # Use requests with timeout to fetch the feed
         response = requests.get(rss_url, timeout=15)
         response.raise_for_status()
         
-        # Parse the feed content
         feed = feedparser.parse(response.content)
 
-        # Check for parsing errors
         if hasattr(feed, 'bozo_exception'):
             logging.error(f"Feed parsing error for {rss_url}: {feed.bozo_exception}")
             return []
@@ -158,13 +151,11 @@ def get_articles_from_rss(rss_url, days_back=1):
                 # Extract additional articles from Google News description
                 if "news.google.com" in entry.link and hasattr(entry, 'description'):
                     additional_articles = extract_links_from_description(entry.description)
-
                     # Filter out unhelpful links
                     filtered_articles = [
                         article_dict for article_dict in additional_articles
                         if "View Full Coverage on Google News" not in article_dict.get('title', '')
                     ]
-
                     articles.extend(filtered_articles)
 
             except Exception as e:
@@ -185,15 +176,8 @@ def get_articles_from_rss(rss_url, days_back=1):
 
 @measure_execution_time
 def extract_significant_words(text, title_only=False, all_words=False):
-    """
-    Extract significant words from text, with options for different extraction modes
-    Args:
-        text (str): Text to extract words from
-        title_only (bool): If True, treats the entire text as a title
-        all_words (bool): If True, includes all words regardless of capitalization
-    """
     if all_words:
-        # For all words mode, we want any word with 2 or more characters
+        # For all words mode, we want any word with 3 or more letters
         words = re.findall(r'\b[a-zA-Z]{3,}\b', text)
     elif title_only:
         # For titles, we want all capitalized words since titles have different grammar
@@ -203,7 +187,8 @@ def extract_significant_words(text, title_only=False, all_words=False):
         words = []
         for sentence in sentences:
             sentence_words = re.findall(r'\b[A-Z][a-z]{1,}\b', sentence)
-            words.extend(sentence_words[1:])  # Exclude the first word of each sentence
+            # Exclude the first word of each sentence
+            words.extend(sentence_words[1:])
     
     words = [word for word in words if word not in INSIGNIFICANT_WORDS]
     return list(dict.fromkeys(words))
@@ -272,14 +257,17 @@ def apply_minimum_articles_and_reassign(clusters, min_articles, join_percentage)
     reassigned_articles = []
     for article in miscellaneous_cluster['articles']:
         for cluster in valid_clusters:
-            cluster_words = [word for article in cluster['articles'] for word in article['significant_words']]
+            cluster_words = [w for a in cluster['articles'] for w in a['significant_words']]
             if calculate_match_percentage(article['significant_words'], cluster_words) >= join_percentage:
                 cluster['articles'].append(article)
                 reassigned_articles.append(article)
                 break
 
     # Remove reassigned articles from miscellaneous cluster
-    miscellaneous_cluster['articles'] = [article for article in miscellaneous_cluster['articles'] if article not in reassigned_articles]
+    miscellaneous_cluster['articles'] = [
+        article for article in miscellaneous_cluster['articles'] 
+        if article not in reassigned_articles
+    ]
 
     if miscellaneous_cluster['articles']:
         valid_clusters.append(miscellaneous_cluster)
@@ -293,8 +281,8 @@ def merge_clusters_by_percentage(clusters, join_percentage):
         merged = False
         for i, cluster1 in enumerate(clusters):
             for j, cluster2 in enumerate(clusters[i+1:], i+1):
-                words1 = [word for article in cluster1['articles'] for word in article['significant_words']]
-                words2 = [word for article in cluster2['articles'] for word in article['significant_words']]
+                words1 = [w for a in cluster1['articles'] for w in a['significant_words']]
+                words2 = [w for a in cluster2['articles'] for w in a['significant_words']]
                 if (calculate_match_percentage(words1, words2) >= join_percentage and
                     calculate_match_percentage(words2, words1) >= join_percentage):
                     merged_cluster = {
@@ -316,8 +304,7 @@ def print_clusters(clusters):
         print(f"Number of articles: {len(cluster['articles'])}")
         for article in cluster['articles']:
             print(f"{article['title']}")
-            print(f"Significant Words: {', '.join(article['significant_words'])}")
-            print()
+            print(f"Significant Words: {', '.join(article['significant_words'])}\n")
         print()
 
 @measure_execution_time
@@ -334,54 +321,47 @@ def calculate_cluster_tokens(cluster):
     return total_tokens
 
 @measure_execution_time
-def limit_cluster_content(cluster, max_tokens=100000):  # Reduced from 124000 to 100000
+def limit_cluster_content(cluster, max_tokens=100000):
     """
     Limits cluster content to stay within token limits while preserving the most recent articles.
-    
-    Args:
-        cluster (dict): The cluster containing articles
-        max_tokens (int): Maximum number of tokens allowed (default 100000)
-    
-    Returns:
-        dict: A new cluster with articles limited to fit within token limit
     """
     cluster_headers = f"Common words: {', '.join(cluster['common_words'])}\n\n"
     header_tokens = estimate_tokens(cluster_headers)
     
-    # Calculate total tokens for the entire cluster
     total_tokens = header_tokens
     for article in cluster['articles']:
-        article_content = f"Title: {article['title']}\n"
-        article_content += f"URL: {article['link']}\n"
-        article_content += f"Summary: {article['summary']}\n"
-        article_content += f"Content: {article['content']}\n\n"
+        article_content = (
+            f"Title: {article['title']}\nURL: {article['link']}\n"
+            f"Summary: {article['summary']}\nContent: {article['content']}\n\n"
+        )
         total_tokens += estimate_tokens(article_content)
     
     print(f"Estimated total tokens for cluster: {total_tokens}")
     
-    if total_tokens > 180000:  # Reduced from 220000 to 180000
+    if total_tokens > 180000:
         print("Token count exceeds 180000, splitting cluster in half")
         mid_point = len(cluster['articles']) // 2
         return {
             'common_words': cluster['common_words'],
-            'articles': cluster['articles'][:mid_point]  # Return first half of articles
+            'articles': cluster['articles'][:mid_point]
         }
     
-    available_tokens = max_tokens - header_tokens - 10000  # Reserve 10000 tokens for prompt and completion
+    available_tokens = max_tokens - header_tokens - 10000  # Reserve some tokens
     limited_articles = []
     current_tokens = 0
     
-    # Sort articles by publication date (newest first)
-    sorted_articles = sorted(cluster['articles'], 
-                           key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')),
-                           reverse=True)
+    # Sort by date (newest first)
+    sorted_articles = sorted(
+        cluster['articles'], 
+        key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')),
+        reverse=True
+    )
     
     for article in sorted_articles:
-        article_content = f"Title: {article['title']}\n"
-        article_content += f"URL: {article['link']}\n"
-        article_content += f"Summary: {article['summary']}\n"
-        article_content += f"Content: {article['content']}\n\n"
-        
+        article_content = (
+            f"Title: {article['title']}\nURL: {article['link']}\n"
+            f"Summary: {article['summary']}\nContent: {article['content']}\n\n"
+        )
         article_tokens = estimate_tokens(article_content)
         
         if current_tokens + article_tokens <= available_tokens:
@@ -405,21 +385,19 @@ def get_openai_response(cluster, max_tokens=4000):
             logging.error("OpenAI API key not found in environment variables")
             return "Error: OpenAI API key not configured"
 
+        from openai import OpenAI
         client = OpenAI(api_key=openai_key)
 
-        # Handle extremely large clusters
-        if calculate_cluster_tokens(cluster) > 300000:  # If cluster is extremely large
-            logging.warning(f"Cluster size exceeds 300k tokens, truncating to newest articles")
+        if calculate_cluster_tokens(cluster) > 300000:
+            logging.warning("Cluster size exceeds 300k tokens, truncating to newest articles")
             cluster['articles'] = sorted(
                 cluster['articles'],
                 key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')),
                 reverse=True
-            )[:10]  # Keep only the 10 newest articles
+            )[:10]
 
-        # Limit cluster content to 124000 tokens before processing
         limited_cluster = limit_cluster_content(cluster, max_tokens=124000)
         
-        # Process in chunks if needed
         if len(limited_cluster['articles']) < len(cluster['articles']) // 2:
             logging.info("Processing large cluster in multiple chunks")
             chunks = []
@@ -437,7 +415,7 @@ def get_openai_response(cluster, max_tokens=4000):
 
     except Exception as e:
         logging.error(f"Error in get_openai_response: {str(e)}")
-        raise  # Retry will handle this
+        raise
 
 @measure_execution_time
 def process_cluster_chunk(cluster, client, max_tokens):
@@ -447,11 +425,10 @@ def process_cluster_chunk(cluster, client, max_tokens):
     current_sub_cluster = []
 
     for article in cluster['articles']:
-        article_content = f"Title: {article['title']}\n"
-        article_content += f"URL: {article['link']}\n"
-        article_content += f"Summary: {article['summary']}\n"
-        article_content += f"Content: {article['content']}\n\n"
-        
+        article_content = (
+            f"Title: {article['title']}\nURL: {article['link']}\n"
+            f"Summary: {article['summary']}\nContent: {article['content']}\n\n"
+        )
         article_tokens = estimate_tokens(article_content)
         
         if current_tokens + article_tokens > max_tokens:
@@ -469,12 +446,14 @@ def process_cluster_chunk(cluster, client, max_tokens):
     for sub_cluster in sub_clusters:
         sub_cluster_content = cluster_content + ''.join(sub_cluster)
         
-        prompt = ("You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
-                  "all the facts from each of the articles in a small but fact-dense summary "
-                  "including all the dates, names and key factors to provide full context on the events."
-                  "also, i want you to add the corresponding url next to every line you put in the summary in parentheses"
-                  "Finally, It is required to add a general summary of the cluster with 3-4 sentences about"
-                  "what is happening, the context and the overall big picture of the events in the articles. ")
+        prompt = (
+            "You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
+            "all the facts from each of the articles in a small but fact-dense summary including all the "
+            "dates, names and key factors to provide full context on the events. Also, I want you to add "
+            "the corresponding url next to every line you put in the summary in parentheses. Finally, "
+            "it is required to add a general summary of the cluster with 3-4 sentences about what is "
+            "happening, the context and the overall big picture."
+        )
 
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -496,15 +475,8 @@ def get_final_summary(
     topic_prompt=None,
     organization_description=""
 ):
-    """
-    Generates a final JSON-based summary of all cluster_summaries.  
-    If organization_description is present, instructs GPT to add an 'Insight:' line 
-    at the end of a story's content if relevant to that organization.  
-    Returns the raw text from GPT (you typically parse it with extract_braces_content, then json.loads).
-    """
     import os
     import json
-    import logging
     from openai import OpenAI
 
     logging.info("Preparing to get final summary from GPT for all cluster summaries")
@@ -513,13 +485,10 @@ def get_final_summary(
     if not openai_key:
         raise ValueError("OpenAI API key not found in environment variables.")
 
-    # Initialize the OpenAI client
     client = OpenAI(api_key=openai_key)
 
-    # Combine cluster summaries into one string for GPT
     all_summaries = "\n\n".join(cluster_summaries)
 
-    # Base prompt telling GPT how to structure the final JSON:
     base_prompt = (
         "You are a News Overview Summarizer. I will provide you with a collection of news article summaries, "
         "and I want you to condense them into a single JSON object with the exact structure shown below. "
@@ -561,7 +530,6 @@ def get_final_summary(
         "4. No single quotes in the JSON.\n\n"
     )
 
-    # If there's a custom topic prompt, fold it in
     if topic_prompt:
         base_prompt += (
             "Additional instructions from the topic owner:\n"
@@ -569,36 +537,28 @@ def get_final_summary(
             "Please incorporate these instructions into your summary.\n"
         )
 
-    # If there's an organization description, instruct GPT to add an 'Insight:' line if relevant
     if organization_description:
         logging.info("Organization description provided; instructing GPT to generate insights.")
         base_prompt += (
             "If there’s a relevant insight or recommended action for this organization specifically: "
             f"{organization_description}"
-
             "you MUST add a final line to that story's content in this format:\n"
             "\n"
             "Insight: [Your one-sentence insight]\n"
             "\n"
-            "The insight must be a piece of information related to the story that would help the bussiness described"
-            "in achieving their goals, or preventing or mitigating possible threats, support the business with relevant information."
+            "The insight must be a piece of information related to the story that would help the business "
+            "in achieving their goals, or preventing or mitigating possible threats. "
             "Try to come up with a relevant insight for at least half of the stories if possible."
-            "The insight can be relevant economically, strategically, an opportunnity, a threat or other"
-            "Tie it back to the organization and its specific needs and opportunities."
         )
 
-    # Append the user-provided cluster summaries
     base_prompt += (
         "Now here are the combined article summaries:\n"
         f"{all_summaries}\n\n"
         "Make sure you follow the JSON structure exactly."
     )
 
-    logging.debug("Sending final summary prompt to OpenAI...")
-
-    # Call the GPT API
     completion = client.chat.completions.create(
-        model="gpt-4o-mini",  # Adjust model if needed
+        model="gpt-4o-mini",
         max_tokens=5000,
         temperature=0.125,
         messages=[
@@ -612,23 +572,15 @@ def get_final_summary(
 def extract_braces_content(s):
     start_index = s.find('{')
     end_index = s.rfind('}')
-        
     if start_index == -1 or end_index == -1:
-        # If there is no '{' or '}', return an empty string or handle as needed
         return ""
-        
-    # Include the end_index in the slice by adding 1
     return s[start_index:end_index + 1]
 
 @measure_execution_time
 def parse_input(input_string):
-    # Safely evaluate the string to a dictionary
     data = ast.literal_eval(input_string)
-    
-    # Extract the summary and questions
     summary = data.get('summary', '')
     questions = data.get('questions', [])
-    
     return summary, questions
 
 @contextmanager
@@ -636,10 +588,9 @@ def parse_input(input_string):
 def timeout(seconds):
     def timeout_handler(signum, frame):
         raise TimeoutError(f"Timed out after {seconds} seconds")
-    
+
     original_handler = signal.signal(signal.SIGALRM, timeout_handler)
     signal.alarm(seconds)
-    
     try:
         yield
     finally:
@@ -647,29 +598,35 @@ def timeout(seconds):
         signal.signal(signal.SIGALRM, original_handler)
 
 @measure_execution_time
-def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_consider=3,
-                 merge_threshold=2, min_articles=3, join_percentage=0.5,
-                 final_merge_percentage=0.5, sentences_final_summary=3, title_only=False, all_words=False):
-
+def process_topic(
+    topic,
+    days_back=1,
+    common_word_threshold=2,
+    top_words_to_consider=3,
+    merge_threshold=2,
+    min_articles=3,
+    join_percentage=0.5,
+    final_merge_percentage=0.5,
+    sentences_final_summary=3,
+    title_only=False,
+    all_words=False
+):
     try:
         logging.info(f"Starting processing for topic: {topic.name}")
         logging.info(f"Title-only mode: {title_only}")
         logging.info(f"All-words mode: {all_words}")
 
-        # Validate topic configuration
         if not topic.sources:
             logging.warning(f"Topic {topic.name} has no sources, skipping")
             return
 
-        # Initialize article collection
         all_articles = []
         failed_sources = []
         successful_sources = []
         
-        # Process each RSS source with timeout and error handling
         for url in topic.sources:
             try:
-                with timeout(60):  # 60-second timeout per source
+                with timeout(60):
                     articles = get_articles_from_rss(url, days_back)
                     if articles:
                         all_articles.extend(articles)
@@ -686,12 +643,10 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                 failed_sources.append((url, str(e)))
                 continue
 
-        # Log source processing results
         logging.info(f"Successfully processed {len(successful_sources)} sources for topic {topic.name}")
         if failed_sources:
             logging.warning(f"Failed sources for topic {topic.name}: {failed_sources}")
 
-        # Check if we have enough articles to proceed
         if not all_articles:
             logging.warning(f"No articles found for topic {topic.name}, skipping")
             return
@@ -700,7 +655,6 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         logging.info(f"Total articles collected: {number_of_articles}")
 
         try:
-            # Extract and count significant words with memory management
             word_counts = Counter()
             for article in all_articles:
                 try:
@@ -723,7 +677,6 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                     logging.error(f"Error processing words for article {article.get('title', 'Unknown')}: {str(e)}")
                     continue
 
-            # Sort words by rarity for each article
             for article in all_articles:
                 try:
                     article['significant_words'] = sort_words_by_rarity(
@@ -733,18 +686,11 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                     logging.error(f"Error sorting words for article {article.get('title', 'Unknown')}: {str(e)}")
                     continue
 
-            # Cluster articles with error handling
             try:
-                clusters = cluster_articles(
-                    all_articles, common_word_threshold, top_words_to_consider, title_only
-                )
+                clusters = cluster_articles(all_articles, common_word_threshold, top_words_to_consider, title_only)
                 merged_clusters = merge_clusters(clusters, merge_threshold)
-                clusters_with_min_articles = apply_minimum_articles_and_reassign(
-                    merged_clusters, min_articles, join_percentage
-                )
-                final_clusters = merge_clusters_by_percentage(
-                    clusters_with_min_articles, final_merge_percentage
-                )
+                clusters_with_min_articles = apply_minimum_articles_and_reassign(merged_clusters, min_articles, join_percentage)
+                final_clusters = merge_clusters_by_percentage(clusters_with_min_articles, final_merge_percentage)
 
                 logging.info(f"Generated {len(final_clusters)} clusters for topic {topic.name}")
                 print_clusters(final_clusters)
@@ -753,19 +699,17 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                 logging.error(f"Error in clustering process for topic {topic.name}: {str(e)}")
                 return
 
-            # Generate summaries for each cluster with retry mechanism
             cluster_summaries = {}
             for cluster in final_clusters:
                 try:
                     key = ' '.join([word.capitalize() for word in cluster['common_words']])
-                    summary = get_openai_response(cluster)  # This has built-in retry
+                    summary = get_openai_response(cluster)
                     cluster_summaries[key] = summary
                     logging.info(f"Generated summary for cluster: {key}")
                 except Exception as e:
                     logging.error(f"Failed to generate summary for cluster {key}: {str(e)}")
                     cluster_summaries[key] = "Error generating summary for this cluster"
 
-            # Generate final summary with error handling
             try:
                 final_summary_json = get_final_summary(
                     list(cluster_summaries.values()),
@@ -779,11 +723,9 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                 logging.info(f"Raw OpenAI response: {final_summary_json}")
 
                 final_summary_json = extract_braces_content(final_summary_json)
-
                 logging.info(f"After extracting braces: {final_summary_json}")
 
                 final_summary_data = json.loads(final_summary_json)
-
                 logging.info(f"Parsed summary JSON: {json.dumps(final_summary_data, indent=2)}")
 
             except Exception as e:
@@ -793,26 +735,23 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                     "questions": ["What happened?", "Why did it happen?", "What's next?"],
                 }
 
-            # Extract questions and clean clusters
             questions = json.dumps(final_summary_data.get('questions', []))
 
-            # Clean clusters to prevent overwhelming the database
             cleaned_data = []
             for item in final_clusters:
                 cleaned_item = {
                     "articles": [
                         {
-                            "title": article["title"],
-                            "link": article["link"],
-                            "favicon": article["favicon"]
+                            "title": art["title"],
+                            "link": art["link"],
+                            "favicon": art["favicon"]
                         }
-                        for article in item.get("articles", [])
+                        for art in item.get("articles", [])
                     ],
                     "common_words": item.get("common_words", [])
                 }
                 cleaned_data.append(cleaned_item)
 
-            # Create the summary in the database with error handling
             try:
                 new_summary = Summary.objects.create(
                     topic=topic,
@@ -828,27 +767,32 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
 
             except Exception as e:
                 logging.error(f"Database error creating summary for {topic.name}: {str(e)}")
-                # Could implement a retry mechanism here if needed
 
         except Exception as e:
             logging.error(f"Error in main processing loop for topic {topic.name}: {str(e)}")
 
     except Exception as e:
         logging.error(f"Critical error processing topic {topic.name}: {str(e)}")
-        # Could add notification system here for critical errors
     finally:
         logging.info(f"Finished processing topic: {topic.name}")
 
 @measure_execution_time
-def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
-                      merge_threshold=2, min_articles=3, join_percentage=0.5,
-                      final_merge_percentage=0.5, sentences_final_summary=3, title_only=False, all_words=False):
-    
+def process_all_topics(
+    days_back=1,
+    common_word_threshold=2,
+    top_words_to_consider=3,
+    merge_threshold=2,
+    min_articles=3,
+    join_percentage=0.5,
+    final_merge_percentage=0.5,
+    sentences_final_summary=3,
+    title_only=False,
+    all_words=False
+):
     logging.info("==== Starting process_all_topics ====")
     
-    # Get the current UTC time
     now_utc = datetime.now(pytz.utc)
-    logging.info(f"Current UTC Time: {now_utc.strftime('%H:%M')}")  # ⬅️ Only logs HH:MM
+    logging.info(f"Current UTC Time: {now_utc.strftime('%H:%M')}")
 
     valid_org_ids = []
     all_orgs = Organization.objects.exclude(plan='inactive')
@@ -856,43 +800,35 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
     for org in all_orgs:
         if not org.summary_time or not org.summary_timezone:
             logging.warning(f"Skipping {org.name} - Missing summary_time or timezone.")
-            continue  # Skip org if missing required fields
+            continue
 
         try:
-            # Convert UTC time to org's local time
             org_tz = pytz.timezone(org.summary_timezone)
             local_now = now_utc.astimezone(org_tz)
 
-            # Ensure summary_time is a valid time object
             if not isinstance(org.summary_time, time):
                 logging.error(f"Invalid summary_time for {org.name}: {org.summary_time}")
                 continue
 
-            # Compute expected run time (30 minutes before summary_time)
             expected_hour = org.summary_time.hour
-            expected_minute = org.summary_time.minute - 30  # Subtract 30 minutes
-            
-            if expected_minute < 0:  # Handle cases where subtraction moves to the previous hour
+            expected_minute = org.summary_time.minute - 30
+            if expected_minute < 0:
                 expected_hour -= 1
                 expected_minute += 60
 
-            # Log the comparison (HH:MM format only)
             logging.info(
                 f"Org: {org.name} | Local Now: {local_now.strftime('%H:%M')} "
                 f"| Expected Run Time: {expected_hour:02d}:{expected_minute:02d}"
             )
 
-            # Compare only the hours and minutes
             if local_now.hour == expected_hour and local_now.minute == expected_minute:
                 logging.info(f"✅ Running process for {org.name} (Time Matched)")
                 valid_org_ids.append(org.id)
             else:
-                logging.info(f"❌ Skipping {org.name} - Time did not match (Local Now: {local_now.strftime('%H:%M')}, Expected: {expected_hour:02d}:{expected_minute:02d})")
-
+                logging.info(f"❌ Skipping {org.name} - Time did not match")
         except Exception as e:
             logging.error(f"❌ Time zone check error for {org.name}: {str(e)}")
 
-    # Process only organizations that passed the time check
     active_organizations = all_orgs.filter(id__in=valid_org_ids)
 
     for organization in active_organizations:
@@ -918,9 +854,19 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
 
         for topic in organization.topics.all():
             try:
-                process_topic(topic, days_back, common_word_threshold, top_words_to_consider,
-                              merge_threshold, min_articles, join_percentage,
-                              final_merge_percentage, sentences_final_summary, title_only, all_words)
+                process_topic(
+                    topic,
+                    days_back,
+                    common_word_threshold,
+                    top_words_to_consider,
+                    merge_threshold,
+                    min_articles,
+                    join_percentage,
+                    final_merge_percentage,
+                    sentences_final_summary,
+                    title_only,
+                    all_words
+                )
             except Exception as e:
                 logging.error(f"❌ Failed to process topic {topic.name}: {str(e)}")
                 continue
