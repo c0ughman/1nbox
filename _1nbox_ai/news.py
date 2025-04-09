@@ -685,9 +685,14 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
         if not all_articles:
             logging.warning(f"No articles found for topic {topic.name}, skipping")
             return
-
+        
         number_of_articles = len(all_articles)
         logging.info(f"Total articles collected: {number_of_articles}")
+        
+        # Cap the total number of articles
+        all_articles = all_articles[:777]
+        number_of_articles = len(all_articles)
+        logging.info(f"⚠️ Article list trimmed to 777 max. Final count: {number_of_articles}")
 
         try:
             # Extract and count significant words with memory management
