@@ -14,7 +14,7 @@ import requests
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 from bs4 import BeautifulSoup 
-from google import genai
+from google import generativeai as genai
 
 import requests
 from contextlib import contextmanager
