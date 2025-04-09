@@ -1,7 +1,7 @@
 from _1nbox_ai.models import User, Topic  # Adjust the import to your actual module path
-from openai import OpenAI
 import os
 import json
+from google import generativeai as genai
 
 def generate_answer(topic, body, context):
     print("GENERATING ANSWER")
@@ -9,31 +9,38 @@ def generate_answer(topic, body, context):
     print(body)
     print("Context:", context)
 
-    chosen_topic = Topic.objects.get(id=topic)  # Checks for the topic id
+    # Fetch the topic and related summaries
+    chosen_topic = Topic.objects.get(id=topic)
     summary = repr(chosen_topic.summaries.first().final_summary)
     cluster_summaries = repr(chosen_topic.summaries.first().cluster_summaries)
 
-    client = OpenAI(api_key=os.environ.get('OPENAI_KEY'))
+    # Set up Gemini API
+    gemini_key = os.environ.get("GEMINI_KEY")
+    if not gemini_key:
+        raise ValueError("Gemini API key not found in environment variables.")
 
-    # Prepare the context for the prompt
-    context_messages = []
+    genai.configure(api_key=gemini_key)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+
+    # Construct context for prompt
+    context_text = ""
     for entry in context:
-        context_messages.append({"role": "user", "content": entry["question"]})
-        context_messages.append({"role": "assistant", "content": entry["answer"]})
+        context_text += f"Q: {entry['question']}\nA: {entry['answer']}\n\n"
 
-    # Make the OpenAI API request
-    response = client.chat.completions.create(
-        model="gpt-4o-mini", 
-        max_tokens=1000,
-        temperature=0.125,
-        messages=[
-            {"role": "system", "content": "You are a news assistant. Use the provided news of the day to answer the question concisely but completely. If you don't have the answer to the question in the provided information, say you can't answer the question."},
-            {"role": "user", "content": f"These are today's news about the topic (The user has no access to these other than what you send): {cluster_summaries}\nThis is what the user received: {summary}"},
-            *context_messages,
-            {"role": "user", "content": f"Question: {body}\n\nProvide a concise but complete answer and refer an article url (you must provide the link) with more information on the topic. if there is no article that can help, just answer the question without refering to an article."}
-        ]
+    # Construct prompt
+    prompt = (
+        "You are a news assistant. Use the provided news of the day to answer the user's question clearly and completely.\n"
+        "If the question cannot be answered using the information provided, say so honestly.\n\n"
+        f"Cluster Summaries:\n{cluster_summaries}\n\n"
+        f"Summary Sent to User:\n{summary}\n\n"
+        f"Past QA Context:\n{context_text}\n"
+        f"User's Question:\n{body}\n\n"
+        "Respond with a short, factual answer. If possible, include a relevant article URL from the data above. "
+        "If no article supports your answer, just answer without a link."
     )
 
-    # Extract the generated answer
-    answer = response.choices[0].message.content.strip()
+    # Call Gemini
+    response = model.generate_content(prompt)
+    answer = response.text.strip()
     return answer
+
