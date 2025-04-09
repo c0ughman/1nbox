@@ -518,7 +518,7 @@ def get_final_summary(
         raise ValueError("Gemini API key not found in environment variables.")
 
     genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel("gemini-2.0-flash-lite")
+    model = genai.GenerativeModel("gemini-2.0-flash")
 
     all_summaries = "\n\n".join(cluster_summaries)
 
