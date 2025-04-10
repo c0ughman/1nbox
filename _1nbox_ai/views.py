@@ -680,7 +680,7 @@ def send_email(email, organization_name, organization_id):
     
     context = {
         'organization_name': organization_name,
-        'join_url': f"https://1nbox-ai.com/pages/join.html?org={organization_id}"
+        'join_url': f"https://trybriefed.com/pages/join.html?org={organization_id}"
     }
     
     content = render_to_string('invitation.html', context)
@@ -688,7 +688,7 @@ def send_email(email, organization_name, organization_id):
     message = Mail(
         from_email='feed@trybriefed.com',
         to_emails=email,
-        subject=f"You've been invited to join {organization_name} on 1nbox",
+        subject=f"You've been invited to join {organization_name} on Briefed",
         html_content=content
     )
     
@@ -942,7 +942,7 @@ def create_subscription(request):
                 organization.save()
                     
                 return JsonResponse({
-                    'checkout_url': f'https://1nbox-ai.com/pages/main?success=true&org={org_id}&plan={new_plan}'
+                    'checkout_url': f'https://trybriefed.com/pages/main?success=true&org={org_id}&plan={new_plan}'
                 })
                     
             except stripe.error.StripeError as e:
@@ -976,8 +976,8 @@ def create_subscription(request):
                     'quantity': 1,
                 }],
                 mode='subscription',
-                success_url=f'https://1nbox-ai.com/pages/main?success=true&org={org_id}&plan={new_plan}',
-                cancel_url=f'https://1nbox-ai.com/pages/main?canceled=true&org={org_id}',
+                success_url=f'https://trybriefed.com/pages/main?success=true&org={org_id}&plan={new_plan}',
+                cancel_url=f'https://trybriefed.com/pages/main?canceled=true&org={org_id}',
                 allow_promotion_codes=True,
                 metadata={
                     'organization_id': str(org_id),
@@ -1729,7 +1729,7 @@ def notify_mentioned_users(request):
                 'organization_name': current_user.organization.name,
                 'comment_text': comment_text,
                 'article_title': article_title,  # Include article title in the context
-                'app_url': 'https://1nbox-ai.com/pages/main'
+                'app_url': 'https://trybriefed.com/pages/main'
             }
             
             content = render_to_string('mention_notification.html', context)
@@ -1737,7 +1737,7 @@ def notify_mentioned_users(request):
             message = Mail(
                 from_email='feed@trybriefed.com',
                 to_emails=user.email,
-                subject=f'{current_user.name or current_user.email} mentioned you in a comment on "{article_title}" - 1nbox',
+                subject=f'{current_user.name or current_user.email} mentioned you in a comment on "{article_title}" - Briefed',
                 html_content=content
             )
             
