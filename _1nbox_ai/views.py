@@ -686,7 +686,7 @@ def send_email(email, organization_name, organization_id):
     content = render_to_string('invitation.html', context)
     
     message = Mail(
-        from_email='news@1nbox-ai.com',
+        from_email='feed@trybriefed.com',
         to_emails=email,
         subject=f"You've been invited to join {organization_name} on 1nbox",
         html_content=content
@@ -1735,7 +1735,7 @@ def notify_mentioned_users(request):
             content = render_to_string('mention_notification.html', context)
             
             message = Mail(
-                from_email='news@1nbox-ai.com',
+                from_email='feed@trybriefed.com',
                 to_emails=user.email,
                 subject=f'{current_user.name or current_user.email} mentioned you in a comment on "{article_title}" - 1nbox',
                 html_content=content
