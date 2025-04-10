@@ -73,7 +73,7 @@ def get_user_topics_summary(organization):
 
 def send_email(user, subject, content):
     message = Mail(
-        from_email='news@1nbox-ai.com',
+        from_email='feed@trybriefed.com',
         to_emails=user.email,
         subject=subject,
         html_content=content
