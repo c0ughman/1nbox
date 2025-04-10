@@ -101,6 +101,8 @@ TEMPLATES = [
 WSGI_APPLICATION = '_1nbox_ai.wsgi.application'
 
 CORS_ALLOWED_ORIGINS = [
+    "trybriefed.com",
+    "www.trybriefed.com",
     "https://1nbox-ai.com",
     "https://www.1nbox-ai.com",
     "https://1nbox.netlify.app",
@@ -187,7 +189,10 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CSRF_TRUSTED_ORIGINS = ['https://app-1nbox-ai-fb8295a32cce.herokuapp.com',
+CSRF_TRUSTED_ORIGINS = [
+                        'https://www.trybriefed.com',
+                        'https://trybriefed.com',
+                        'https://app-1nbox-ai-fb8295a32cce.herokuapp.com',
                         'https://www.1nbox-ai.com',
                         'https://api.stripe.com/v1/webhook_endpoints',
                         'https://a.stripecdn.com',
