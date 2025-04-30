@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from ratelimit.decorators import ratelimit
+from django_ratelimit.decorators import ratelimit
 import json
 from django.views.decorators.csrf import csrf_exempt
 from _1nbox_ai.models import User, Topic, Organization, Summary, Comment
