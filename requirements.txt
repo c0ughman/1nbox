@@ -21,4 +21,4 @@ sendgrid
 firebase-admin
 tenacity
 google-generativeai
-
+django-ratelimit
