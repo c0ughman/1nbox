@@ -1,4 +1,5 @@
 from django.http import JsonResponse
+from ratelimit.decorators import ratelimit
 import json
 from django.views.decorators.csrf import csrf_exempt
 from _1nbox_ai.models import User, Topic, Organization, Summary, Comment
@@ -777,6 +778,7 @@ def invite_team_member(request):
         print(f"Internal error: {str(e)}")  # For debugging in MVP
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
+@ratelimit(key='ip', rate='10/m', block=True)
 @csrf_exempt
 def message_received(request):
     if request.method == 'POST':
@@ -792,6 +794,7 @@ def message_received(request):
     else:
         return HttpResponse("Only POST requests are allowed.", status=405)
 
+@ratelimit(key='ip', rate='5/h', block=True)
 @csrf_exempt
 def sign_up(request):
     if request.method == 'POST':
@@ -1770,6 +1773,7 @@ def notify_mentioned_users(request):
         print(f"Internal error: {str(e)}")  # For debugging in MVP
         return JsonResponse({'error': 'An internal error occurred'}, status=500)
 
+@ratelimit(key='ip', rate='10/m', block=True)
 @csrf_exempt
 def get_bubbles(request):
     """
