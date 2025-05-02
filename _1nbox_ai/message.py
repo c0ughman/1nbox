@@ -161,7 +161,7 @@ def send_summaries():
             
             success, result = send_email(
                 user,
-                f"Your Daily Edge ({reading_time} min)",
+                f"Your Daily Brief ({reading_time} min)",
                 email_content
             )
 
