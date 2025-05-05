@@ -20,8 +20,6 @@ import requests
 from contextlib import contextmanager
 import signal
 
-from time import perf_counter as time_function 
-
 # List of insignificant words to exclude
 INSIGNIFICANT_WORDS = set([
     'In', 'The', 'Continue', 'Fox', 'News', 'Newstalk', 'Newsweek', 'Is', 
@@ -500,117 +498,105 @@ def process_cluster_chunk(cluster, client, max_tokens):
 
     return ' '.join(summaries)
 
-import os, json, re, logging
-import google.generativeai as genai
-from time import perf_counter as time_function  # or your own @time_function decorator
-
-# ── helper ──────────────────────────────────────────────────────────────────────
-def _enforce_insight_spacing(text: str) -> str:
-    """
-    Inside a story’s 'content' string, replace any newline sequence that
-    comes immediately before 'Insight:' with exactly two line breaks.
-    """
-    return re.sub(r'\n{1,}\s*Insight:', '\n\nInsight:', text.strip())
-
-
-# ── main function ───────────────────────────────────────────────────────────────
 @time_function
 def get_final_summary(
     cluster_summaries,
-    sentences_final_summary: int,
-    topic_prompt: str | None = None,
-    organization_description: str = ""
+    sentences_final_summary,
+    topic_prompt=None,
+    organization_description=""
 ):
     """
-    Generates a single JSON summary from multiple cluster_summaries using Gemini.
-    If organization_description is provided, the model may append an 'Insight:' line,
-    but only when it passes strict relevance & formatting rules.
+    Generates a final JSON-based summary of all cluster_summaries using Gemini API.  
+    If organization_description is present, instructs Gemini to add an 'Insight:' line 
+    at the end of a story's content if relevant to that organization.  
+    Returns the raw text response from Gemini (you typically parse it with extract_braces_content, then json.loads).
     """
+    logging.info("Preparing to get final summary from Gemini for all cluster summaries")
 
-    logging.info("Preparing final summary prompt for Gemini")
-
-    gemini_key = os.environ.get("GEMINI_KEY")
+    gemini_key = os.environ.get('GEMINI_KEY')
     if not gemini_key:
         raise ValueError("Gemini API key not found in environment variables.")
 
     genai.configure(api_key=gemini_key)
     model = genai.GenerativeModel("gemini-2.0-flash")
 
-    # ── build prompt ────────────────────────────────────────────────────────────
     all_summaries = "\n\n".join(cluster_summaries)
 
     base_prompt = (
-        "You are a News Overview Summarizer. I will give you a collection of news "
-        "article summaries; condense them into the exact JSON schema below.\n\n"
+        "You are a News Overview Summarizer. I will provide you with a collection of news article summaries, "
+        "and I want you to condense them into a single JSON object with the exact structure shown below. "
+        "Your entire output must be valid JSON and use double quotes for all keys and string values, "
+        "with no extra text or code blocks outside the JSON.\n\n"
 
-        "Produce **2–4** main stories (plus an optional 'miscellaneous' story) where each story has:\n"
-        "  1. \"title\"   – a concise, attention-grabbing headline\n"
-        "  2. \"content\" – a single string of bullet points, each separated by **two** newlines (\\n\\n). "
-        f"Use ~{sentences_final_summary} sentences total per story.\n\n"
+        "You must produce between 2 and 4 main stories (plus a 'miscellaneous' one if needed), each with two properties:\n"
+        "1. \"title\": A concise headline that partially explains the situation but remains attention-grabbing.\n"
+        "2. \"content\": A concise, bullet-pointed summary (one bullet per key aspect) in a single string, with each bullet "
+        "   separated by two newlines (\\n\\n). Use about "
+        f"{sentences_final_summary} sentences total per story to fully explain the situation.\n\n"
 
-        "Also add exactly three natural questions a curious reader might ask.\n\n"
+        "Also produce exactly three short questions a user might naturally ask about these stories.\n\n"
 
-        "Return **valid JSON only** (no fences, no single quotes) in this shape:\n"
+        "Return your output in valid JSON (no code fences, no single quotes) with the structure:\n"
         "{\n"
-        "  \"summary\": [ {\"title\": \"...\", \"content\": \"...\"}, ... ],\n"
-        "  \"questions\": [\"...\", \"...\", \"...\"],\n"
-        "  \"prompt\": \"<the original topic prompt here or empty>\"\n"
+        "  \"summary\": [\n"
+        "    {\n"
+        "      \"title\": \"Title 1\",\n"
+        "      \"content\": \"\u2022 Bulletpoint 1.\\n\\n\u2022 Bulletpoint 2.\\n\\n\u2022 Bulletpoint 3.\"\n"
+        "    },\n"
+        "    {\n"
+        "      \"title\": \"Title 2\",\n"
+        "      \"content\": \"\u2022 Bulletpoint 1.\\n\\n\u2022 Bulletpoint 2.\\n\\n\u2022 Bulletpoint 3.\"\n"
+        "    }\n"
+        "  ],\n"
+        "  \"questions\": [\n"
+        "    \"Question one?\",\n"
+        "    \"Question two?\",\n"
+        "    \"Question three?\"\n"
+        "  ],\n"
+        "  \"prompt\": \"Original topic prompt here (or empty if none)\"\n"
         "}\n\n"
 
-        "JSON rules: double quotes for all keys/strings, no trailing commas, no extra fields.\n\n"
+        "Important:\n"
+        "1. All strings and keys must use double quotes.\n"
+        "2. There must be no trailing commas or extra fields.\n"
+        "3. Do not wrap your JSON in any code fences.\n"
+        "4. No single quotes in the JSON.\n\n"
     )
 
-    # any extra instructions from the caller
     if topic_prompt:
         base_prompt += (
-            "### Additional instructions from the topic owner\n"
+            "Additional instructions from the topic owner:\n"
             f"{topic_prompt}\n\n"
+            "Please incorporate these instructions into your summary.\n"
         )
 
-    # tightened Insight guidance
     if organization_description:
+        logging.info("Organization description provided; instructing Gemini to generate insights.")
         base_prompt += (
-            "### Organization Context\n"
-            f"{organization_description}\n\n"
-
-            "### When to add an Insight line\n"
-            "Append **one** line starting with \"Insight:\" *only* if **all** checkpoints are met:\n"
-            "1. **Direct linkage** – the story clearly affects the organization’s goals, market, positioning, or risks.\n"
-            "2. **Actionability** – it recommends a concrete, realistic move (not generic “monitor” advice).\n"
-            "3. **Specificity** – it references the organization’s unique capabilities, resources, or value prop.\n\n"
-
-            "### Insight format\n"
-            "If all checkpoints pass, place the string below at the *end* of that story’s bullet list "
-            "(inside the same \"content\" value):\n\n"
-            "\\n\\nInsight: <Start with an action verb, ≤ 30 words, stating the recommendation and benefit/risk>\n\n"
-            "✱ The two leading \"\\n\\n\" characters are **mandatory**; "
-            "do NOT add extra spaces or blank lines before or after them.\n\n"
-
-            "### Quality over quantity\n"
-            "Skip the Insight line entirely if relevance is uncertain. Fewer high-impact insights are better than many weak ones.\n\n"
+            "If there’s a relevant insight or recommended action for this organization specifically: "
+            f"{organization_description}"
+            "you MUST add a final line to that story's content in this format:\n"
+            "\n"
+            "Insight: [Your one-sentence insight]\n"
+            "\n"
+            "The insight must be a piece of information related to the story that would help the business described"
+            "in achieving their goals, or preventing or mitigating possible threats, support the business with relevant information."
+            "Try to come up with a relevant insight for at least half of the stories if possible."
+            "The insight can be relevant economically, strategically, an opportunity, a threat or other."
+            "Tie it back to the organization and its specific needs and opportunities."
         )
 
-    # add the actual article material
     base_prompt += (
-        "### Combined article summaries\n"
+        "Now here are the combined article summaries:\n"
         f"{all_summaries}\n\n"
-        "Now output the JSON."
+        "Make sure you follow the JSON structure exactly."
     )
 
-    logging.debug("Sending request to Gemini...")
-    response = model.generate_content(base_prompt)
+    logging.debug("Sending final summary prompt to Gemini...")
 
-    # ── post-process: guarantee \\n\\n before Insight: ───────────────────────────
-    raw = response.text
-    try:
-        data = json.loads(raw)  # ensure valid JSON before editing
-        for story in data.get("summary", []):
-            story["content"] = _enforce_insight_spacing(story["content"])
-        cleaned = json.dumps(data, ensure_ascii=False)
-        return cleaned
-    except Exception as err:
-        logging.warning("Post-processing skipped (JSON parse failed): %s", err)
-        return raw
+    response = model.generate_content(base_prompt)
+    return response.text
+
 
 @time_function
 def extract_braces_content(s):
