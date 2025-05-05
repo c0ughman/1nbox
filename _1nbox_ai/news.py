@@ -584,6 +584,11 @@ def get_final_summary(
             "Try to come up with a relevant insight for at least half of the stories if possible."
             "The insight can be relevant economically, strategically, an opportunity, a threat or other."
             "Tie it back to the organization and its specific needs and opportunities."
+            "### Insight format\n"
+            "If all three checkpoints pass, append **exactly** this string to the end of the "
+            "story’s bullet list (inside the same \"content\" value):\n\n"
+            "\\n\\nInsight: <one sentence, ≤ 30 words, starting with an action verb>\n\n"
+            "✱ The two leading “\\n\\n” characters are mandatory; do NOT add extra spaces or newlines before or after them.\n"
         )
 
     base_prompt += (
