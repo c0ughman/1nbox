@@ -20,6 +20,8 @@ import requests
 from contextlib import contextmanager
 import signal
 
+from time import perf_counter as time_function 
+
 # List of insignificant words to exclude
 INSIGNIFICANT_WORDS = set([
     'In', 'The', 'Continue', 'Fox', 'News', 'Newstalk', 'Newsweek', 'Is', 
