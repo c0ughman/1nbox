@@ -9,20 +9,17 @@ https://docs.djangoproject.com/en/5.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
-import django_heroku
 import dj_database_url
 from pathlib import Path
 import os
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
@@ -33,7 +30,16 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['app-1nbox-ai-fb8295a32cce.herokuapp.com', '127.0.0.1',"https://nbox-ai-bb518.firebaseapp.com"]
+ALLOWED_HOSTS = [
+    '127.0.0.1',
+    'localhost',
+    '.railway.app',
+    'nbox-ai-bb518.firebaseapp.com',
+]
+
+RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+if RAILWAY_PUBLIC_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
 
 SESSION_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SECURE = True
@@ -75,6 +81,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -194,43 +201,16 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CSRF_TRUSTED_ORIGINS = [
-                        'https://www.trybriefed.com',
-                        'https://trybriefed.com',
-                        'https://app-1nbox-ai-fb8295a32cce.herokuapp.com',
-                        'https://www.1nbox-ai.com',
-                        'https://api.stripe.com/v1/webhook_endpoints',
-                        'https://a.stripecdn.com',
-                        'https://api.stripe.com',
-                        'https://atlas.stripe.com',
-                        'https://auth.stripe.com',
-                        'https://b.stripecdn.com',
-                        'https://billing.stripe.com',
-                        'https://buy.stripe.com',
-                        'https://c.stripecdn.com',
-                        'https://checkout.stripe.com',
-                        'https://climate.stripe.com',
-                        'https://connect.stripe.com',
-                        'https://dashboard.stripe.com',
-                        'https://express.stripe.com',
-                        'https://files.stripe.com',
-                        'https://hooks.stripe.com',
-                        'https://invoice.stripe.com',
-                        'https://invoicedata.stripe.com',
-                        'https://js.stripe.com',
-                        'https://m.stripe.com',
-                        'https://m.stripe.network',
-                        'https://manage.stripe.com',
-                        'https://pay.stripe.com',
-                        'https://payments.stripe.com',
-                        'https://q.stripe.com',
-                        'https://qr.stripe.com',
-                        'https://r.stripe.com',
-                        'https://verify.stripe.com',
-                        'https://stripe.com',
-                        'https://terminal.stripe.com',
-                        'https://uploads.stripe.com',
-                        'https://editor.weweb.io',
-                        'https://1nbox.netlify.app'
-                        ]
+    'https://www.trybriefed.com',
+    'https://trybriefed.com',
+    'https://www.1nbox-ai.com',
+    'https://1nbox-ai.com',
+    'https://api.stripe.com',
+    'https://hooks.stripe.com',
+    'https://checkout.stripe.com',
+    'https://editor.weweb.io',
+    'https://1nbox.netlify.app',
+]
 
-django_heroku.settings(locals())
+if RAILWAY_PUBLIC_DOMAIN:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RAILWAY_PUBLIC_DOMAIN}')

@@ -9,9 +9,9 @@ python-dotenv
 djangorestframework
 django-cors-headers
 gunicorn
-django-heroku
+whitenoise
 dj_database_url
-honcho
+psycopg2-binary
 feedparser
 scikit-learn
 numpy
