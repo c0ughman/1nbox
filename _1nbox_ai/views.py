@@ -27,6 +27,10 @@ from sendgrid.helpers.mail import Mail
 from .bubbles import process_feeds_and_cluster
 
 
+def health_check(request):
+    return JsonResponse({'status': 'ok'})
+
+
 def firebase_auth_required(view_func):
     @wraps(view_func)
     def wrapped_view(request, *args, **kwargs):

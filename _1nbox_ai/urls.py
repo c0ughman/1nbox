@@ -21,6 +21,8 @@ from django.contrib import admin
 from django.db import connection
 
 urlpatterns = [
+    path('', views.health_check),
+    path('health/', views.health_check),
     path('admin/', admin.site.urls),
     path('user/<str:id>/', views.get_user_data),
     path('sign_up/', views.sign_up),

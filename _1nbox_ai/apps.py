@@ -7,9 +7,14 @@ class MyAppConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = '_1nbox_ai'
 
-
     def ready(self):
-        # Initialize Firebase if not already initialized
         if not firebase_admin._apps:
-            cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
-            firebase_admin.initialize_app(cred)
+            try:
+                firebase_creds = settings.FIREBASE_CREDENTIALS
+                if firebase_creds and firebase_creds.get('private_key'):
+                    cred = credentials.Certificate(firebase_creds)
+                    firebase_admin.initialize_app(cred)
+                else:
+                    print("Warning: Firebase credentials not configured")
+            except Exception as e:
+                print(f"Warning: Firebase initialization failed: {e}")
