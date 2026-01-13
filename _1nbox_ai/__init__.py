@@ -1,3 +1,1 @@
-
-
-default_app_config = 'myapp.apps.MyAppConfig'
+default_app_config = '_1nbox_ai.apps.MyAppConfig'

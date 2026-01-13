@@ -34,7 +34,9 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
     '.railway.app',
+    '.herokuapp.com',
     'nbox-ai-bb518.firebaseapp.com',
+    'nbox-ai-bb518.web.app',
 ]
 
 RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
@@ -117,7 +119,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://1nbox-ai.com",
     "https://www.1nbox-ai.com",
     "https://1nbox.netlify.app",
-    "https://nbox-ai-bb518.firebaseapp.com"
+    "https://nbox-ai-bb518.firebaseapp.com",
+    "https://nbox-ai-bb518.web.app",
 ]
 
 # Add these settings
@@ -219,6 +222,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://checkout.stripe.com',
     'https://editor.weweb.io',
     'https://1nbox.netlify.app',
+    'https://nbox-ai-bb518.firebaseapp.com',
+    'https://nbox-ai-bb518.web.app',
 ]
 
 if RAILWAY_PUBLIC_DOMAIN:
