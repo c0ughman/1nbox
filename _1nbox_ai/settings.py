@@ -156,12 +156,22 @@ CORS_ALLOW_HEADERS = [
 
 # Database configuration
 # DATABASE_URL is required - PostgreSQL only (no SQLite fallback)
+# Railway automatically provides DATABASE_URL when PostgreSQL service is linked
 DATABASE_URL = os.environ.get('DATABASE_URL')
+
+# Check if DATABASE_URL is set but contains a template variable (not resolved)
+if DATABASE_URL and DATABASE_URL.startswith('${{'):
+    raise ValueError(
+        f"DATABASE_URL appears to be a template variable that wasn't resolved: {DATABASE_URL}. "
+        "In Railway, ensure your PostgreSQL service is properly linked to this service. "
+        "Railway should automatically provide DATABASE_URL - you may not need to set it manually."
+    )
 
 if not DATABASE_URL:
     raise ValueError(
         "DATABASE_URL environment variable is required. "
-        "Please configure a PostgreSQL database connection in Railway."
+        "Please ensure a PostgreSQL database service is linked to this Railway service. "
+        "Railway automatically provides DATABASE_URL when services are linked."
     )
 
 DATABASES = {
