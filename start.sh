@@ -5,25 +5,11 @@ echo "================================"
 echo "STARTING DEPLOYMENT"
 echo "================================"
 
-# Print ALL environment variables to debug
-echo "=== ENVIRONMENT CHECK ==="
-echo "PORT: ${PORT:-NOT SET}"
-echo "DATABASE_URL exists: $(if [ -n "$DATABASE_URL" ]; then echo YES; else echo NO; fi)"
-echo "DATABASE_URL first 30 chars: ${DATABASE_URL:0:30}..."
-echo "DJANGO_SECRET_KEY exists: $(if [ -n "$DJANGO_SECRET_KEY" ]; then echo YES; else echo NO; fi)"
-echo "FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-NOT SET}"
-echo "FIREBASE_PRIVATE_KEY exists: $(if [ -n "$FIREBASE_PRIVATE_KEY" ]; then echo YES; else echo NO; fi)"
-echo "FIREBASE_PRIVATE_KEY starts with: ${FIREBASE_PRIVATE_KEY:0:25}"
-echo "========================="
-
-# Test Python import
-echo "Testing Python and Django import..."
-python -c "import django; print(f'Django version: {django.get_version()}')"
-
-# Test settings import
-echo "Testing settings import..."
-python -c "from django.conf import settings; print('Settings loaded successfully')" || {
-    echo "FATAL: Settings failed to load!"
+# Run environment check FIRST before anything loads Django
+echo "Running environment check..."
+python test_env.py || {
+    echo "FATAL: Environment check failed!"
+    echo "Fix the environment variables in Railway and redeploy."
     exit 1
 }
 
@@ -37,12 +23,6 @@ python manage.py collectstatic --noinput || {
 echo "Running database migrations..."
 python manage.py migrate --noinput || {
     echo "WARNING: Migrations failed, continuing..."
-}
-
-# Test that health endpoint is accessible
-echo "Testing Django setup..."
-python manage.py check || {
-    echo "WARNING: Django check failed, continuing..."
 }
 
 # Start gunicorn with verbose logging
