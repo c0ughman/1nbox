@@ -152,24 +152,16 @@ CORS_ALLOW_HEADERS = [
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
-    }
-else:
-    import logging
-    logging.warning("No DATABASE_URL environment variable set, and so no databases setup")
-    print("WARNING: DATABASE_URL not set. Add a PostgreSQL database in Railway.")
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is required. Add a PostgreSQL database in Railway.")
+
+DATABASES = {
+    'default': dj_database_url.config(
+        default=DATABASE_URL,
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
 
 
 # Password validation
