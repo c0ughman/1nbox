@@ -9,10 +9,7 @@ python-dotenv
 djangorestframework
 django-cors-headers
 gunicorn
-<<<<<<< HEAD
 whitenoise
-=======
->>>>>>> b00486b (Remove SQLite fallback and Heroku dependencies - require PostgreSQL DATABASE_URL, update for Railway deployment)
 dj_database_url
 psycopg2-binary
 feedparser
