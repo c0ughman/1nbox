@@ -54,19 +54,28 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"  # Blocks iframe embedding
 
 # FIREBASE
-FIREBASE_CREDENTIALS = {
-    "type": "service_account",
-    "project_id": os.environ.get("FIREBASE_PROJECT_ID"),
-    "private_key_id": os.environ.get("FIREBASE_PRIVATE_KEY_ID"),
-    "private_key": os.environ.get("FIREBASE_PRIVATE_KEY").replace('\\n', '\n') if os.environ.get("FIREBASE_PRIVATE_KEY") else None,
-    "client_email": os.environ.get("FIREBASE_CLIENT_EMAIL"),
-    "client_id": os.environ.get("FIREBASE_CLIENT_ID"),
-    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-    "token_uri": "https://oauth2.googleapis.com/token",
-    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-    "client_x509_cert_url": os.environ.get("FIREBASE_CLIENT_CERT_URL"),
-    "universe_domain": "googleapis.com",
-}
+# Only set FIREBASE_CREDENTIALS if all required env vars are present
+FIREBASE_PRIVATE_KEY = os.environ.get("FIREBASE_PRIVATE_KEY")
+FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID")
+FIREBASE_CLIENT_EMAIL = os.environ.get("FIREBASE_CLIENT_EMAIL")
+
+if FIREBASE_PRIVATE_KEY and FIREBASE_PROJECT_ID and FIREBASE_CLIENT_EMAIL:
+    FIREBASE_CREDENTIALS = {
+        "type": "service_account",
+        "project_id": FIREBASE_PROJECT_ID,
+        "private_key_id": os.environ.get("FIREBASE_PRIVATE_KEY_ID"),
+        "private_key": FIREBASE_PRIVATE_KEY.replace('\\n', '\n'),
+        "client_email": FIREBASE_CLIENT_EMAIL,
+        "client_id": os.environ.get("FIREBASE_CLIENT_ID"),
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": os.environ.get("FIREBASE_CLIENT_CERT_URL"),
+        "universe_domain": "googleapis.com",
+    }
+else:
+    FIREBASE_CREDENTIALS = None
+    print("WARNING: Firebase credentials not fully configured. Authentication features will be disabled.")
 
 # Application definition
 
