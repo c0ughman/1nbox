@@ -166,30 +166,47 @@ def get_user_organization_data(request):
 def initial_signup(request):
     try:
         data = json.loads(request.body)
-        firebase_user = request.firebase_user  # from the decorator
-        
-        # Grab the description from the incoming JSON
+        firebase_user = request.firebase_user
+        email = firebase_user['email']
+
+        existing_user = User.objects.filter(email=email).first()
+        if existing_user:
+            return JsonResponse({
+                'success': True,
+                'user': {
+                    'id': existing_user.id,
+                    'email': existing_user.email,
+                    'role': existing_user.role,
+                    'organization': {
+                        'id': existing_user.organization.id,
+                        'name': existing_user.organization.name,
+                        'plan': existing_user.organization.plan,
+                        'description': existing_user.organization.description,
+                    }
+                }
+            })
+
         description = data.get('organization_description', '')
 
-        # Example: store description on the Organization model
-        # (Make sure you've added a `description` field on Organization or handle it as needed)
+        from datetime import time
         organization = Organization.objects.create(
-            name=data.get('organization_name', f"{firebase_user['email']}'s Organization"),
+            name=data.get('organization_name', f"{email}'s Organization"),
             plan='free',
             status='active',
-            summary_time='8:00:00',
+            summary_time=time(8, 0, 0),
             summary_timezone='America/New_York',
-            description=description  # assuming your Organization model has description
+            description=description
         )
-        
+
         user = User.objects.create(
-            email=firebase_user['email'],
+            email=email,
             role='admin',
-            name=firebase_user['email'],
+            name=email,
             send_email=True,
+            state='active',
             organization=organization
         )
-        
+
         return JsonResponse({
             'success': True,
             'user': {
@@ -200,14 +217,19 @@ def initial_signup(request):
                     'id': organization.id,
                     'name': organization.name,
                     'plan': organization.plan,
-                    'description': organization.description,  # if you want to return it
+                    'description': organization.description,
                 }
             }
         })
-        
+
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {str(e)}")
+        return JsonResponse({'error': 'Invalid JSON in request body'}, status=400)
     except Exception as e:
-        print(f"Internal error: {str(e)}")  # For debugging
-        return JsonResponse({'error': 'An internal error occurred'}, status=500)
+        import traceback
+        print(f"Initial signup error: {str(e)}")
+        print(traceback.format_exc())
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @firebase_auth_required
