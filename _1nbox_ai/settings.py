@@ -9,10 +9,7 @@ https://docs.djangoproject.com/en/5.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
-<<<<<<< HEAD
-=======
 
->>>>>>> b00486b (Remove SQLite fallback and Heroku dependencies - require PostgreSQL DATABASE_URL, update for Railway deployment)
 import dj_database_url
 from pathlib import Path
 import os
@@ -35,11 +32,10 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-c
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = [
-<<<<<<< HEAD
     '127.0.0.1',
     'localhost',
     '.railway.app',
-    '.herokuapp.com',
+    'briefed-production.up.railway.app',
     'nbox-ai-bb518.firebaseapp.com',
     'nbox-ai-bb518.web.app',
 ]
@@ -47,14 +43,6 @@ ALLOWED_HOSTS = [
 RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
 if RAILWAY_PUBLIC_DOMAIN:
     ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
-=======
-    'briefed-production.up.railway.app',
-    '*.up.railway.app',  # Allow all Railway subdomains
-    '127.0.0.1', 
-    'localhost', 
-    "https://nbox-ai-bb518.firebaseapp.com"
-]
->>>>>>> b00486b (Remove SQLite fallback and Heroku dependencies - require PostgreSQL DATABASE_URL, update for Railway deployment)
 
 SESSION_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SECURE = True
@@ -133,13 +121,10 @@ CORS_ALLOWED_ORIGINS = [
     "https://www.1nbox-ai.com",
     "https://1nbox.netlify.app",
     "https://nbox-ai-bb518.firebaseapp.com",
-<<<<<<< HEAD
     "https://nbox-ai-bb518.web.app",
-=======
     "https://briefed-production.up.railway.app",
     "http://localhost:3030",
     "http://127.0.0.1:3030"
->>>>>>> b00486b (Remove SQLite fallback and Heroku dependencies - require PostgreSQL DATABASE_URL, update for Railway deployment)
 ]
 
 # Add these settings
@@ -169,18 +154,6 @@ CORS_ALLOW_HEADERS = [
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-<<<<<<< HEAD
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is required. Add a PostgreSQL database in Railway.")
-
-DATABASES = {
-    'default': dj_database_url.config(
-        default=DATABASE_URL,
-        conn_max_age=600,
-        conn_health_checks=True,
-=======
 # Database configuration
 # DATABASE_URL is required - PostgreSQL only (no SQLite fallback)
 DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -189,11 +162,14 @@ if not DATABASE_URL:
     raise ValueError(
         "DATABASE_URL environment variable is required. "
         "Please configure a PostgreSQL database connection."
->>>>>>> b00486b (Remove SQLite fallback and Heroku dependencies - require PostgreSQL DATABASE_URL, update for Railway deployment)
     )
 
 DATABASES = {
-    'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)
+    'default': dj_database_url.config(
+        default=DATABASE_URL,
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
 
@@ -244,9 +220,9 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CSRF_TRUSTED_ORIGINS = [
-<<<<<<< HEAD
     'https://www.trybriefed.com',
     'https://trybriefed.com',
+    'https://briefed-production.up.railway.app',
     'https://www.1nbox-ai.com',
     'https://1nbox-ai.com',
     'https://api.stripe.com',
@@ -260,43 +236,3 @@ CSRF_TRUSTED_ORIGINS = [
 
 if RAILWAY_PUBLIC_DOMAIN:
     CSRF_TRUSTED_ORIGINS.append(f'https://{RAILWAY_PUBLIC_DOMAIN}')
-=======
-                        'https://www.trybriefed.com',
-                        'https://trybriefed.com',
-                        'https://briefed-production.up.railway.app',
-                        'https://www.1nbox-ai.com',
-                        'https://api.stripe.com/v1/webhook_endpoints',
-                        'https://a.stripecdn.com',
-                        'https://api.stripe.com',
-                        'https://atlas.stripe.com',
-                        'https://auth.stripe.com',
-                        'https://b.stripecdn.com',
-                        'https://billing.stripe.com',
-                        'https://buy.stripe.com',
-                        'https://c.stripecdn.com',
-                        'https://checkout.stripe.com',
-                        'https://climate.stripe.com',
-                        'https://connect.stripe.com',
-                        'https://dashboard.stripe.com',
-                        'https://express.stripe.com',
-                        'https://files.stripe.com',
-                        'https://hooks.stripe.com',
-                        'https://invoice.stripe.com',
-                        'https://invoicedata.stripe.com',
-                        'https://js.stripe.com',
-                        'https://m.stripe.com',
-                        'https://m.stripe.network',
-                        'https://manage.stripe.com',
-                        'https://pay.stripe.com',
-                        'https://payments.stripe.com',
-                        'https://q.stripe.com',
-                        'https://qr.stripe.com',
-                        'https://r.stripe.com',
-                        'https://verify.stripe.com',
-                        'https://stripe.com',
-                        'https://terminal.stripe.com',
-                        'https://uploads.stripe.com',
-                        'https://editor.weweb.io',
-                        'https://1nbox.netlify.app'
-                        ]
->>>>>>> b00486b (Remove SQLite fallback and Heroku dependencies - require PostgreSQL DATABASE_URL, update for Railway deployment)
