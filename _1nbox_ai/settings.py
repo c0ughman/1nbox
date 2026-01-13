@@ -60,11 +60,17 @@ FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID")
 FIREBASE_CLIENT_EMAIL = os.environ.get("FIREBASE_CLIENT_EMAIL")
 
 if FIREBASE_PRIVATE_KEY and FIREBASE_PROJECT_ID and FIREBASE_CLIENT_EMAIL:
+    # Strip quotes if they were accidentally added in Railway
+    FIREBASE_PRIVATE_KEY = FIREBASE_PRIVATE_KEY.strip('"').strip("'")
+    
+    # Replace literal \n with actual newlines
+    FIREBASE_PRIVATE_KEY = FIREBASE_PRIVATE_KEY.replace('\\n', '\n')
+    
     FIREBASE_CREDENTIALS = {
         "type": "service_account",
         "project_id": FIREBASE_PROJECT_ID,
         "private_key_id": os.environ.get("FIREBASE_PRIVATE_KEY_ID"),
-        "private_key": FIREBASE_PRIVATE_KEY.replace('\\n', '\n'),
+        "private_key": FIREBASE_PRIVATE_KEY,
         "client_email": FIREBASE_CLIENT_EMAIL,
         "client_id": os.environ.get("FIREBASE_CLIENT_ID"),
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -73,6 +79,7 @@ if FIREBASE_PRIVATE_KEY and FIREBASE_PROJECT_ID and FIREBASE_CLIENT_EMAIL:
         "client_x509_cert_url": os.environ.get("FIREBASE_CLIENT_CERT_URL"),
         "universe_domain": "googleapis.com",
     }
+    print(f"Firebase credentials configured for project: {FIREBASE_PROJECT_ID}")
 else:
     FIREBASE_CREDENTIALS = None
     print("WARNING: Firebase credentials not fully configured. Authentication features will be disabled.")
