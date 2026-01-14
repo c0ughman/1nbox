@@ -59,6 +59,7 @@ echo "Starting Gunicorn on port ${PORT:-8000}..." >&2
 echo "Environment variables available:" >&2
 echo "  - DATABASE_URL: ${DATABASE_URL:+SET}" >&2
 echo "  - DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:+SET}" >&2
+echo "  - GEMINI_API_KEY: ${GEMINI_API_KEY:+SET}" >&2
 echo "  - GEMINI_KEY: ${GEMINI_KEY:+SET}" >&2
 echo "  - PORT: ${PORT:-8000}" >&2
 

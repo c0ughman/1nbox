@@ -61,9 +61,10 @@ def get_news_context(organization):
 
 
 def generate_analysis(organization, query, news_context):
-    gemini_key = os.environ.get("GEMINI_KEY")
+    # Support both GEMINI_API_KEY and GEMINI_KEY for backwards compatibility
+    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_KEY")
     if not gemini_key:
-        raise ValueError("Gemini API key not found")
+        raise ValueError("Gemini API key not found. Set GEMINI_API_KEY or GEMINI_KEY.")
 
     genai.configure(api_key=gemini_key)
     model = genai.GenerativeModel("gemini-2.0-flash")

@@ -10,7 +10,7 @@ print("=" * 50)
 # Check critical variables (required for Django to start)
 required_vars = ['DATABASE_URL', 'DJANGO_SECRET_KEY']
 optional_vars = ['FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL']
-api_vars = ['GEMINI_KEY', 'OPENAI_KEY', 'SENDGRID_API_KEY']
+api_vars = ['GEMINI_API_KEY', 'GEMINI_KEY', 'OPENAI_KEY', 'SENDGRID_API_KEY']
 
 print("\nREQUIRED VARIABLES (Django startup):")
 has_errors = False

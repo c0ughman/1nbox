@@ -15,9 +15,10 @@ def generate_answer(topic, body, context):
     cluster_summaries = repr(chosen_topic.summaries.first().cluster_summaries)
 
     # Set up Gemini API
-    gemini_key = os.environ.get("GEMINI_KEY")
+    # Support both GEMINI_API_KEY and GEMINI_KEY for backwards compatibility
+    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_KEY")
     if not gemini_key:
-        raise ValueError("Gemini API key not found in environment variables.")
+        raise ValueError("Gemini API key not found in environment variables. Set GEMINI_API_KEY or GEMINI_KEY.")
 
     genai.configure(api_key=gemini_key)
     model = genai.GenerativeModel("gemini-2.0-flash")
