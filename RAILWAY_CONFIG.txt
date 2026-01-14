@@ -10,17 +10,22 @@
    • Click "New" → "Cron Job"
    • Name: news-processing-cron
 
-2️⃣  SET COMMAND (choose one)
+2️⃣  SET ENVIRONMENT VARIABLE
 
+   In Railway Dashboard → Cron Service → Variables:
+   
    FOR TESTING (processes ALL organizations immediately):
    ┌────────────────────────────────────────────┐
-   │ bash run-cron.sh runnews --force           │
+   │ CRON_COMMAND = runnews --force              │
    └────────────────────────────────────────────┘
 
    FOR PRODUCTION (only at scheduled times):
    ┌────────────────────────────────────────────┐
-   │ bash run-cron.sh runnews                   │
+   │ CRON_COMMAND = runnews                      │
    └────────────────────────────────────────────┘
+
+   NOTE: The startCommand in railway.json stays as "bash start.sh"
+         start.sh will detect CRON_COMMAND and run it automatically.
 
 3️⃣  SET SCHEDULE
 

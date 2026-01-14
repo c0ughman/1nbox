@@ -7,17 +7,21 @@
 2. Click **"New"** → **"Cron Job"**
 3. Name it: `news-processing-cron`
 
-### 2. Configure Command
+### 2. Set Environment Variable
+
+**In Railway Dashboard → Cron Service → Variables tab:**
 
 **For Testing (processes ALL orgs immediately):**
-```bash
-bash run-cron.sh runnews --force
+```
+CRON_COMMAND = runnews --force
 ```
 
 **For Production (only processes orgs at scheduled time):**
-```bash
-bash run-cron.sh runnews
 ```
+CRON_COMMAND = runnews
+```
+
+**Note:** The `startCommand` in `railway.json` stays as `bash start.sh`. The `start.sh` script will automatically detect the `CRON_COMMAND` environment variable and execute it instead of starting Gunicorn.
 
 ### 3. Set Schedule
 

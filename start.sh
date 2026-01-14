@@ -25,7 +25,16 @@ python manage.py migrate --noinput || {
     echo "WARNING: Migrations failed, continuing..."
 }
 
-# Start gunicorn with verbose logging
+# Check if this is a cron job (Railway sets CRON_COMMAND env var for cron jobs)
+if [ -n "$CRON_COMMAND" ]; then
+    echo "================================"
+    echo "EXECUTING CRON COMMAND"
+    echo "================================"
+    echo "Running: python manage.py $CRON_COMMAND"
+    exec python manage.py $CRON_COMMAND
+fi
+
+# Start gunicorn with verbose logging (web service)
 echo "Starting Gunicorn on port ${PORT:-8000}..."
 exec gunicorn _1nbox_ai.wsgi \
     --bind 0.0.0.0:${PORT:-8000} \
