@@ -518,7 +518,8 @@ def get_final_summary(
         raise ValueError("Gemini API key not found in environment variables.")
 
     genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    # Use gemini-1.5-flash (gemini-2.0-flash doesn't exist)
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
     all_summaries = "\n\n".join(cluster_summaries)
 
@@ -602,16 +603,35 @@ def get_final_summary(
     try:
         response = model.generate_content(base_prompt)
         
-        # Handle Gemini API response - check if response has text attribute
+        # Check if response was blocked by safety filters
+        if hasattr(response, 'candidates') and len(response.candidates) > 0:
+            candidate = response.candidates[0]
+            if hasattr(candidate, 'finish_reason'):
+                if candidate.finish_reason == 'SAFETY':
+                    logging.error("⚠️ Gemini response blocked by content safety filters")
+                    raise ValueError("Response blocked by content safety filters")
+                elif candidate.finish_reason == 'RECITATION':
+                    logging.error("⚠️ Gemini response blocked due to recitation")
+                    raise ValueError("Response blocked due to recitation")
+                elif candidate.finish_reason not in [None, 'STOP']:
+                    logging.warning(f"⚠️ Unexpected finish_reason: {candidate.finish_reason}")
+            
+            # Extract text from candidate
+            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                if len(candidate.content.parts) > 0:
+                    return candidate.content.parts[0].text
+        
+        # Fallback to direct text attribute
         if hasattr(response, 'text'):
             return response.text
-        elif hasattr(response, 'candidates') and len(response.candidates) > 0:
-            # Alternative response format
-            return response.candidates[0].content.parts[0].text
-        else:
-            logging.error(f"Unexpected Gemini response format: {type(response)}")
-            logging.error(f"Response attributes: {dir(response)}")
-            raise ValueError("Gemini API returned unexpected response format")
+        
+        # Last resort - try to get text from response
+        logging.error(f"Unexpected Gemini response format: {type(response)}")
+        logging.error(f"Response attributes: {dir(response)}")
+        if hasattr(response, 'candidates'):
+            logging.error(f"Candidates: {response.candidates}")
+        raise ValueError("Gemini API returned unexpected response format - no text found")
+        
     except Exception as e:
         logging.error(f"Gemini API error in get_final_summary: {str(e)}")
         logging.error(f"Error type: {type(e).__name__}")
@@ -814,7 +834,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                 elif "rate limit" in str(e).lower() or "quota" in str(e).lower():
                     logging.error("⚠️ Gemini API rate limit or quota exceeded!")
                 elif "model" in str(e).lower():
-                    logging.error("⚠️ Gemini model error - check if 'gemini-2.0-flash' is available!")
+                    logging.error("⚠️ Gemini model error - check if 'gemini-1.5-flash' is available!")
                 
                 final_summary_data = {
                     "summary": [{"title": "Error", "content": f"Failed to generate summary: {str(e)}"}],
