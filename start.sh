@@ -44,7 +44,7 @@ echo "  - PORT: ${PORT:-8000}"
 
 # Test Django import before starting Gunicorn
 echo "Testing Django import..."
-python -c "import django; django.setup(); from django.conf import settings; print('✓ Django loaded successfully')" || {
+python -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', '_1nbox_ai.settings'); import django; django.setup(); from django.conf import settings; print('✓ Django loaded successfully')" || {
     echo "❌ ERROR: Django failed to load!"
     echo "This usually means there's an error in settings.py or a missing dependency."
     exit 1
