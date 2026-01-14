@@ -152,7 +152,7 @@ def process_bites_subscriptions():
 
     for subscription in active_subs:
         try:
-            tz = pytz.timezone(subscription.timezone)
+            tz = pytz.timezone(subscription.user_timezone)
             local_now = now_utc.astimezone(tz)
 
             if (local_now.hour != subscription.delivery_time.hour or

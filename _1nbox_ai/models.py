@@ -238,7 +238,7 @@ class BitesSubscription(models.Model):
     )
     frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES)
     delivery_time = models.TimeField(default=timezone.now)
-    timezone = models.CharField(max_length=50, default='UTC')
+    user_timezone = models.CharField(max_length=50, default='UTC')
     is_active = models.BooleanField(default=True)
     last_sent_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)

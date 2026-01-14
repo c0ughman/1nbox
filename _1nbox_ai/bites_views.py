@@ -161,7 +161,7 @@ def subscriptions(request):
                     'topic_name': sub.topic.name,
                     'frequency': sub.frequency,
                     'delivery_time': str(sub.delivery_time),
-                    'timezone': sub.timezone,
+                    'timezone': sub.user_timezone,
                     'is_active': sub.is_active,
                     'last_sent_at': sub.last_sent_at,
                     'created_at': sub.created_at,
@@ -229,7 +229,7 @@ def subscriptions(request):
                 'topic_name': topic.name,
                 'frequency': subscription.frequency,
                 'delivery_time': str(subscription.delivery_time),
-                'timezone': subscription.timezone,
+                'timezone': subscription.user_timezone,
                 'next_delivery': next_delivery_str
             })
 
@@ -266,7 +266,7 @@ def subscription_detail(request, subscription_id):
                 'topic_name': subscription.topic.name,
                 'frequency': subscription.frequency,
                 'delivery_time': str(subscription.delivery_time),
-                'timezone': subscription.timezone,
+                'timezone': subscription.user_timezone,
                 'is_active': subscription.is_active,
                 'last_sent_at': subscription.last_sent_at,
                 'created_at': subscription.created_at,
@@ -287,7 +287,7 @@ def subscription_detail(request, subscription_id):
                     pass
 
             if 'timezone' in data:
-                subscription.timezone = data['timezone']
+                subscription.user_timezone = data['timezone']
 
             if 'is_active' in data:
                 subscription.is_active = bool(data['is_active'])
@@ -299,7 +299,7 @@ def subscription_detail(request, subscription_id):
                 'id': subscription.id,
                 'frequency': subscription.frequency,
                 'delivery_time': str(subscription.delivery_time),
-                'timezone': subscription.timezone,
+                'timezone': subscription.user_timezone,
                 'is_active': subscription.is_active,
             })
 
