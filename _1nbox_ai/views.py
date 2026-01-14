@@ -155,11 +155,18 @@ def get_user_organization_data(request):
     
     except User.DoesNotExist:
         return JsonResponse({
-            'error': 'User not found in database'
+            'error': 'User not found in database',
+            'message': 'Your Firebase account exists but you need to complete signup. Please sign up again to create your organization.'
         }, status=404)
     except Exception as e:
-        print(f"Internal error: {str(e)}")  # For debugging in MVP
-        return JsonResponse({'error': 'An internal error occurred'}, status=500)
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Internal error in get_user_organization_data: {str(e)}")
+        print(f"Traceback: {error_trace}")
+        return JsonResponse({
+            'error': 'An internal error occurred',
+            'message': str(e)
+        }, status=500)
 
 @csrf_exempt
 @firebase_auth_required

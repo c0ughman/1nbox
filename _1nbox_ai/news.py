@@ -599,8 +599,25 @@ def get_final_summary(
 
     logging.debug("Sending final summary prompt to Gemini...")
 
-    response = model.generate_content(base_prompt)
-    return response.text
+    try:
+        response = model.generate_content(base_prompt)
+        
+        # Handle Gemini API response - check if response has text attribute
+        if hasattr(response, 'text'):
+            return response.text
+        elif hasattr(response, 'candidates') and len(response.candidates) > 0:
+            # Alternative response format
+            return response.candidates[0].content.parts[0].text
+        else:
+            logging.error(f"Unexpected Gemini response format: {type(response)}")
+            logging.error(f"Response attributes: {dir(response)}")
+            raise ValueError("Gemini API returned unexpected response format")
+    except Exception as e:
+        logging.error(f"Gemini API error in get_final_summary: {str(e)}")
+        logging.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        raise
 
 
 @time_function
@@ -785,9 +802,22 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                 logging.info(f"Parsed summary JSON: {json.dumps(final_summary_data, indent=2)}")
 
             except Exception as e:
+                import traceback
+                error_trace = traceback.format_exc()
                 logging.error(f"Error generating final summary for {topic.name}: {str(e)}")
+                logging.error(f"Error type: {type(e).__name__}")
+                logging.error(f"Full traceback:\n{error_trace}")
+                
+                # Log more details about the error
+                if "GEMINI_KEY" in str(e) or "API key" in str(e):
+                    logging.error("⚠️ GEMINI_KEY environment variable is missing or invalid!")
+                elif "rate limit" in str(e).lower() or "quota" in str(e).lower():
+                    logging.error("⚠️ Gemini API rate limit or quota exceeded!")
+                elif "model" in str(e).lower():
+                    logging.error("⚠️ Gemini model error - check if 'gemini-2.0-flash' is available!")
+                
                 final_summary_data = {
-                    "summary": [{"title": "Error", "content": "Failed to generate summary"}],
+                    "summary": [{"title": "Error", "content": f"Failed to generate summary: {str(e)}"}],
                     "questions": ["What happened?", "Why did it happen?", "What's next?"],
                 }
 
