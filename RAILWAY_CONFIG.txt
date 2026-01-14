@@ -1,0 +1,125 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                   RAILWAY CRON JOB CONFIGURATION                 ║
+╚══════════════════════════════════════════════════════════════════╝
+
+📋 STEP-BY-STEP SETUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣  CREATE NEW CRON JOB SERVICE
+   • Railway Dashboard → Your Project
+   • Click "New" → "Cron Job"
+   • Name: news-processing-cron
+
+2️⃣  SET COMMAND (choose one)
+
+   FOR TESTING (processes ALL organizations immediately):
+   ┌────────────────────────────────────────────┐
+   │ bash run-cron.sh runnews --force           │
+   └────────────────────────────────────────────┘
+
+   FOR PRODUCTION (only at scheduled times):
+   ┌────────────────────────────────────────────┐
+   │ bash run-cron.sh runnews                   │
+   └────────────────────────────────────────────┘
+
+3️⃣  SET SCHEDULE
+
+   FOR TESTING:
+   • Don't set schedule, just click "Run Now" button
+
+   FOR PRODUCTION:
+   ┌────────────────────────────────────────────┐
+   │ 0 * * * *                                  │
+   └────────────────────────────────────────────┘
+   (Runs every hour at minute 0)
+
+4️⃣  COPY ENVIRONMENT VARIABLES
+   From your web service, copy these to cron service:
+
+   ⚠️  CRITICAL (app won't start without these):
+   • DATABASE_URL
+   • DJANGO_SECRET_KEY
+
+   🔧 REQUIRED (features won't work without these):
+   • OPENAI_API_KEY
+   • GEMINI_API_KEY
+   • SENDGRID_API_KEY
+   • FIREBASE_PROJECT_ID
+   • FIREBASE_PRIVATE_KEY
+   • FIREBASE_CLIENT_EMAIL
+
+5️⃣  DEPLOY & TEST
+   • Click "Deploy" button
+   • Wait for deployment to complete
+   • Click "Run Now" button
+   • Check logs for output
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ EXPECTED OUTPUT (with --force)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+================================
+STARTING CRON JOB
+================================
+Running environment check...
+✓ DATABASE_URL: postgresql://...
+✓ DJANGO_SECRET_KEY: ...
+Running database migrations...
+Operations to perform:
+  No migrations to apply.
+================================
+EXECUTING MANAGEMENT COMMAND
+================================
+Running: python manage.py runnews
+Starting news processing...
+⚠️  FORCE MODE: Processing ALL organizations, bypassing time checks
+==== Starting process_all_topics ====
+Current UTC Time: 16:30
+⚠️  FORCE MODE ENABLED: Processing ALL organizations
+🔄 Processing organization: [Your Org Name]
+... [processing details] ...
+News processing completed successfully.
+================================
+CRON JOB COMPLETED
+================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ COMMON ISSUES & FIXES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ISSUE: Gunicorn starts and job runs forever
+FIX:   Change command from "bash start.sh" to "bash run-cron.sh runnews"
+
+ISSUE: "DATABASE_URL environment variable is required"
+FIX:   Copy DATABASE_URL from web service to cron service env vars
+
+ISSUE: "No organizations matched the time check"
+FIX:   This is NORMAL in production. Add --force flag for testing.
+
+ISSUE: No output in logs
+FIX:   Check that command is exactly: bash run-cron.sh runnews --force
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• RAILWAY_QUICK_START.md  → Quick reference guide
+• RAILWAY_CRON_SETUP.md   → Comprehensive technical guide  
+• CRON_FIX_SUMMARY.md     → What was changed and why
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 REMEMBER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Use --force for testing (processes ALL orgs immediately)
+✓ Remove --force for production (only processes at scheduled time)
+✓ Environment variables MUST be copied from web service
+✓ Cron jobs and web service are SEPARATE containers
+✓ Check logs after clicking "Run Now"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

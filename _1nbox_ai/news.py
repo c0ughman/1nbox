@@ -840,7 +840,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
 @time_function
 def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consider=3,
                       merge_threshold=2, min_articles=3, join_percentage=0.5,
-                      final_merge_percentage=0.5, sentences_final_summary=3, title_only=False, all_words=False):
+                      final_merge_percentage=0.5, sentences_final_summary=3, title_only=False, all_words=False, force=False):
     
     logging.info("==== Starting process_all_topics ====")
     
@@ -851,44 +851,48 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
     valid_org_ids = []
     all_orgs = Organization.objects.exclude(plan='inactive')
 
-    for org in all_orgs:
-        if not org.summary_time or not org.summary_timezone:
-            logging.warning(f"Skipping {org.name} - Missing summary_time or timezone.")
-            continue  # Skip org if missing required fields
+    if force:
+        logging.warning("⚠️  FORCE MODE ENABLED: Processing ALL organizations, bypassing time checks")
+        valid_org_ids = list(all_orgs.values_list('id', flat=True))
+    else:
+        for org in all_orgs:
+            if not org.summary_time or not org.summary_timezone:
+                logging.warning(f"Skipping {org.name} - Missing summary_time or timezone.")
+                continue  # Skip org if missing required fields
 
-        try:
-            # Convert UTC time to org's local time
-            org_tz = pytz.timezone(org.summary_timezone)
-            local_now = now_utc.astimezone(org_tz)
+            try:
+                # Convert UTC time to org's local time
+                org_tz = pytz.timezone(org.summary_timezone)
+                local_now = now_utc.astimezone(org_tz)
 
-            # Ensure summary_time is a valid `time` object
-            if not isinstance(org.summary_time, datetime_time):
-                logging.error(f"Invalid summary_time for {org.name}: {org.summary_time}")
-                continue
+                # Ensure summary_time is a valid `time` object
+                if not isinstance(org.summary_time, datetime_time):
+                    logging.error(f"Invalid summary_time for {org.name}: {org.summary_time}")
+                    continue
 
-            # Compute expected run time (30 minutes before summary_time)
-            expected_hour = org.summary_time.hour
-            expected_minute = org.summary_time.minute - 30  # Subtract 30 minutes
-            
-            if expected_minute < 0:  # Handle cases where subtraction moves to the previous hour
-                expected_hour -= 1
-                expected_minute += 60
+                # Compute expected run time (30 minutes before summary_time)
+                expected_hour = org.summary_time.hour
+                expected_minute = org.summary_time.minute - 30  # Subtract 30 minutes
+                
+                if expected_minute < 0:  # Handle cases where subtraction moves to the previous hour
+                    expected_hour -= 1
+                    expected_minute += 60
 
-            # Log the comparison (HH:MM format only)
-            logging.info(
-                f"Org: {org.name} | Local Now: {local_now.strftime('%H:%M')} "
-                f"| Expected Run Time: {expected_hour:02d}:{expected_minute:02d}"
-            )
+                # Log the comparison (HH:MM format only)
+                logging.info(
+                    f"Org: {org.name} | Local Now: {local_now.strftime('%H:%M')} "
+                    f"| Expected Run Time: {expected_hour:02d}:{expected_minute:02d}"
+                )
 
-            # Compare only the hours and minutes
-            if local_now.hour == expected_hour and local_now.minute == expected_minute:
-                logging.info(f"✅ Running process for {org.name} (Time Matched)")
-                valid_org_ids.append(org.id)
-            else:
-                logging.info(f"❌ Skipping {org.name} - Time did not match (Local Now: {local_now.strftime('%H:%M')}, Expected: {expected_hour:02d}:{expected_minute:02d})")
+                # Compare only the hours and minutes
+                if local_now.hour == expected_hour and local_now.minute == expected_minute:
+                    logging.info(f"✅ Running process for {org.name} (Time Matched)")
+                    valid_org_ids.append(org.id)
+                else:
+                    logging.info(f"❌ Skipping {org.name} - Time did not match (Local Now: {local_now.strftime('%H:%M')}, Expected: {expected_hour:02d}:{expected_minute:02d})")
 
-        except Exception as e:
-            logging.error(f"❌ Time zone check error for {org.name}: {str(e)}")
+            except Exception as e:
+                logging.error(f"❌ Time zone check error for {org.name}: {str(e)}")
 
     # Process only organizations that passed the time check
     active_organizations = all_orgs.filter(id__in=valid_org_ids)

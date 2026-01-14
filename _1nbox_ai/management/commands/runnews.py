@@ -16,9 +16,12 @@ class Command(BaseCommand):
         parser.add_argument('--sentences_final_summary', type=int, default=3, help='Amount of sentences per topic in the final summary')
         parser.add_argument('--title_only', action='store_true', help='If set, clustering will only use article titles')
         parser.add_argument('--all_words', action='store_true', help='If set, clustering will include all words, not just capitalized ones')
+        parser.add_argument('--force', action='store_true', help='Force processing for ALL organizations, bypassing time checks (use for testing)')
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('Starting news processing...'))
+        if options['force']:
+            self.stdout.write(self.style.WARNING('⚠️  FORCE MODE: Processing ALL organizations, bypassing time checks'))
         try:
             process_all_topics(
                 days_back=options['days'],
@@ -30,7 +33,8 @@ class Command(BaseCommand):
                 final_merge_percentage=options['final_merge_percentage'],
                 sentences_final_summary=options['sentences_final_summary'],
                 title_only=options['title_only'],
-                all_words=options['all_words']
+                all_words=options['all_words'],
+                force=options['force']
             )
             self.stdout.write(self.style.SUCCESS('News processing completed successfully.'))
         except Exception as e:
