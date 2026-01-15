@@ -139,10 +139,9 @@ CORS_ALLOWED_ORIGINS = [
     "https://nbox-ai-bb518.firebaseapp.com",
     "https://nbox-ai-bb518.web.app",
     "https://briefed-production.up.railway.app",
+    # Localhost entries kept for local development (harmless if not used)
     "http://localhost:3030",
     "http://127.0.0.1:3030",
-    "http://localhost:3000",
-    "http://localhost:8000",
 ]
 
 # Add these settings

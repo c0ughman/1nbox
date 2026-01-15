@@ -34,10 +34,8 @@ def health_check(request):
 def firebase_auth_required(view_func):
     @wraps(view_func)
     def wrapped_view(request, *args, **kwargs):
-        # Handle OPTIONS preflight requests
-        if request.method == 'OPTIONS':
-            return JsonResponse({}, status=200)
-        
+        # CORS middleware handles OPTIONS requests automatically, so we don't need to handle them here
+        # If OPTIONS gets here, let CORS middleware handle it by not blocking it
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Bearer '):
             return JsonResponse({'error': 'No token provided'}, status=401)
