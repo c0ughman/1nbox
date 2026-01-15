@@ -653,6 +653,109 @@ def extract_braces_content(s):
     # Include the end_index in the slice by adding 1
     return s[start_index:end_index + 1]
 
+
+def repair_json(json_string):
+    """
+    Attempts to repair common JSON issues from Gemini API responses.
+    Handles trailing commas, unescaped quotes, and other common issues.
+    """
+    import re
+    
+    if not json_string:
+        return json_string
+    
+    # Remove trailing commas before closing braces/brackets
+    json_string = re.sub(r',(\s*[}\]])', r'\1', json_string)
+    
+    # Fix unescaped newlines in strings (replace actual newlines with \n)
+    # This is tricky - we need to preserve newlines that are part of the JSON structure
+    # but escape newlines inside string values
+    lines = json_string.split('\n')
+    repaired_lines = []
+    in_string = False
+    escape_next = False
+    
+    for line in lines:
+        repaired_line = ""
+        i = 0
+        while i < len(line):
+            char = line[i]
+            
+            if escape_next:
+                repaired_line += char
+                escape_next = False
+            elif char == '\\':
+                repaired_line += char
+                escape_next = True
+            elif char == '"' and (i == 0 or line[i-1] != '\\'):
+                in_string = not in_string
+                repaired_line += char
+            elif in_string and char == '\n':
+                # Escape newlines inside strings
+                repaired_line += '\\n'
+            else:
+                repaired_line += char
+            i += 1
+        
+        repaired_lines.append(repaired_line)
+    
+    json_string = '\n'.join(repaired_lines)
+    
+    # Fix common issues with quotes in content
+    # Replace smart quotes with regular quotes
+    json_string = json_string.replace('"', '"').replace('"', '"')
+    json_string = json_string.replace(''', "'").replace(''', "'")
+    
+    return json_string
+
+
+def parse_json_with_repair(json_string, max_retries=3):
+    """
+    Attempts to parse JSON, repairing it if necessary.
+    Returns parsed JSON or raises an exception if all attempts fail.
+    """
+    import json
+    
+    # First, extract JSON from any surrounding text
+    json_string = extract_braces_content(json_string)
+    
+    if not json_string:
+        raise ValueError("No JSON content found in response")
+    
+    last_error = None
+    
+    for attempt in range(max_retries):
+        try:
+            # Try parsing as-is first
+            return json.loads(json_string)
+        except json.JSONDecodeError as e:
+            last_error = e
+            logging.warning(f"JSON parse attempt {attempt + 1} failed: {str(e)}")
+            
+            if attempt < max_retries - 1:
+                # Try to repair the JSON
+                json_string = repair_json(json_string)
+                logging.info(f"Attempting JSON repair (attempt {attempt + 1})...")
+            else:
+                # Last attempt - log the problematic JSON for debugging
+                logging.error(f"Failed to parse JSON after {max_retries} attempts")
+                logging.error(f"JSON decode error: {str(e)}")
+                logging.error(f"Error position: line {e.lineno}, column {e.colno}")
+                # Log a snippet around the error
+                if e.lineno and e.colno:
+                    lines = json_string.split('\n')
+                    error_line_idx = e.lineno - 1
+                    if 0 <= error_line_idx < len(lines):
+                        error_line = lines[error_line_idx]
+                        start = max(0, e.colno - 50)
+                        end = min(len(error_line), e.colno + 50)
+                        logging.error(f"Problem area: ...{error_line[start:end]}...")
+                logging.error(f"Full JSON (first 2000 chars): {json_string[:2000]}")
+                raise
+    
+    # Should never reach here, but just in case
+    raise last_error
+
 @time_function
 def parse_input(input_string):
     # Safely evaluate the string to a dictionary
@@ -810,17 +913,14 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                     topic.organization.description if topic.organization.description else ""
                 )
 
-                logging.info("----------- LOGGING SHIT -----------")
+                logging.info("----------- LOGGING SUMMARY GENERATION -----------")
                 logging.info(f"Organization description: {topic.organization.description}")
-                logging.info(f"Raw OpenAI response: {final_summary_json}")
+                logging.info(f"Raw Gemini response (first 500 chars): {final_summary_json[:500]}...")
 
-                final_summary_json = extract_braces_content(final_summary_json)
+                # Parse JSON with repair logic
+                final_summary_data = parse_json_with_repair(final_summary_json)
 
-                logging.info(f"After extracting braces: {final_summary_json}")
-
-                final_summary_data = json.loads(final_summary_json)
-
-                logging.info(f"Parsed summary JSON: {json.dumps(final_summary_data, indent=2)}")
+                logging.info(f"Successfully parsed summary JSON: {json.dumps(final_summary_data, indent=2)}")
 
             except Exception as e:
                 import traceback
