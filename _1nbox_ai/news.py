@@ -664,49 +664,56 @@ def repair_json(json_string):
     if not json_string:
         return json_string
     
-    # Remove trailing commas before closing braces/brackets
+    # Remove trailing commas before closing braces/brackets (most common issue)
     json_string = re.sub(r',(\s*[}\]])', r'\1', json_string)
     
-    # Fix unescaped newlines in strings (replace actual newlines with \n)
-    # This is tricky - we need to preserve newlines that are part of the JSON structure
-    # but escape newlines inside string values
-    lines = json_string.split('\n')
-    repaired_lines = []
-    in_string = False
-    escape_next = False
-    
-    for line in lines:
-        repaired_line = ""
-        i = 0
-        while i < len(line):
-            char = line[i]
-            
-            if escape_next:
-                repaired_line += char
-                escape_next = False
-            elif char == '\\':
-                repaired_line += char
-                escape_next = True
-            elif char == '"' and (i == 0 or line[i-1] != '\\'):
-                in_string = not in_string
-                repaired_line += char
-            elif in_string and char == '\n':
-                # Escape newlines inside strings
-                repaired_line += '\\n'
-            else:
-                repaired_line += char
-            i += 1
-        
-        repaired_lines.append(repaired_line)
-    
-    json_string = '\n'.join(repaired_lines)
-    
-    # Fix common issues with quotes in content
-    # Replace smart quotes with regular quotes
+    # Fix smart quotes (replace with regular quotes)
     json_string = json_string.replace('"', '"').replace('"', '"')
     json_string = json_string.replace(''', "'").replace(''', "'")
     
-    return json_string
+    # Fix unescaped backslashes (but preserve escaped ones)
+    # This is a simplified approach - we'll handle newlines separately
+    json_string = re.sub(r'(?<!\\)\\(?!["\\/bfnrtu])', r'\\\\', json_string)
+    
+    # Try to fix unescaped newlines and tabs in string values
+    # We'll use a state machine to track if we're inside a string
+    result = []
+    in_string = False
+    escape_next = False
+    i = 0
+    
+    while i < len(json_string):
+        char = json_string[i]
+        
+        if escape_next:
+            result.append(char)
+            escape_next = False
+        elif char == '\\':
+            result.append(char)
+            escape_next = True
+        elif char == '"' and (i == 0 or json_string[i-1] != '\\'):
+            in_string = not in_string
+            result.append(char)
+        elif in_string:
+            # Inside a string value
+            if char == '\n':
+                # Escape newlines inside strings
+                result.append('\\n')
+            elif char == '\t':
+                # Escape tabs inside strings
+                result.append('\\t')
+            elif char == '\r':
+                # Escape carriage returns
+                result.append('\\r')
+            else:
+                result.append(char)
+        else:
+            # Outside string - keep as is
+            result.append(char)
+        
+        i += 1
+    
+    return ''.join(result)
 
 
 def parse_json_with_repair(json_string, max_retries=3):
