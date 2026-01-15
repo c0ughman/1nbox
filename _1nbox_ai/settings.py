@@ -32,12 +32,15 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-c
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = [
-    '127.0.0.1',
-    'localhost',
-    '.railway.app',
+    'trybriefed.com',
+    'www.trybriefed.com',
     'briefed-production.up.railway.app',
+    '.railway.app',
     'nbox-ai-bb518.firebaseapp.com',
     'nbox-ai-bb518.web.app',
+    # Localhost for local development
+    '127.0.0.1',
+    'localhost',
 ]
 
 RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
