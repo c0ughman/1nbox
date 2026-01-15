@@ -16,8 +16,21 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+# SendGrid API key - will be validated when used
 sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
-sg = SendGridAPIClient(sendgrid_api_key)
+
+def get_sendgrid_client():
+    """
+    Get SendGrid client with proper validation.
+    Raises ValueError if API key is missing or invalid.
+    """
+    if not sendgrid_api_key:
+        raise ValueError("SENDGRID_API_KEY environment variable is not set")
+    
+    if not sendgrid_api_key.startswith('SG.'):
+        raise ValueError(f"SENDGRID_API_KEY appears invalid (should start with 'SG.'): {sendgrid_api_key[:10]}...")
+    
+    return SendGridAPIClient(sendgrid_api_key)
 
 def get_user_topics_summary(organization):
     """
