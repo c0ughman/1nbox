@@ -17,18 +17,39 @@ logging.basicConfig(
 )
 
 # SendGrid API key - will be validated when used
-sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+_raw_sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+# Strip whitespace/newlines that might have been accidentally added
+sendgrid_api_key = _raw_sendgrid_api_key.strip() if _raw_sendgrid_api_key else None
 
 def get_sendgrid_client():
     """
     Get SendGrid client with proper validation.
-    Raises ValueError if API key is missing or invalid.
+    Raises ValueError if API key is missing.
+    Note: SendGrid API keys typically start with 'SG.' and are ~69 characters,
+    but we let SendGrid validate the actual format.
     """
     if not sendgrid_api_key:
         raise ValueError("SENDGRID_API_KEY environment variable is not set")
     
+    # Check for common issues but don't fail - let SendGrid validate
+    key_length = len(sendgrid_api_key)
+    key_preview = sendgrid_api_key[:15] + "..." if len(sendgrid_api_key) > 15 else sendgrid_api_key
+    
+    # Warn if format looks unusual (but still try to use it)
     if not sendgrid_api_key.startswith('SG.'):
-        raise ValueError(f"SENDGRID_API_KEY appears invalid (should start with 'SG.'): {sendgrid_api_key[:10]}...")
+        logging.warning(f"⚠️  SendGrid API key doesn't start with 'SG.' - this is unusual.")
+        logging.warning(f"   Key preview: {key_preview}")
+        logging.warning(f"   Key length: {key_length} characters")
+        logging.warning(f"   If you get 401 errors, verify you copied the full API key from SendGrid.")
+        logging.warning(f"   SendGrid API keys should start with 'SG.' and be ~69 characters long.")
+        logging.warning(f"   Make sure you copied the API KEY (not the API Key ID or webhook secret).")
+    else:
+        # If it does start with SG., check length
+        if key_length < 60 or key_length > 80:
+            logging.warning(f"⚠️  SendGrid API key length ({key_length}) seems unusual (expected ~69 characters)")
+    
+    # Log key info for debugging (first/last few chars only, never full key)
+    logging.info(f"Using SendGrid API key: {sendgrid_api_key[:10]}...{sendgrid_api_key[-5:] if len(sendgrid_api_key) > 15 else ''} (length: {key_length})")
     
     return SendGridAPIClient(sendgrid_api_key)
 

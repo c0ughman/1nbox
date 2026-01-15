@@ -723,18 +723,24 @@ def send_email(email, organization_name, organization_id):
     """
     import logging
     
-    sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+    _raw_sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+    # Strip whitespace/newlines that might have been accidentally added
+    sendgrid_api_key = _raw_sendgrid_api_key.strip() if _raw_sendgrid_api_key else None
     
-    # Validate API key before using it
+    # Validate API key exists before using it
     if not sendgrid_api_key:
         error_msg = "SENDGRID_API_KEY environment variable is not set"
         logging.error(f"❌ {error_msg}")
         return False, error_msg
     
+    # Warn if format looks unusual (but still try to use it - let SendGrid validate)
+    key_length = len(sendgrid_api_key)
     if not sendgrid_api_key.startswith('SG.'):
-        error_msg = f"SENDGRID_API_KEY appears invalid (should start with 'SG.'): {sendgrid_api_key[:10]}..."
-        logging.error(f"❌ {error_msg}")
-        return False, error_msg
+        logging.warning(f"⚠️  SendGrid API key doesn't start with 'SG.' - this is unusual.")
+        logging.warning(f"   Key preview: {sendgrid_api_key[:15]}...")
+        logging.warning(f"   Key length: {key_length} characters")
+        logging.warning(f"   Make sure you copied the API KEY (not API Key ID or webhook secret)")
+        logging.warning(f"   SendGrid will validate the key - if it's wrong, you'll get a 401 error")
     
     try:
         sg = SendGridAPIClient(sendgrid_api_key)
