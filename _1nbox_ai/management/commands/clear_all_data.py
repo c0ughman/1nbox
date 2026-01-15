@@ -45,16 +45,21 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('=' * 60))
             
             if not firebase_only:
-                org_count = Organization.objects.count()
-                user_count = User.objects.count()
-                topic_count = Topic.objects.count()
-                summary_count = Summary.objects.count()
-                
-                self.stdout.write(f'\nDatabase counts:')
-                self.stdout.write(f'  - Organizations: {org_count}')
-                self.stdout.write(f'  - Users: {user_count}')
-                self.stdout.write(f'  - Topics: {topic_count}')
-                self.stdout.write(f'  - Summaries: {summary_count}')
+                try:
+                    org_count = Organization.objects.count()
+                    user_count = User.objects.count()
+                    topic_count = Topic.objects.count()
+                    summary_count = Summary.objects.count()
+                    
+                    self.stdout.write(f'\nDatabase counts:')
+                    self.stdout.write(f'  - Organizations: {org_count}')
+                    self.stdout.write(f'  - Users: {user_count}')
+                    self.stdout.write(f'  - Topics: {topic_count}')
+                    self.stdout.write(f'  - Summaries: {summary_count}')
+                except Exception as e:
+                    # Database connection might fail if running locally with Railway env vars
+                    self.stdout.write(self.style.WARNING(f'\nCould not connect to database to show counts: {str(e)}'))
+                    self.stdout.write(self.style.WARNING('This is normal if running locally. Proceeding with deletion...'))
             
             if not database_only:
                 try:
