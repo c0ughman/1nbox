@@ -140,12 +140,15 @@ CORS_ALLOWED_ORIGINS = [
     "https://nbox-ai-bb518.web.app",
     "https://briefed-production.up.railway.app",
     "http://localhost:3030",
-    "http://127.0.0.1:3030"
+    "http://127.0.0.1:3030",
+    "http://localhost:3000",
+    "http://localhost:8000",
 ]
 
 # Add these settings
 CORS_ALLOW_CREDENTIALS = True
 
+# Allow all methods including OPTIONS for preflight
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -155,6 +158,7 @@ CORS_ALLOW_METHODS = [
     'PUT',
 ]
 
+# Allow all common headers including Authorization for CORS preflight
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -165,7 +169,18 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'access-control-request-method',
+    'access-control-request-headers',
 ]
+
+# Expose headers to frontend
+CORS_EXPOSE_HEADERS = [
+    'content-type',
+    'authorization',
+]
+
+# Preflight cache time (in seconds) - 24 hours
+CORS_PREFLIGHT_MAX_AGE = 86400
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
