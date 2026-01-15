@@ -27,8 +27,16 @@ from sendgrid.helpers.mail import Mail
 from .bubbles import process_feeds_and_cluster
 
 
+@csrf_exempt
 def health_check(request):
-    return JsonResponse({'status': 'ok'})
+    """Health check endpoint that doesn't require authentication - useful for debugging CORS"""
+    response = JsonResponse({'status': 'ok', 'message': 'Backend is running'})
+    # Explicitly set CORS headers for health check
+    response['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+    response['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response['Access-Control-Allow-Credentials'] = 'true'
+    return response
 
 
 def firebase_auth_required(view_func):

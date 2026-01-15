@@ -147,7 +147,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3030",
 ]
 
-# Add these settings
+# CORS Configuration
 CORS_ALLOW_CREDENTIALS = True
 
 # Allow all methods including OPTIONS for preflight
@@ -183,6 +183,9 @@ CORS_EXPOSE_HEADERS = [
 
 # Preflight cache time (in seconds) - 24 hours
 CORS_PREFLIGHT_MAX_AGE = 86400
+
+# Additional CORS settings for better compatibility
+CORS_ALLOW_PRIVATE_NETWORK = True  # Allow private network requests
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
