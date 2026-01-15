@@ -89,11 +89,17 @@ def send_email(user, subject, content):
 sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
 sg = SendGridAPIClient(sendgrid_api_key)
 
-def send_summaries():
+def send_summaries(force=False):
     """
     Main function to process and send summaries for all active organizations.
+    
+    Args:
+        force: If True, bypass time checks and send to all organizations regardless of time
     """
     logging.info("==== Starting send_summaries ====")
+    
+    if force:
+        logging.info("⚠️  FORCE MODE: Sending emails to ALL organizations, bypassing time checks")
 
     # Get current UTC time
     now_utc = datetime.now(pytz.utc)
@@ -102,33 +108,40 @@ def send_summaries():
     for organization in Organization.objects.exclude(plan="inactive"):
         # 1) Check if summary_time and timezone are available
         if not organization.summary_time or not organization.summary_timezone:
-            logging.warning(f"Skipping {organization.name} - Missing summary_time or timezone.")
-            continue
-
-        try:
-            org_tz = pytz.timezone(organization.summary_timezone)
-            local_now = now_utc.astimezone(org_tz)
-
-            org_summary_today = datetime(
-                year=local_now.year,
-                month=local_now.month,
-                day=local_now.day,
-                hour=organization.summary_time.hour,
-                minute=organization.summary_time.minute,
-                second=0,  # Explicitly setting seconds to 0
-                tzinfo=org_tz
-            )
-
-            # Compare ONLY hours and minutes (ignore seconds)
-            if local_now.hour != org_summary_today.hour or local_now.minute != org_summary_today.minute:
-                logging.info(f"❌ Skipping {organization.name} - Time did not match (Expected {org_summary_today.strftime('%H:%M')}, Got {local_now.strftime('%H:%M')})")
+            if force:
+                logging.info(f"⚠️  FORCE MODE: Processing {organization.name} despite missing summary_time/timezone")
+            else:
+                logging.warning(f"Skipping {organization.name} - Missing summary_time or timezone.")
                 continue
 
-            logging.info(f"✅ Time Matched for {organization.name} - Proceeding with email sending.")
+        # Skip time check if force mode is enabled
+        if not force:
+            try:
+                org_tz = pytz.timezone(organization.summary_timezone)
+                local_now = now_utc.astimezone(org_tz)
 
-        except Exception as e:
-            logging.error(f"❌ Time zone check error for {organization.name}: {str(e)}")
-            continue
+                org_summary_today = datetime(
+                    year=local_now.year,
+                    month=local_now.month,
+                    day=local_now.day,
+                    hour=organization.summary_time.hour,
+                    minute=organization.summary_time.minute,
+                    second=0,  # Explicitly setting seconds to 0
+                    tzinfo=org_tz
+                )
+
+                # Compare ONLY hours and minutes (ignore seconds)
+                if local_now.hour != org_summary_today.hour or local_now.minute != org_summary_today.minute:
+                    logging.info(f"❌ Skipping {organization.name} - Time did not match (Expected {org_summary_today.strftime('%H:%M')}, Got {local_now.strftime('%H:%M')})")
+                    continue
+
+                logging.info(f"✅ Time Matched for {organization.name} - Proceeding with email sending.")
+
+            except Exception as e:
+                logging.error(f"❌ Time zone check error for {organization.name}: {str(e)}")
+                continue
+        else:
+            logging.info(f"⚠️  FORCE MODE: Processing {organization.name} - bypassing time check")
 
         # 2) If we get here, we want to send the email summary to that org’s users
         topics = get_user_topics_summary(organization)
