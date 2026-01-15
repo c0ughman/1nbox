@@ -37,23 +37,38 @@ When you get `401 Unauthorized` errors from SendGrid, it's usually one of these 
 
 ---
 
-### Step 3: Disable IP Allowlist (Recommended for Railway)
+### Step 3: Remove IP Allowlist (Required for Railway)
 
-**Important**: Railway uses dynamic IP addresses, so IP allowlisting won't work reliably.
+**What is IP Allowlist?**
+- IP Allowlist restricts SendGrid API access to **specific IP addresses only**
+- When enabled, SendGrid **ONLY accepts API calls** from IPs in the list
+- If your app's IP isn't in the list → **401 Unauthorized error**
+- Railway uses **dynamic IPs** that change with each deployment → breaks allowlist
+
+**The IP You See:**
+- The IP address showing your city is likely from:
+  - Your **Heroku backend** (old hosting)
+  - Your **local machine** (if you tested locally)
+  - Not Railway's current IP (which changes constantly)
+
+**How to Fix (Remove All IPs):**
 
 1. Go to **SendGrid Dashboard** → **Settings** → **IP Access Management**
-2. Check if **"IP Allowlist"** is enabled
-3. If enabled, you have two options:
+2. You'll see a list of allowed IP addresses
+3. **Delete/Remove ALL IP addresses** from the list:
+   - Click the **trash/delete icon** (🗑️) next to each IP
+   - Or select the IP and click **"Remove"** or **"Delete"** button
+   - Remove every IP until the list is **empty**
+4. **Empty allowlist = No IP restrictions**
+   - SendGrid will accept API calls from any IP
+   - Security comes from your API key (not IP address)
 
-   **Option A: Disable IP Allowlist (Easiest)**
-   - Toggle **"IP Allowlist"** to **OFF**
-   - This allows API calls from any IP (API key is the security)
+**Why This Works:**
+- When allowlist is **empty**, SendGrid doesn't restrict by IP
+- Railway can use any IP address (since they're dynamic)
+- Your API key provides the security instead
 
-   **Option B: Add Railway IPs (Not Recommended)**
-   - Railway uses dynamic IPs that change frequently
-   - This approach is unreliable
-
-**Recommendation**: Disable IP allowlist and rely on API key security.
+**Important**: Make sure you have your API key saved before removing IPs, in case you get locked out!
 
 ---
 
