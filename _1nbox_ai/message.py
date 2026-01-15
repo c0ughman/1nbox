@@ -72,22 +72,51 @@ def get_user_topics_summary(organization):
     return topic_list
 
 def send_email(user, subject, content):
-    message = Mail(
-        from_email=('feed@trybriefed.com', 'Briefed'),  # <-- this part
-        to_emails=user.email,
-        subject=subject,
-        html_content=content
-    )
-    
+    """
+    Send an email using SendGrid.
+    Returns (success: bool, result: status_code or error_message)
+    """
     try:
+        # Get SendGrid client with validation
+        sg = get_sendgrid_client()
+        
+        message = Mail(
+            from_email=('feed@trybriefed.com', 'Briefed'),
+            to_emails=user.email,
+            subject=subject,
+            html_content=content
+        )
+        
         response = sg.send(message)
-        return True, response.status_code
+        
+        # Check response status
+        if response.status_code >= 200 and response.status_code < 300:
+            logging.info(f"✅ Email sent successfully to {user.email} - Status: {response.status_code}")
+            return True, response.status_code
+        else:
+            logging.error(f"❌ SendGrid returned non-success status {response.status_code} for {user.email}")
+            logging.error(f"Response body: {response.body if hasattr(response, 'body') else 'N/A'}")
+            return False, f"SendGrid returned status {response.status_code}"
+            
+    except ValueError as e:
+        # API key validation error
+        logging.error(f"❌ SendGrid API key error: {str(e)}")
+        return False, f"API key error: {str(e)}"
     except Exception as e:
-        logging.error(f"Failed to send email to {user.email}: {str(e)}")
-        return False, str(e)
-
-sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
-sg = SendGridAPIClient(sendgrid_api_key)
+        # SendGrid API error (401, 403, etc.)
+        error_msg = str(e)
+        logging.error(f"❌ Failed to send email to {user.email}: {error_msg}")
+        
+        # Log more details for 401 errors
+        if '401' in error_msg or 'unauthorized' in error_msg.lower():
+            logging.error("⚠️  401 Unauthorized - Check:")
+            logging.error("   1. SENDGRID_API_KEY is set in Railway environment variables")
+            logging.error("   2. API key is correct and starts with 'SG.'")
+            logging.error("   3. API key has 'Mail Send' permissions")
+            logging.error("   4. API key hasn't been revoked")
+            logging.error(f"   5. Current API key value (first 10 chars): {sendgrid_api_key[:10] if sendgrid_api_key else 'NOT SET'}...")
+        
+        return False, error_msg
 
 def send_summaries(force=False):
     """

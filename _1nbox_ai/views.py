@@ -719,29 +719,66 @@ def join_team_member(request, organization_id):
 def send_email(email, organization_name, organization_id):
     """
     Send an invitation email using SendGrid.
+    Returns (success: bool, result: status_code or error_message)
     """
-    sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+    import logging
     
-    context = {
-        'organization_name': organization_name,
-        'join_url': f"https://trybriefed.com/pages/join.html?org={organization_id}"
-    }
+    sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
     
-    content = render_to_string('invitation.html', context)
+    # Validate API key before using it
+    if not sendgrid_api_key:
+        error_msg = "SENDGRID_API_KEY environment variable is not set"
+        logging.error(f"❌ {error_msg}")
+        return False, error_msg
     
-    message = Mail(
-        from_email=('feed@trybriefed.com', 'Briefed'),  # <-- this part
-        to_emails=email,
-        subject=f"You've been invited to join {organization_name} on Briefed",
-        html_content=content
-    )
+    if not sendgrid_api_key.startswith('SG.'):
+        error_msg = f"SENDGRID_API_KEY appears invalid (should start with 'SG.'): {sendgrid_api_key[:10]}..."
+        logging.error(f"❌ {error_msg}")
+        return False, error_msg
     
     try:
+        sg = SendGridAPIClient(sendgrid_api_key)
+        
+        context = {
+            'organization_name': organization_name,
+            'join_url': f"https://trybriefed.com/pages/join.html?org={organization_id}"
+        }
+        
+        content = render_to_string('invitation.html', context)
+        
+        message = Mail(
+            from_email=('feed@trybriefed.com', 'Briefed'),
+            to_emails=email,
+            subject=f"You've been invited to join {organization_name} on Briefed",
+            html_content=content
+        )
+        
         response = sg.send(message)
-        return True, response.status_code
+        
+        # Check response status
+        if response.status_code >= 200 and response.status_code < 300:
+            logging.info(f"✅ Invitation email sent successfully to {email} - Status: {response.status_code}")
+            return True, response.status_code
+        else:
+            logging.error(f"❌ SendGrid returned non-success status {response.status_code} for {email}")
+            logging.error(f"Response body: {response.body if hasattr(response, 'body') else 'N/A'}")
+            return False, f"SendGrid returned status {response.status_code}"
+            
     except Exception as e:
-        print(f"Failed to send email to {email}: {str(e)}")
-        return False, str(e)
+        error_msg = str(e)
+        logging.error(f"❌ Failed to send invitation email to {email}: {error_msg}")
+        
+        # Log more details for 401 errors
+        if '401' in error_msg or 'unauthorized' in error_msg.lower():
+            logging.error("⚠️  401 Unauthorized - Check:")
+            logging.error("   1. SENDGRID_API_KEY is set in Railway environment variables")
+            logging.error("   2. API key is correct and starts with 'SG.'")
+            logging.error("   3. API key has 'Mail Send' permissions")
+            logging.error("   4. API key hasn't been revoked")
+            logging.error(f"   5. Current API key value (first 10 chars): {sendgrid_api_key[:10]}...")
+            logging.error("   6. Sender email 'feed@trybriefed.com' is verified in SendGrid")
+        
+        return False, error_msg
 
 @csrf_exempt
 @firebase_auth_required
