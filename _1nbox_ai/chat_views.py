@@ -33,170 +33,25 @@ def firebase_auth_required(view_func):
 
 
 DOCUMENT_TYPE_PROMPTS = {
-    'executive_brief': """Generate an executive brief based on the following news articles.
+    'executive_brief': """Generate an Executive Brief with: Headline + 5-8 key bullets + 3 key risks + 3 opportunities + 3 recommended actions. Be concise and high-signal.""",
 
-FORMAT YOUR RESPONSE AS:
+    'consulting_memo': """Structure your response as a Consulting Memo with: Situation / Complication / Key Insights / Recommendations / Next Steps. Make it structured and client-ready.""",
 
-# Executive Brief
-**Date:** {date}
+    'swot': """Present your response as a SWOT Analysis with: Strengths / Weaknesses / Opportunities / Threats sections, each with 3-5 justified bullets.""",
 
-## Key Developments
-[3-5 bullet points of the most important developments]
+    'pestle': """Format your response as a PESTLE analysis covering: Political / Economic / Social / Technological / Legal / Environmental factors with implications for each.""",
 
-## What This Means
-[2-3 paragraphs explaining implications for business leaders]
+    'risk_register': """Create a Risk Register table format with columns: Risk | Likelihood (High/Medium/Low) | Impact (High/Medium/Low) | Early Indicators | Mitigation strategies.""",
 
-## Watch List
-[3-5 items to monitor going forward]
+    'market_landscape': """Provide a Market & Competitive Landscape analysis with: Market trends / Competitor moves / Customer signals / Strategic implications sections.""",
 
-## Recommended Actions
-[2-3 specific, actionable recommendations]""",
+    'investor_board_memo': """Structure as an Investor/Board Memo with: Top developments / Why it matters / Key risks / Recommended posture / Anticipated FAQs with answers.""",
 
-    'swot_analysis': """Generate a SWOT analysis based on the following news articles.
+    'slide_outline': """Create a 10-slide deck outline with clear titles and 3-5 bullet points per slide. Make it presentation-ready.""",
 
-FORMAT YOUR RESPONSE AS:
+    'client_email': """Draft a professional client email with: Subject line / 2-4 concise paragraphs / Key bullet points / Clear call-to-action.""",
 
-# SWOT Analysis
-
-## Strengths
-[Positive factors/advantages evident from the news]
-
-## Weaknesses
-[Vulnerabilities or challenges highlighted]
-
-## Opportunities
-[Potential opportunities emerging from developments]
-
-## Threats
-[Risks or threats to be aware of]
-
-## Strategic Implications
-[2-3 paragraphs on what this means strategically]""",
-
-    'risk_assessment': """Generate a risk assessment based on the following news articles.
-
-FORMAT YOUR RESPONSE AS:
-
-# Risk Assessment
-
-## Risk Summary
-[Overall risk level: Low/Medium/High/Critical]
-[One paragraph summary]
-
-## Identified Risks
-[For each significant risk (max 5):
-- **Severity:** Low/Medium/High/Critical
-- **Likelihood:** Low/Medium/High
-- **Description:** What is this risk
-- **Mitigation:** Suggested mitigation steps]
-
-## Emerging Concerns
-[Items that aren't risks yet but could become ones]
-
-## Recommendations
-[Prioritized list of risk management actions]""",
-
-    'competitive_intel': """Generate a competitive intelligence report based on the following news articles.
-
-FORMAT YOUR RESPONSE AS:
-
-# Competitive Intelligence Report
-
-## Market Overview
-[Current state of the competitive landscape]
-
-## Competitor Moves
-[Key actions and announcements from competitors]
-
-## Market Trends
-[Emerging trends affecting competition]
-
-## Opportunities
-[Gaps or opportunities identified]
-
-## Recommendations
-[Strategic recommendations based on competitive analysis]""",
-
-    'trend_report': """Generate a trend report based on the following news articles.
-
-FORMAT YOUR RESPONSE AS:
-
-# Trend Report
-
-## Emerging Trends
-[Key trends identified from the news]
-
-## Trend Analysis
-[For each trend:
-- Description
-- Potential Impact
-- Timeline]
-
-## Industry Implications
-[What these trends mean for the industry]
-
-## Action Items
-[How to prepare for or capitalize on these trends]""",
-
-    'stakeholder_brief': """Generate a stakeholder brief based on the following news articles.
-
-FORMAT YOUR RESPONSE AS:
-
-# Stakeholder Brief
-
-## Executive Summary
-[High-level summary for stakeholders]
-
-## Key Updates
-[Important developments stakeholders should know]
-
-## Impact Assessment
-[How these developments affect stakeholders]
-
-## Next Steps
-[Recommended actions and timeline]
-
-## Q&A Preparation
-[Anticipated questions and suggested responses]""",
-
-    'action_items': """Generate a list of action items based on the following news articles.
-
-FORMAT YOUR RESPONSE AS:
-
-# Action Items
-
-## Immediate Actions (This Week)
-[Urgent items requiring immediate attention]
-
-## Short-term Actions (This Month)
-[Important items to address soon]
-
-## Long-term Actions (This Quarter)
-[Strategic items to plan for]
-
-## Monitoring Items
-[Things to watch but not act on yet]""",
-
-    'market_snapshot': """Generate a market snapshot based on the following news articles.
-
-FORMAT YOUR RESPONSE AS:
-
-# Market Snapshot
-
-## Market Conditions
-[Current state of the market]
-
-## Key Metrics
-[Important numbers and indicators]
-
-## Notable Events
-[Significant market events]
-
-## Sentiment Analysis
-[Overall market sentiment: Bullish/Neutral/Bearish]
-
-## Outlook
-[Short-term market outlook]"""
+    'talking_points': """Provide 10-15 crisp talking points grouped by theme, plus 3 tough Q&A responses with suggested answers. Make them soundbite-friendly."""
 }
 
 
@@ -242,49 +97,60 @@ def generate_chat_response(topic, user_message, conversation_history, document_t
         raise ValueError("Gemini API key not found in environment variables. Set GEMINI_API_KEY or GEMINI_KEY.")
 
     genai.configure(api_key=gemini_key)
-    # Use gemini-2.5-flash-lite (cheapest smart model)
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+    # Use gemini-2.0-flash-exp for better performance
+    model = genai.GenerativeModel("gemini-2.0-flash-exp")
 
     context, articles = get_topic_context(topic)
 
     history_text = ""
-    for msg in conversation_history:
+    for msg in conversation_history[-10:]:  # Only last 10 messages for context
         role = "User" if msg.role == "user" else "Assistant"
         history_text += f"{role}: {msg.content}\n\n"
 
-    if document_type and document_type in DOCUMENT_TYPE_PROMPTS:
-        prompt = f"""You are Briefed Chat, an AI assistant specialized in analyzing news content.
+    # Build comprehensive article list for context
+    articles_context = "\n\nAVAILABLE ARTICLES:\n"
+    for i, article in enumerate(articles[:20], 1):  # Include up to 20 articles
+        articles_context += f"{i}. {article.get('title', 'Untitled')}\n   URL: {article.get('link', 'N/A')}\n"
 
-CONTEXT:
-{context}
+    if document_type and document_type in DOCUMENT_TYPE_PROMPTS:
+        prompt = f"""You are Briefed Chat, an AI assistant specialized in analyzing news content for consultants, analysts, and executives.
+
+TOPIC: {topic.name}
+
+NEWS CONTEXT:
+{context}{articles_context}
 
 CONVERSATION HISTORY:
 {history_text}
 
+FORMAT INSTRUCTIONS:
 {DOCUMENT_TYPE_PROMPTS[document_type]}
 
 USER REQUEST: {user_message}
 
-Generate the requested document based on the news context provided."""
+Generate the requested document based on the news context provided. Include relevant article citations with URLs when making specific claims."""
     else:
         prompt = f"""You are Briefed Chat, an AI assistant specialized in analyzing and discussing news content.
 
-CONTEXT:
-{context}
+TOPIC: {topic.name}
+
+NEWS CONTEXT:
+{context}{articles_context}
 
 CONVERSATION HISTORY:
 {history_text}
 
 INSTRUCTIONS:
 1. Answer questions based on the news context provided above
-2. Always cite specific articles when making claims
+2. Always cite specific articles with URLs when making claims (e.g., "According to [article title](URL)...")
 3. If asked about something not covered in the articles, say so clearly
 4. Be concise but thorough
 5. Highlight connections between different stories when relevant
+6. Use markdown formatting for better readability
 
 USER QUESTION: {user_message}
 
-Respond with a helpful, factual answer."""
+Respond with a helpful, factual answer with citations."""
 
     response = model.generate_content(prompt)
     return response.text.strip(), articles
