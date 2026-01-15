@@ -74,7 +74,8 @@ def generate_digest_content(topic, frequency='daily'):
         raise ValueError("Gemini API key not found. Set GEMINI_API_KEY or GEMINI_KEY.")
 
     genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    # Use gemini-2.5-flash-lite (cheapest smart model)
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
     period = "today" if frequency == "daily" else "this week"
 

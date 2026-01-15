@@ -519,8 +519,8 @@ def get_final_summary(
         raise ValueError("Gemini API key not found in environment variables. Set GEMINI_API_KEY or GEMINI_KEY.")
 
     genai.configure(api_key=gemini_key)
-    # Use gemini-1.5-flash (gemini-2.0-flash doesn't exist)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    # Use gemini-2.5-flash-lite (cheapest smart model, generally available)
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
     all_summaries = "\n\n".join(cluster_summaries)
 
@@ -835,7 +835,7 @@ def process_topic(topic, days_back=1, common_word_threshold=2, top_words_to_cons
                 elif "rate limit" in str(e).lower() or "quota" in str(e).lower():
                     logging.error("⚠️ Gemini API rate limit or quota exceeded!")
                 elif "model" in str(e).lower():
-                    logging.error("⚠️ Gemini model error - check if 'gemini-1.5-flash' is available!")
+                    logging.error("⚠️ Gemini model error - check if 'gemini-2.5-flash-lite' is available!")
                 
                 final_summary_data = {
                     "summary": [{"title": "Error", "content": f"Failed to generate summary: {str(e)}"}],

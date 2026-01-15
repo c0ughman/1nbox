@@ -21,7 +21,8 @@ def generate_answer(topic, body, context):
         raise ValueError("Gemini API key not found in environment variables. Set GEMINI_API_KEY or GEMINI_KEY.")
 
     genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    # Use gemini-2.5-flash-lite (cheapest smart model)
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
     # Construct context for prompt
     context_text = ""

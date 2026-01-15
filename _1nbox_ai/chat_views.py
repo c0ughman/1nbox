@@ -242,7 +242,8 @@ def generate_chat_response(topic, user_message, conversation_history, document_t
         raise ValueError("Gemini API key not found in environment variables. Set GEMINI_API_KEY or GEMINI_KEY.")
 
     genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    # Use gemini-2.5-flash-lite (cheapest smart model)
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
     context, articles = get_topic_context(topic)
 
