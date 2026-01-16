@@ -1,0 +1,537 @@
+{
+  "prd": {
+    "id": "briefed-chat",
+    "name": "Briefed Chat",
+    "type": "subproduct",
+    "status": "draft",
+    "version": "0.1.0",
+    "created_at": "2026-01-12",
+    "owner": "Briefed",
+    "summary": "A ChatGPT-style chat experience that is fully connected to the existing Briefed/1nbox backend (topics + news summaries + AI Q&A), presented with Briefed’s design language. Users pick a news category (existing Topic), browse a horizontal news carousel, and chat with an AI that can generate consultant-friendly report formats.",
+    "context_existing_platform": {
+      "backend": {
+        "stack": "Django",
+        "auth": "Firebase Auth (Bearer token) used by most endpoints; note: /message_received/ currently does not require auth.",
+        "core_models": ["Organization", "User", "Topic", "Summary", "Comment"],
+        "key_existing_endpoints": [
+          {
+            "method": "GET",
+            "path": "/get_user_organization_data/",
+            "auth": "Firebase Bearer",
+            "notes": "Returns user/org + topics with latest_summary (final_summary, clusters, questions)."
+          },
+          {
+            "method": "POST",
+            "path": "/message_received/",
+            "auth": "none (today)",
+            "content_type": "application/x-www-form-urlencoded",
+            "params": ["topic", "body", "context"],
+            "notes": "Returns plain text answer from Gemini using the topic’s latest summary + cluster_summaries."
+          }
+        ],
+        "news_data_available_for_ui": {
+          "topics": "Organization topics (used as 'categories')",
+          "topic_latest_summary": {
+            "final_summary": "JSON: summary[] and questions[]",
+            "clusters": "List of clusters; each cluster has common_words and articles[] (title, link, favicon).",
+            "cluster_summaries": "Large text/JSON-ish content used by AI answering"
+          },
+          "limitations": [
+            "Cluster article payload does not include publish timestamps or images beyond favicon.",
+            "AI Q&A endpoint is unauthenticated today and therefore not aligned with a production chat product without changes."
+          ]
+        }
+      },
+      "frontend": {
+        "stack": "Vanilla JS + static HTML pages served by a small server",
+        "design_language": {
+          "approach": "Use existing platform design tokens / CSS variables (do not hardcode colors, fonts, radii, or shadows in the implementation).",
+          "css_variables_source": "1nbox-frontend/css/main.css",
+          "notes": [
+            "Prefer referencing existing CSS variables for colors/spacing/typography.",
+            "If new tokens are required, define them as variables in one place rather than hardcoding values across components.",
+            "Exact aesthetics (spacing, rounding, micro-interactions) should be decided by the build AI to match Briefed’s proprietary design language while staying ChatGPT-familiar."
+          ]
+        },
+        "existing_chat_ui": "There is already an inline topic chatbox on the Today page that sends {topic, body, context} to /message_received/."
+      }
+    },
+    "goals": [
+      "Recreate the layout and core interaction patterns of a ChatGPT page (left chat history sidebar + main chat pane + composer), using Briefed’s design language.",
+      "Use existing Briefed backend data (Topics + Summaries + Clusters) to power category selection and a horizontal news carousel at the top of the chat pane.",
+      "Add a 'report format' selector (about 10 options) that guides the AI response style for consultant/analyst/executive workflows.",
+      "Support persistent chat threads with time-bucketed grouping (Today, Yesterday, This week, etc.) and a Share button that shares the current chat."
+    ],
+    "non_goals": [
+      "Do not rebuild the entire Briefed platform or change how news is gathered/clustering works.",
+      "Do not introduce a new backend stack; remain on the existing Django backend.",
+      "Do not over-design new interaction patterns; follow ChatGPT conventions unless they conflict with Briefed branding."
+    ],
+    "target_users": [
+      {
+        "persona": "Consultant",
+        "needs": [
+          "Rapidly understand the state of current news in a domain",
+          "Generate structured client-ready artifacts (memos, frameworks, slide outlines)"
+        ]
+      },
+      {
+        "persona": "Analyst / Strategist",
+        "needs": ["Track topic-specific developments", "Ask follow-up questions with citations/links"]
+      },
+      {
+        "persona": "Executive",
+        "needs": ["Fast, high-signal briefs and action items", "Shareable summaries with stakeholders"]
+      }
+    ],
+    "ux_spec": {
+      "north_star": "A page that looks and behaves like ChatGPT, but uses Briefed’s colors, typography, and UI tokens.",
+      "information_architecture": {
+        "route": "Implementation-defined (build AI may choose best-fit route and integration).",
+        "navigation_integration": "Not a requirement for this PRD; primary requirement is a ChatGPT-like chat page that is connected to the existing backend and gated behind auth."
+      },
+      "layout": {
+        "overall": "ChatGPT-like: left sidebar for thread list; main pane for chat.",
+        "left_sidebar": {
+          "width": "ChatGPT-like fixed width (e.g., 260–320px), collapsible on mobile.",
+          "components": [
+            "New chat button",
+            "Search chats (optional v1)",
+            "Thread list grouped by time buckets",
+            "User/account footer actions (optional v1)"
+          ],
+          "thread_grouping_rules": [
+            "Today",
+            "Yesterday",
+            "Previous 7 days (This week)",
+            "Previous 30 days",
+            "Older"
+          ],
+          "thread_list_item": {
+            "title": "Auto-generated from first user message or chosen category",
+            "subtitle": "Optional: category + last updated time",
+            "actions": ["Select thread", "Overflow menu (rename, delete, archive) - optional v1"]
+          }
+        },
+        "main_pane": {
+          "top_bar": {
+            "left": [
+              {
+                "component": "Category selector",
+                "source_of_truth": "Organization topics from /get_user_organization_data/ (Topic.name)",
+                "behavior": "Category is selected when creating a thread (or set once on first use) and is treated as the thread’s fixed category. The selector should behave like a standard platform dropdown/picker (native-feeling on desktop and mobile)."
+              }
+            ],
+            "right": [
+              {
+                "component": "Share button",
+                "behavior": "Optional/implementation-defined. If implemented, share the current chat thread in a way that matches existing product conventions."
+              },
+              {
+                "component": "Settings button",
+                "behavior": "Opens settings (can deep link to existing /pages/settings.html or open an in-chat settings panel)."
+              }
+            ]
+          },
+          "news_carousel": {
+            "position": "Below top bar, above chat transcript",
+            "height_ratio": "Approximately 40% of main pane height (desktop); responsive on mobile",
+            "items_source": "Selected topic’s latest_summary.clusters[].articles[] (flattened + deduped by link)",
+            "cards_per_view": 4,
+            "navigation": [
+              "Horizontal scroll/trackpad swipe",
+              "Chevron arrows left/right for paging"
+            ],
+            "card_content": {
+              "title": "Article title",
+              "snippet": "Short excerpt if available; otherwise show domain + cluster keywords as fallback",
+              "image": "Use favicon if no image is available; optional enhancement: fetch OG image client-side",
+              "actions": ["Open article in new tab", "Optional: 'Use in chat' to cite/select"]
+            }
+          },
+          "chat_transcript": {
+            "behavior": "ChatGPT-like scrolling transcript with user and assistant messages.",
+            "message_rendering": {
+              "assistant": "Rich text / markdown rendering (preferred) with clickable links",
+              "user": "Plain text",
+              "citations": "When possible, include relevant article URLs in assistant output (already supported by current prompting)."
+            }
+          },
+          "composer": {
+            "position": "Sticky at bottom of main pane",
+            "components": [
+              {
+                "component": "Report format selector",
+                "default": "Executive Brief",
+                "notes": "Affects how the assistant responds to the next message (and optionally persists as thread default)."
+              },
+              {
+                "component": "Text input",
+                "placeholder": "Type your message…"
+              },
+              {
+                "component": "Send button",
+                "behavior": "Sends message; Enter to send; Shift+Enter for newline (ChatGPT-like)."
+              }
+            ]
+          }
+        },
+        "responsive_behavior": {
+          "mobile": [
+            "Sidebar collapses into a drawer",
+            "Carousel becomes 1–2 cards per view, swipeable, with optional dots",
+            "Composer remains sticky"
+          ]
+        }
+      },
+      "interaction_principles": [
+        "Don’t overthink it: copy what already works in ChatGPT for layout and interaction patterns.",
+        "Keep the Briefed aesthetic via existing design tokens/CSS variables (avoid hardcoded design values).",
+        "Minimize clicks: category and report format are always accessible."
+      ]
+    },
+    "report_formats": {
+      "count_target": 10,
+      "formats": [
+        {
+          "id": "executive_brief",
+          "label": "Executive Brief",
+          "who_its_for": ["Executives", "Operators"],
+          "output_shape": "Headline + 5–8 bullets + 3 key risks + 3 opportunities + 3 recommended actions",
+          "tone": "Concise, high-signal"
+        },
+        {
+          "id": "consulting_memo",
+          "label": "Consulting Memo",
+          "who_its_for": ["Consultants", "PMs"],
+          "output_shape": "Situation / Complication / Key Insights / Recommendations / Next Steps",
+          "tone": "Structured, client-ready"
+        },
+        {
+          "id": "swot",
+          "label": "SWOT Analysis",
+          "who_its_for": ["Strategists", "Leadership"],
+          "output_shape": "Strengths / Weaknesses / Opportunities / Threats + short justification bullets",
+          "tone": "Analytical"
+        },
+        {
+          "id": "pestle",
+          "label": "PESTLE Scan",
+          "who_its_for": ["Strategists", "Market analysts"],
+          "output_shape": "Political / Economic / Social / Technological / Legal / Environmental bullets",
+          "tone": "Survey + implications"
+        },
+        {
+          "id": "risk_register",
+          "label": "Risk Register",
+          "who_its_for": ["Risk managers", "Executives"],
+          "output_shape": "Table-like list: Risk | Likelihood | Impact | Early indicators | Mitigation | Owner (owner optional)",
+          "tone": "Operational"
+        },
+        {
+          "id": "market_landscape",
+          "label": "Market & Competitive Landscape",
+          "who_its_for": ["Corp strategy", "Product leaders"],
+          "output_shape": "Market trends + competitor moves + customer signals + strategic implications",
+          "tone": "Insightful"
+        },
+        {
+          "id": "investor_board_memo",
+          "label": "Investor / Board Memo",
+          "who_its_for": ["Founders", "Execs"],
+          "output_shape": "Top developments + why it matters + risks + recommended posture + FAQs",
+          "tone": "Formal"
+        },
+        {
+          "id": "slide_outline",
+          "label": "Slide Deck Outline (10 slides)",
+          "who_its_for": ["Consultants", "Analysts"],
+          "output_shape": "10-slide outline with titles and 3–5 bullets per slide",
+          "tone": "Presentation-ready"
+        },
+        {
+          "id": "client_email",
+          "label": "Client Email Draft",
+          "who_its_for": ["Consultants", "Account managers"],
+          "output_shape": "Email with subject + 2–4 short paragraphs + bullets + CTA",
+          "tone": "Professional, clear"
+        },
+        {
+          "id": "talking_points",
+          "label": "Talking Points",
+          "who_its_for": ["Execs", "Spokespeople"],
+          "output_shape": "10–15 bullets grouped by theme + 3 tough Q&A responses",
+          "tone": "Crisp, soundbite-friendly"
+        }
+      ],
+      "format_selector_behavior": {
+        "per_message": true,
+        "optional_thread_default": true,
+        "ui_copy": "Format"
+      }
+    },
+    "functional_requirements": [
+      {
+        "id": "auth_required",
+        "priority": "P0",
+        "requirement": "Briefed Chat requires authenticated users (Firebase) consistent with the rest of the app."
+      },
+      {
+        "id": "category_selector_topics",
+        "priority": "P0",
+        "requirement": "Category selector options are the organization’s Topics from /get_user_organization_data/, and each thread has exactly one (fixed) category."
+      },
+      {
+        "id": "news_carousel_from_clusters",
+        "priority": "P0",
+        "requirement": "Carousel shows a flattened list of articles from selected topic.latest_summary.clusters[].articles[], deduped by link, with chevron paging and horizontal scroll."
+      },
+      {
+        "id": "chat_threads_persistence",
+        "priority": "P0",
+        "requirement": "Chats are persistent threads with messages stored server-side and listed in the left sidebar grouped by time buckets."
+      },
+      {
+        "id": "send_message_and_generate_reply",
+        "priority": "P0",
+        "requirement": "Sending a message appends a user message, shows a typing/loading indicator, then appends the assistant reply."
+      },
+      {
+        "id": "report_format_influences_output",
+        "priority": "P0",
+        "requirement": "Selected report format must influence the assistant response (prompting), producing structured consultant-friendly outputs."
+      },
+      {
+        "id": "share_chat",
+        "priority": "P2",
+        "requirement": "Optional: Share button may share the current chat thread, but specific share behavior is not required for v1."
+      },
+      {
+        "id": "settings_access",
+        "priority": "P1",
+        "requirement": "Settings button opens settings (existing settings page or a lightweight in-chat settings panel)."
+      },
+      {
+        "id": "thread_title_generation",
+        "priority": "P1",
+        "requirement": "Thread titles are generated automatically from the first message and/or selected category; allow rename later."
+      },
+      {
+        "id": "suggested_prompts_optional",
+        "priority": "P2",
+        "requirement": "Optionally show suggested questions (already available in latest_summary.questions) to help users start."
+      }
+    ],
+    "backend_changes_minimal": {
+      "principle": "Keep the existing news/topic pipeline as-is; add only what’s needed for saved threads, sharing, and format-aware prompting.",
+      "security_fix_recommended": [
+        {
+          "change": "Require Firebase auth on /message_received/ (or introduce a new authenticated chat endpoint and migrate the frontend to use it).",
+          "reason": "A ChatGPT-like product must not expose the AI Q&A endpoint without auth."
+        }
+      ],
+      "data_models_proposed": [
+        {
+          "model": "ChatThread",
+          "fields": [
+            "id (UUID)",
+            "organization (FK Organization)",
+            "owner (FK User)",
+            "title (string)",
+            "topic (FK Topic, nullable)",
+            "default_report_format (string, nullable)",
+            "is_archived (bool)",
+            "share_slug (string, nullable, unique)",
+            "is_shared (bool)",
+            "created_at (datetime)",
+            "updated_at (datetime)",
+            "last_message_at (datetime)"
+          ],
+          "notes": "Keeps threads scoped to an organization; supports time-bucket listing and share links."
+        },
+        {
+          "model": "ChatMessage",
+          "fields": [
+            "id (UUID)",
+            "thread (FK ChatThread)",
+            "role (enum: user|assistant|system)",
+            "content (text)",
+            "topic_id_snapshot (int, nullable)",
+            "report_format_snapshot (string, nullable)",
+            "metadata (JSON, optional: cited_urls, model, latency_ms, etc.)",
+            "created_at (datetime)"
+          ],
+          "notes": "Stores the transcript exactly as shown; enables replay, sharing, and export later."
+        }
+      ],
+      "api_endpoints_proposed": [
+        {
+          "method": "GET",
+          "path": "/chat/threads/",
+          "auth": "Firebase Bearer",
+          "response": "List threads ordered by last_message_at desc; client groups into Today/Yesterday/etc."
+        },
+        {
+          "method": "POST",
+          "path": "/chat/threads/",
+          "auth": "Firebase Bearer",
+          "body_json": {
+            "topic_id": "number|null",
+            "title": "string|null",
+            "default_report_format": "string|null"
+          },
+          "response": "Created thread"
+        },
+        {
+          "method": "GET",
+          "path": "/chat/threads/{thread_id}/",
+          "auth": "Firebase Bearer",
+          "response": "Thread + messages"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/threads/{thread_id}/messages/",
+          "auth": "Firebase Bearer",
+          "body_json": {
+            "topic_id": "number",
+            "report_format": "string",
+            "message": "string"
+          },
+          "response": {
+            "user_message": "ChatMessage",
+            "assistant_message": "ChatMessage"
+          },
+          "notes": "Server should compute context window from stored messages instead of trusting the client."
+        },
+        {
+          "method": "POST",
+          "path": "/chat/threads/{thread_id}/share/",
+          "auth": "Firebase Bearer",
+          "response": {
+            "share_url": "string",
+            "share_slug": "string"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/chat/shared/{share_slug}/",
+          "auth": "depends (see open questions)",
+          "response": "Read-only transcript for shared thread"
+        }
+      ],
+      "ai_prompting_changes": [
+        {
+          "change": "Add report_format instructions into the prompt (system or preamble) so Gemini returns the selected structure.",
+          "change_type": "small prompt change",
+          "notes": "Keep existing behavior of including relevant URLs when possible."
+        },
+        {
+          "change": "Optionally add 'selected articles' context when users click a carousel item (future).",
+          "change_type": "optional enhancement"
+        }
+      ]
+    },
+    "data_contracts": {
+      "category_topics": {
+        "source": "/get_user_organization_data/",
+        "fields_used": ["topics[].id", "topics[].name", "topics[].latest_summary"]
+      },
+      "news_carousel": {
+        "source": "topics[].latest_summary.clusters",
+        "minimum_fields": ["articles[].title", "articles[].link", "articles[].favicon"],
+        "dedupe_rule": "unique by articles[].link",
+        "ordering": "Use server-provided cluster ordering; within cluster preserve ordering as returned"
+      }
+    },
+    "analytics_and_metrics": {
+      "north_star_metric": "Weekly active chat users (WACU) and messages per active user",
+      "secondary_metrics": [
+        "Report generations per user",
+        "Share rate (threads shared / threads created)",
+        "Time-to-first-reply latency",
+        "Carousel engagement (article opens, scroll depth)"
+      ],
+      "events": [
+        "briefed_chat_opened",
+        "briefed_chat_thread_created",
+        "briefed_chat_thread_selected",
+        "briefed_chat_topic_changed",
+        "briefed_chat_carousel_scrolled",
+        "briefed_chat_article_opened",
+        "briefed_chat_message_sent",
+        "briefed_chat_reply_received",
+        "briefed_chat_report_format_changed",
+        "briefed_chat_shared"
+      ]
+    },
+    "access_control_and_privacy": {
+      "default_scope": "Organization-scoped: only members of the same org can see threads unless explicitly shared.",
+      "share_model": {
+        "options": [
+          "Implementation-defined (share behavior not specified in this PRD)."
+        ],
+        "recommended_default": "Defer decision; implement later if needed."
+      },
+      "data_retention": "Threads persist until deleted/archived by user/org policy (define policy later)."
+    },
+    "performance_and_reliability": {
+      "targets": {
+        "initial_load": "Chat page interactive in < 2s on broadband (excluding model latency)",
+        "ai_reply_p50": "< 6s",
+        "ai_reply_p95": "< 20s"
+      },
+      "rate_limiting": {
+        "current": "message_received is rate-limited by IP",
+        "proposed": "Rate limit by user/org as well; avoid blocking shared IPs unfairly"
+      }
+    },
+    "rollout_plan": {
+      "phases": [
+        {
+          "name": "Phase 0: Internal",
+          "scope": [
+            "ChatGPT-style page skeleton",
+            "Topic selector + carousel from existing summaries",
+            "Basic chat send/receive using authenticated endpoint",
+            "Thread persistence + sidebar grouping"
+          ]
+        },
+        {
+          "name": "Phase 1: Beta",
+          "scope": [
+            "Share chat",
+            "Thread title generation + rename",
+            "Report format selector fully wired"
+          ]
+        }
+      ]
+    },
+    "acceptance_criteria": [
+      "User can open Briefed Chat and see a ChatGPT-like layout with Briefed styling.",
+      "User can select a category (existing Topic) and see a horizontal carousel of news articles (4 visible per view on desktop) above the chat transcript.",
+      "Carousel is horizontally scrollable and has chevron navigation to move left/right.",
+      "User can create a new chat, send messages, and receive AI replies.",
+      "Chat history persists across refresh and appears in the left sidebar grouped by time (Today, Yesterday, This week, etc.).",
+      "User can pick a report format and the AI responds in that format.",
+      "User can share the current chat via a Share button (behavior per sharing decision).",
+      "Settings and Share controls appear in the top-right of the main pane."
+    ],
+    "open_questions": [
+      {
+        "question": "Should the news carousel show only article cards, or also include a mini 'top stories' summary for the selected topic?",
+        "why_it_matters": "Impacts how much content lives in the 40% top area."
+      },
+      {
+        "question": "For report formats, should outputs be plain text/markdown only (v1), or exportable files (PDF/Doc/Slides) in v1?",
+        "why_it_matters": "Defines scope and complexity."
+      }
+    ],
+    "assumptions": [
+      "Briefed Chat reuses existing Topics as 'categories' (Economy, Financial, Business, Stock Market, etc.) and expects orgs to have these topics configured.",
+      "News carousel can use favicon as the default image; OG image fetching is optional later.",
+      "AI model remains Gemini (as currently implemented) unless explicitly changed."
+    ]
+  }
+}
+
+
