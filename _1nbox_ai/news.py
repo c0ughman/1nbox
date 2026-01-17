@@ -774,6 +774,122 @@ def parse_input(input_string):
     
     return summary, questions
 
+@time_function
+def generate_cluster_hash(common_words):
+    """Generate stable hash from common words to identify a cluster"""
+    import hashlib
+    words_str = '-'.join(sorted(common_words))
+    return hashlib.md5(words_str.encode()).hexdigest()[:12]
+
+@time_function
+def calculate_cluster_difference(current_clusters, previous_clusters):
+    """
+    Calculate how much the clusters changed.
+    Returns a value between 0 (identical) and 1 (completely different).
+    Different common_words = different cluster identity.
+    
+    IMPORTANT: For existing clusters, only counts NEW articles added (not removals).
+    We only want to regenerate summaries when there's NEW information, not less information.
+    """
+    if not previous_clusters:
+        return 1.0  # No previous clusters, 100% different
+    
+    # Create cluster signatures based on common words (cluster identity)
+    current_sigs = {
+        generate_cluster_hash(cluster['common_words']): set(a['link'] for a in cluster['articles'])
+        for cluster in current_clusters
+    }
+    
+    previous_sigs = {
+        generate_cluster_hash(cluster['common_words']): set(a['link'] for a in cluster['articles'])
+        for cluster in previous_clusters
+    }
+    
+    # Count changes
+    current_cluster_ids = set(current_sigs.keys())
+    previous_cluster_ids = set(previous_sigs.keys())
+    
+    new_clusters = len(current_cluster_ids - previous_cluster_ids)
+    # NOTE: We still count removed clusters for the "new_clusters" metric
+    # but this is about clusters disappearing entirely, not articles being removed
+    
+    # For clusters that exist in both, check if NEW articles were added
+    common_cluster_ids = current_cluster_ids & previous_cluster_ids
+    modified_clusters = 0
+    
+    for cluster_id in common_cluster_ids:
+        current_articles = current_sigs[cluster_id]
+        previous_articles = previous_sigs[cluster_id]
+        
+        # Only count NEW articles (additions), ignore removals
+        new_articles = current_articles - previous_articles
+        
+        if len(current_articles) > 0:
+            # Calculate percentage of NEW articles in current cluster
+            new_percentage = len(new_articles) / len(current_articles)
+            
+            # If 40% or more of the cluster is new articles, consider it modified
+            if new_percentage >= 0.40:
+                modified_clusters += 1
+    
+    # Calculate total change percentage
+    # Only count new clusters and modified clusters (not removed clusters for cluster summaries)
+    total_clusters = len(current_sigs) if len(current_sigs) > 0 else 1
+    changed_clusters = new_clusters + modified_clusters
+    change_percentage = changed_clusters / total_clusters
+    
+    return change_percentage
+
+@time_function
+def calculate_summary_difference(current_summaries, previous_summaries):
+    """
+    Calculate how much the cluster summaries changed.
+    Returns a value between 0 (identical) and 1 (completely different).
+    """
+    import hashlib
+    
+    if not previous_summaries:
+        return 1.0  # No previous summaries, 100% different
+    
+    # Create hashes of summaries for comparison
+    current_hashes = {hashlib.md5(s.encode()).hexdigest() for s in current_summaries}
+    previous_hashes = {hashlib.md5(s.encode()).hexdigest() for s in previous_summaries}
+    
+    # Count new and removed summaries
+    new_summaries = len(current_hashes - previous_hashes)
+    removed_summaries = len(previous_hashes - current_hashes)
+    
+    total_summaries = max(len(current_summaries), len(previous_summaries))
+    if total_summaries == 0:
+        return 0.0
+    
+    changed_summaries = new_summaries + removed_summaries
+    change_percentage = changed_summaries / total_summaries
+    
+    return change_percentage
+
+@time_function
+def clean_clusters_for_storage(clusters):
+    """
+    Clean clusters to prevent overwhelming the database.
+    Only store essential information.
+    """
+    cleaned_data = []
+    for cluster in clusters:
+        cleaned_item = {
+            "articles": [
+                {
+                    "title": article["title"],
+                    "link": article["link"],
+                    "favicon": article.get("favicon", "")
+                }
+                for article in cluster.get("articles", [])
+            ],
+            "common_words": cluster.get("common_words", [])
+        }
+        cleaned_data.append(cleaned_item)
+    return cleaned_data
+
 @contextmanager
 @time_function
 def timeout(seconds):
@@ -1002,58 +1118,10 @@ def process_all_topics(days_back=1, common_word_threshold=2, top_words_to_consid
     
     logging.info("==== Starting process_all_topics ====")
     
-    # Get the current UTC time
-    now_utc = datetime.now(pytz.utc)
-    logging.info(f"Current UTC Time: {now_utc.strftime('%H:%M')}")  # ⬅️ Only logs HH:MM
-
-    valid_org_ids = []
-    all_orgs = Organization.objects.exclude(plan='inactive')
-
-    if force:
-        logging.warning("⚠️  FORCE MODE ENABLED: Processing ALL organizations, bypassing time checks")
-        valid_org_ids = list(all_orgs.values_list('id', flat=True))
-    else:
-        for org in all_orgs:
-            if not org.summary_time or not org.summary_timezone:
-                logging.warning(f"Skipping {org.name} - Missing summary_time or timezone.")
-                continue  # Skip org if missing required fields
-
-            try:
-                # Convert UTC time to org's local time
-                org_tz = pytz.timezone(org.summary_timezone)
-                local_now = now_utc.astimezone(org_tz)
-
-                # Ensure summary_time is a valid `time` object
-                if not isinstance(org.summary_time, datetime_time):
-                    logging.error(f"Invalid summary_time for {org.name}: {org.summary_time}")
-                    continue
-
-                # Compute expected run time (30 minutes before summary_time)
-                expected_hour = org.summary_time.hour
-                expected_minute = org.summary_time.minute - 30  # Subtract 30 minutes
-                
-                if expected_minute < 0:  # Handle cases where subtraction moves to the previous hour
-                    expected_hour -= 1
-                    expected_minute += 60
-
-                # Log the comparison (HH:MM format only)
-                logging.info(
-                    f"Org: {org.name} | Local Now: {local_now.strftime('%H:%M')} "
-                    f"| Expected Run Time: {expected_hour:02d}:{expected_minute:02d}"
-                )
-
-                # Compare only the hours and minutes
-                if local_now.hour == expected_hour and local_now.minute == expected_minute:
-                    logging.info(f"✅ Running process for {org.name} (Time Matched)")
-                    valid_org_ids.append(org.id)
-                else:
-                    logging.info(f"❌ Skipping {org.name} - Time did not match (Local Now: {local_now.strftime('%H:%M')}, Expected: {expected_hour:02d}:{expected_minute:02d})")
-
-            except Exception as e:
-                logging.error(f"❌ Time zone check error for {org.name}: {str(e)}")
-
-    # Process only organizations that passed the time check
-    active_organizations = all_orgs.filter(id__in=valid_org_ids)
+    # Get all active organizations (no time check - process all every time)
+    active_organizations = Organization.objects.exclude(plan='inactive')
+    
+    logging.info(f"Processing {active_organizations.count()} active organizations")
 
     for organization in active_organizations:
         logging.info(f"🔄 Processing organization: {organization.name}")

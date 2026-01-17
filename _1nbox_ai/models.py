@@ -77,6 +77,7 @@ class Topic(models.Model):
         on_delete=models.CASCADE,
         related_name='topics'
     )
+    current_clusters = models.JSONField(default=dict, blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
     
     def __str__(self):
