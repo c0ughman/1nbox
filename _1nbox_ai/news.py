@@ -423,9 +423,10 @@ def get_openai_response(cluster, max_tokens=4000):
         # Handle extremely large clusters
         if calculate_cluster_tokens(cluster) > 300000:  # If cluster is extremely large
             logging.warning(f"Cluster size exceeds 300k tokens, truncating to newest articles")
+            from datetime import timezone
             cluster['articles'] = sorted(
                 cluster['articles'],
-                key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')) if x.get('published') else datetime.min,
+                key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')) if x.get('published') else datetime.min.replace(tzinfo=timezone.utc),
                 reverse=True
             )[:10]  # Keep only the 10 newest articles
 
