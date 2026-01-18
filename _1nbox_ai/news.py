@@ -341,6 +341,22 @@ def calculate_cluster_tokens(cluster):
         total_tokens += estimate_tokens(article['content'])
     return total_tokens
 
+def parse_datetime_safe(date_str):
+    """Parse a datetime string and ensure it's timezone-aware (UTC if naive)"""
+    from datetime import timezone
+    if not date_str:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    try:
+        # Try to parse with timezone info
+        dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        # If it's naive, make it UTC-aware
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, AttributeError):
+        # Fallback to minimum datetime if parsing fails
+        return datetime.min.replace(tzinfo=timezone.utc)
+
 @time_function
 def limit_cluster_content(cluster, max_tokens=100000):
     """
@@ -380,9 +396,8 @@ def limit_cluster_content(cluster, max_tokens=100000):
     current_tokens = 0
     
     # Sort articles by publication date (newest first)
-    from datetime import timezone
     sorted_articles = sorted(cluster['articles'], 
-                            key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')) if x.get('published') else datetime.min.replace(tzinfo=timezone.utc),
+                            key=lambda x: parse_datetime_safe(x.get('published')),
                             reverse=True)
     
     for article in sorted_articles:
@@ -424,10 +439,9 @@ def get_openai_response(cluster, max_tokens=4000):
         # Handle extremely large clusters
         if calculate_cluster_tokens(cluster) > 300000:  # If cluster is extremely large
             logging.warning(f"Cluster size exceeds 300k tokens, truncating to newest articles")
-            from datetime import timezone
             cluster['articles'] = sorted(
                 cluster['articles'],
-                key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')) if x.get('published') else datetime.min.replace(tzinfo=timezone.utc),
+                key=lambda x: parse_datetime_safe(x.get('published')),
                 reverse=True
             )[:10]  # Keep only the 10 newest articles
 
