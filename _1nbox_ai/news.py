@@ -5,7 +5,6 @@ import pytz
 from django.core.management.base import BaseCommand
 import re
 import os
-from openai import OpenAI
 from collections import Counter
 from .models import Topic, Organization, Summary, Comment
 import json
@@ -408,13 +407,18 @@ def limit_cluster_content(cluster, max_tokens=100000):
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 @time_function
 def get_openai_response(cluster, max_tokens=4000):
+    """
+    Generate cluster summaries using Gemini API (renamed from get_openai_response for compatibility).
+    """
     try:
-        openai_key = os.environ.get('OPENAI_KEY')
-        if not openai_key:
-            logging.error("OpenAI API key not found in environment variables")
-            return "Error: OpenAI API key not configured"
+        # Support both GEMINI_API_KEY and GEMINI_KEY for backwards compatibility
+        gemini_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GEMINI_KEY')
+        if not gemini_key:
+            logging.error("Gemini API key not found in environment variables")
+            return "Error: Gemini API key not configured"
 
-        client = OpenAI(api_key=openai_key)
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
         # Handle extremely large clusters
         if calculate_cluster_tokens(cluster) > 300000:  # If cluster is extremely large
@@ -438,18 +442,18 @@ def get_openai_response(cluster, max_tokens=4000):
                     'articles': cluster['articles'][i:i+10]
                 }
                 chunk_limited = limit_cluster_content(chunk_cluster, max_tokens=124000)
-                chunks.append(process_cluster_chunk(chunk_limited, client, max_tokens))
+                chunks.append(process_cluster_chunk(chunk_limited, model, max_tokens))
             
             return "\n\n".join(chunks)
         
-        return process_cluster_chunk(limited_cluster, client, max_tokens)
+        return process_cluster_chunk(limited_cluster, model, max_tokens)
 
     except Exception as e:
-        logging.error(f"Error in get_openai_response: {str(e)}")
+        logging.error(f"Error in get_openai_response (Gemini): {str(e)}")
         raise  # Retry will handle this
 
 @time_function
-def process_cluster_chunk(cluster, client, max_tokens):
+def process_cluster_chunk(cluster, model, max_tokens):
     cluster_content = f"Common words: {', '.join(cluster['common_words'])}\n\n"
     current_tokens = 0
     sub_clusters = []
@@ -480,21 +484,31 @@ def process_cluster_chunk(cluster, client, max_tokens):
         
         prompt = ("You are a News Facts Summarizer. I will give you some articles, and I want you to tell me "
                   "all the facts from each of the articles in a small but fact-dense summary "
-                  "including all the dates, names and key factors to provide full context on the events."
-                  "also, i want you to add the corresponding url next to every line you put in the summary in parentheses"
-                  "Finally, It is required to add a general summary of the cluster with 3-4 sentences about"
-                  "what is happening, the context and the overall big picture of the events in the articles. ")
+                  "including all the dates, names and key factors to provide full context on the events. "
+                  "Also, I want you to add the corresponding url next to every line you put in the summary in parentheses. "
+                  "Finally, It is required to add a general summary of the cluster with 3-4 sentences about "
+                  "what is happening, the context and the overall big picture of the events in the articles.")
 
-        completion = client.chat.completions.create(
-            model="gpt-4o-mini",
-            max_tokens=5000,
-            temperature=0.125,
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": sub_cluster_content}
-            ]
-        )
-        summaries.append(completion.choices[0].message.content)
+        try:
+            response = model.generate_content(prompt + "\n\n" + sub_cluster_content)
+            
+            # Extract text from response
+            if hasattr(response, 'candidates') and len(response.candidates) > 0:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                    if len(candidate.content.parts) > 0:
+                        summaries.append(candidate.content.parts[0].text)
+                        continue
+            
+            # Fallback to direct text attribute
+            if hasattr(response, 'text'):
+                summaries.append(response.text)
+            else:
+                logging.warning("Unexpected Gemini response format in cluster summary")
+                summaries.append("Error generating cluster summary")
+        except Exception as e:
+            logging.error(f"Error generating cluster summary chunk: {str(e)}")
+            summaries.append(f"Error generating summary: {str(e)}")
 
     return ' '.join(summaries)
 
