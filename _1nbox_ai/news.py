@@ -381,7 +381,7 @@ def limit_cluster_content(cluster, max_tokens=100000):
     
     # Sort articles by publication date (newest first)
     sorted_articles = sorted(cluster['articles'], 
-                            key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')),
+                            key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')) if x.get('published') else datetime.min,
                             reverse=True)
     
     for article in sorted_articles:
@@ -425,7 +425,7 @@ def get_openai_response(cluster, max_tokens=4000):
             logging.warning(f"Cluster size exceeds 300k tokens, truncating to newest articles")
             cluster['articles'] = sorted(
                 cluster['articles'],
-                key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')),
+                key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')) if x.get('published') else datetime.min,
                 reverse=True
             )[:10]  # Keep only the 10 newest articles
 
