@@ -380,8 +380,9 @@ def limit_cluster_content(cluster, max_tokens=100000):
     current_tokens = 0
     
     # Sort articles by publication date (newest first)
+    from datetime import timezone
     sorted_articles = sorted(cluster['articles'], 
-                            key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')) if x.get('published') else datetime.min,
+                            key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')) if x.get('published') else datetime.min.replace(tzinfo=timezone.utc),
                             reverse=True)
     
     for article in sorted_articles:
