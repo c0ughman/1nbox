@@ -781,6 +781,8 @@ def generate_cluster_hash(common_words):
     words_str = '-'.join(sorted(common_words))
     return hashlib.md5(words_str.encode()).hexdigest()[:12]
 
+# Helper functions for cluster news system
+
 @time_function
 def calculate_cluster_difference(current_clusters, previous_clusters):
     """
