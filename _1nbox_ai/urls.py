@@ -73,6 +73,7 @@ urlpatterns = [
 
     # Genie API
     path('genie/organization/', genie_views.organization_profile),
+    path('genie/questionnaire/', genie_views.questionnaire),
     path('genie/analyze/', genie_views.analyze),
     path('genie/analyses/', genie_views.analyses_list),
     path('genie/analyses/<int:analysis_id>/', genie_views.analysis_detail),
