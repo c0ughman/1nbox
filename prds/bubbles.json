@@ -1,0 +1,301 @@
+{
+  "prd": {
+    "id": "bubbles",
+    "name": "Bubbles",
+    "type": "subproduct",
+    "status": "draft",
+    "version": "0.1.0",
+    "created_at": "2026-01-12",
+    "owner": "Briefed",
+    "summary": "A redesigned Bubbles page that visualizes clustered news (bubble/canvas view) with a dramatically improved UI: topic search + selection instead of raw RSS entry, settings hidden behind an optional dropdown, and on-demand cluster summaries via lightweight LLM calls.",
+    "context_existing_platform": {
+      "frontend_current_state": {
+        "page": "1nbox-frontend/pages/bubbles.html",
+        "behavior": [
+          "Fullscreen canvas with clusters rendered as rectangles containing article tiles",
+          "A floating gear icon opens an always-available settings menu",
+          "Settings currently include raw RSS URLs input and clustering parameters",
+          "Calls backend POST /get_bubbles/ with rss_urls + params and renders returned clusters"
+        ],
+        "current_pain_points": [
+          "Too many knobs exposed by default (settings always prominent)",
+          "Manual RSS entry is not aligned with product 'Topics' abstraction",
+          "Styling is utilitarian and not aligned with the rest of Briefed",
+          "No cluster-level summary; user must open articles to understand the cluster"
+        ]
+      },
+      "backend_current_state": {
+        "endpoint": {
+          "method": "POST",
+          "path": "/get_bubbles/",
+          "auth": "none (today)",
+          "request_json": {
+            "rss_urls": "string[]",
+            "days_back": "number",
+            "common_word_threshold": "number",
+            "top_words_to_consider": "number",
+            "merge_threshold": "number",
+            "min_articles": "number",
+            "join_percentage": "number",
+            "final_merge_percentage": "number",
+            "title_only": "boolean",
+            "all_words": "boolean"
+          },
+          "response_json": {
+            "clusters": "Cluster[]",
+            "failed_sources": "array"
+          }
+        },
+        "cluster_payload": {
+          "Cluster": {
+            "common_words": "string[]",
+            "articles": [
+              {
+                "title": "string",
+                "link": "string",
+                "favicon": "string"
+              }
+            ]
+          }
+        },
+        "note": "The clustering pipeline already fetches per-article summary/content internally but strips it from the response for bubbles."
+      },
+      "design_principles": {
+        "do_not_hardcode_design_values": true,
+        "approach": [
+          "Use existing platform design tokens / CSS variables wherever possible",
+          "If new tokens are needed, define them once (theme) rather than embedding raw values across the UI",
+          "Let the build AI choose the exact styling to make it 'very cool' while staying consistent with Briefed"
+        ]
+      }
+    },
+    "goals": [
+      "Replace RSS-input-centric Bubbles UX with a topic-centric UX: show all Topics with search, and render bubbles based on the selected Topic’s sources.",
+      "Hide advanced clustering settings behind a dropdown (optional), not always visible.",
+      "Upgrade styling of the menu section and overall page to feel modern and aligned with Briefed.",
+      "Add cluster summaries so users can understand a cluster without opening each article."
+    ],
+    "non_goals": [
+      "Do not change the core clustering algorithm unless required for performance/stability.",
+      "Do not require users to manually paste RSS feeds in the primary UX (advanced-only at most).",
+      "Do not lock the UI to specific pixel-perfect values; this PRD communicates intent and interaction goals."
+    ],
+    "target_users": [
+      {
+        "persona": "Power user / Analyst",
+        "needs": [
+          "Quickly explore clusters within a topic",
+          "Understand what a cluster is about via a concise summary",
+          "Optionally tune clustering parameters when debugging/iterating"
+        ]
+      }
+    ],
+    "ux_spec": {
+      "north_star": "A canvas-based, playful-but-professional cluster visualization that feels like a polished product, not a debug tool.",
+      "layout": {
+        "header": {
+          "left": [
+            {
+              "component": "Topic search input",
+              "behavior": "Filters the topic list in real time"
+            }
+          ],
+          "right": [
+            {
+              "component": "Image icon placeholder",
+              "behavior": "Reserved space for a future image/icon; exact image provided later by user."
+            },
+            {
+              "component": "Settings dropdown trigger",
+              "behavior": "Opens/closes advanced settings; settings are not always visible."
+            }
+          ],
+          "notes": [
+            "Do not place a persistent settings icon in the corner; the top-right should prioritize the image placeholder.",
+            "Exact header composition and spacing should be decided by the build AI."
+          ]
+        },
+        "left_panel": {
+          "purpose": "Topic list + selection",
+          "components": [
+            {
+              "component": "Topic list",
+              "source_of_truth": "Organization topics (Topic.name) from /get_user_organization_data/ (recommended) OR equivalent existing topic source in the app",
+              "behavior": [
+                "All topics visible (virtualized if needed)",
+                "Search filters by topic name",
+                "Selecting a topic triggers bubble refresh for that topic"
+              ]
+            }
+          ],
+          "notes": [
+            "This replaces raw RSS feed entry as the primary navigation."
+          ]
+        },
+        "main_canvas": {
+          "purpose": "Visualize clusters and articles as bubbles/tiles",
+          "behavior": [
+            "Pan and zoom remains supported (mouse + touch)",
+            "Hover/interaction should feel responsive and delightful",
+            "Clusters remain readable at various zoom levels (inverse scaling for text is ok)"
+          ]
+        },
+        "settings_dropdown": {
+          "visibility": "Hidden by default; user opens via dropdown",
+          "contents": [
+            "days_back",
+            "common_word_threshold",
+            "top_words_to_consider",
+            "merge_threshold",
+            "min_articles",
+            "join_percentage",
+            "final_merge_percentage",
+            "title_only",
+            "all_words"
+          ],
+          "defaults": "Use current defaults from existing bubbles page unless the build AI suggests better defaults",
+          "advanced_only": [
+            "Optional: allow manual RSS override behind an 'Advanced' accordion, but not in the primary UX."
+          ]
+        }
+      },
+      "cluster_summary_interaction": {
+        "user_intent": "User wants to understand the cluster quickly without opening multiple articles.",
+        "requirement": "When user hovers a cluster, show a small contextual 'Summarize' affordance that follows the cursor OR an equivalently intuitive interaction chosen by the build AI.",
+        "build_ai_instruction": "Design the most intuitive and user-friendly UX for cluster summaries (e.g., hover-follow button, tooltip action, mini popover, side panel preview). Prefer minimal visual clutter and low interaction cost.",
+        "expected_behaviors": [
+          "Summary action is discoverable but not noisy",
+          "Summary is scoped to that cluster’s articles",
+          "Loading state is lightweight and non-blocking",
+          "Summary result is readable and can be dismissed easily"
+        ],
+        "summary_display_options": [
+          "Hover popover anchored to cluster",
+          "Floating card near cursor that expands into a readable panel",
+          "Right-side drawer with summary content and key article links"
+        ]
+      }
+    },
+    "functional_requirements": [
+      {
+        "id": "topic_list_with_search",
+        "priority": "P0",
+        "requirement": "Show all Topics with a search function to filter topics by name."
+      },
+      {
+        "id": "topic_driven_bubbles",
+        "priority": "P0",
+        "requirement": "Selecting a topic renders clusters using that Topic’s RSS sources (no manual RSS entry in the primary UX)."
+      },
+      {
+        "id": "settings_dropdown",
+        "priority": "P0",
+        "requirement": "Clustering settings are available via a dropdown (hidden by default), not always visible."
+      },
+      {
+        "id": "top_right_image_placeholder",
+        "priority": "P0",
+        "requirement": "Top-right corner has reserved space for a user-provided image/icon."
+      },
+      {
+        "id": "cluster_summaries",
+        "priority": "P0",
+        "requirement": "User can get a concise summary of a cluster via a 'Summarize' interaction, powered by lightweight LLM calls."
+      },
+      {
+        "id": "ui_upgrade",
+        "priority": "P1",
+        "requirement": "Overall UI is upgraded (menu styling + layout polish) to feel modern and aligned with Briefed; avoid hardcoding design constants."
+      }
+    ],
+    "backend_changes_minimal": {
+      "principle": "Preserve the existing /get_bubbles/ clustering behavior; add only what is needed to support topic-driven input and cluster summaries safely.",
+      "security_fix_recommended": [
+        {
+          "change": "Require Firebase auth for /get_bubbles/ (or add an authenticated variant used by the product UI).",
+          "reason": "Bubbles should not be an open compute endpoint in a production product."
+        }
+      ],
+      "topic_integration_options": [
+        {
+          "option": "Frontend-resolved RSS sources (minimal backend change)",
+          "description": "Frontend fetches org topics via existing /get_user_organization_data/ and passes the selected Topic.sources as rss_urls to /get_bubbles/."
+        },
+        {
+          "option": "Backend-resolved topic_id (cleaner contract)",
+          "description": "Add /bubbles/run/ that accepts topic_id + params, fetches Topic.sources server-side, then calls process_feeds_and_cluster."
+        }
+      ],
+      "cluster_summary_api": {
+        "goal": "Summarize one cluster’s current articles with a small/cheap model call, ideally cached.",
+        "proposed_endpoints": [
+          {
+            "method": "POST",
+            "path": "/bubbles/cluster_summary/",
+            "auth": "Firebase Bearer",
+            "body_json": {
+              "cache_key": "string",
+              "cluster_index": "number"
+            },
+            "response_json": {
+              "summary": "string",
+              "cluster_common_words": "string[]",
+              "article_links": "string[]",
+              "cached": "boolean"
+            },
+            "notes": [
+              "This endpoint assumes the server has a short-lived cache of the last bubbles run, keyed by cache_key."
+            ]
+          }
+        ],
+        "supporting_change": {
+          "change": "Modify /get_bubbles/ (or new /bubbles/run/) to return a cache_key and store the full fetched article data (title + link + short summary/content snippet) in a short-lived server cache for summarization.",
+          "why": "The current bubbles response strips article summaries/content, so server needs access to richer content for better summaries without refetching everything."
+        },
+        "llm_guidance": {
+          "cost_profile": "lightweight",
+          "model": "Implementation-defined (use existing provider keys already in the platform unless a new provider is explicitly required)",
+          "output_style": [
+            "3–6 bullet points",
+            "Include dates/names when present",
+            "Include 1–3 relevant article links as citations when possible"
+          ]
+        }
+      }
+    },
+    "data_contracts": {
+      "topic_source": {
+        "recommended": "/get_user_organization_data/ topics[]",
+        "required_fields": ["topics[].id", "topics[].name", "topics[].sources"]
+      },
+      "bubbles_run_response": {
+        "minimum": ["clusters[].common_words", "clusters[].articles[].title", "clusters[].articles[].link", "clusters[].articles[].favicon"],
+        "recommended_additions": ["cache_key", "failed_sources"]
+      }
+    },
+    "acceptance_criteria": [
+      "User can open Bubbles and see a topic list with search.",
+      "User can select a topic and the canvas renders clusters for that topic without manual RSS entry.",
+      "Settings are accessible via a dropdown and not always visible.",
+      "Top-right includes a placeholder area for a user-provided image/icon.",
+      "Hovering (or equivalent) over a cluster exposes a Summarize action, and a concise cluster summary is displayed in a user-friendly way.",
+      "UI feels significantly more polished than the current bubbles page and uses theme/tokens rather than hardcoded design values."
+    ],
+    "open_questions": [
+      {
+        "question": "Should cluster summaries be generated automatically for visible clusters (higher cost) or strictly on-demand via Summarize (lower cost)?",
+        "why_it_matters": "Cost and latency vs perceived usefulness."
+      },
+      {
+        "question": "Should Bubbles be available to all plans or only certain plans (e.g., internal/debug vs product feature)?",
+        "why_it_matters": "Access control and cost containment."
+      }
+    ],
+    "assumptions": [
+      "Organizations already have Topics configured with RSS sources.",
+      "Build AI will implement styling consistent with Briefed without the PRD hardcoding exact colors/fonts/spacings."
+    ]
+  }
+}
+
+
