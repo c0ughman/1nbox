@@ -191,9 +191,7 @@ ORGANIZATION CONTEXT:
 RECENT NEWS CONTEXT:
 {news_context[:15000]}
 
-USER QUERY: {query}
-
-Analyze this query in the context of the organization above and the clarifying information provided. Your response MUST be a valid JSON object with this exact structure (output ONLY valid JSON, no markdown code blocks):
+Based on the organization context, clarifying information, and recent news provided above, generate a comprehensive strategic analysis. Your response MUST be a valid JSON object with this exact structure (output ONLY valid JSON, no markdown code blocks):
 
 {{
   "top_insight": {{
