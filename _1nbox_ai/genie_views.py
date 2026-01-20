@@ -77,17 +77,21 @@ def generate_questionnaire(query):
         raise ValueError("Gemini API key not found. Set GEMINI_API_KEY or GEMINI_KEY.")
 
     genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+    model = genai.GenerativeModel("gemini-3-flash-preview")
 
-    prompt = f"""You are helping to refine a strategic intelligence query. Based on the user's question, generate 3-5 clarifying questions that will help provide better, more targeted analysis.
+    prompt = f"""You are helping a user make an important strategic decision. Based on their question, generate 3-5 clarifying questions that will help them make the best possible decision.
 
 USER QUERY: {query}
 
 Generate questions that will help understand:
-- Specific context or constraints
-- Timeframes or priorities
-- Stakeholder perspectives
-- Risk tolerance or strategic goals
+- User's preferences and priorities
+- Trade-offs they're willing to accept
+- Constraints and requirements
+- Risk tolerance
+- Decision criteria and success metrics
+- Stakeholder perspectives that matter
+
+The goal is to gather information that will inform a comprehensive decision-making report - "everything you need to know before making this decision."
 
 Your response MUST be a valid JSON object with this exact structure (output ONLY valid JSON, no markdown):
 
@@ -161,8 +165,8 @@ def generate_analysis(organization, query, questionnaire_answers, news_context):
         raise ValueError("Gemini API key not found. Set GEMINI_API_KEY or GEMINI_KEY.")
 
     genai.configure(api_key=gemini_key)
-    # Use gemini-2.5-flash-lite (cheapest smart model)
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+    # Use gemini-3-pro-preview for comprehensive decision support
+    model = genai.GenerativeModel("gemini-3-pro-preview")
 
     org_context = f"""
 ORGANIZATION CONTEXT:
@@ -183,7 +187,7 @@ ORGANIZATION CONTEXT:
     for qa in questionnaire_answers:
         qa_context += f"Q: {qa.get('question', '')}\nA: {qa.get('answer', '')}\n\n"
 
-    prompt = f"""You are Briefed Genie, a strategic intelligence analyst. Provide deep, actionable analysis tailored to the user's specific organization.
+    prompt = f"""You are Briefed Genie, a strategic decision support system. Your role is to provide everything the user needs to know before making an important decision. This is decision-making support, not just analysis.
 
 {org_context}
 {qa_context}
@@ -191,7 +195,9 @@ ORGANIZATION CONTEXT:
 RECENT NEWS CONTEXT:
 {news_context[:15000]}
 
-Based on the organization context, clarifying information, and recent news provided above, generate a comprehensive strategic analysis. Your response MUST be a valid JSON object with this exact structure (output ONLY valid JSON, no markdown code blocks):
+Based on the organization context, user preferences/trade-offs, and recent news provided above, generate a comprehensive decision support report. This should be "everything you need to know before making this decision" - complete, actionable, and tailored to help the user make the best possible choice.
+
+Your response MUST be a valid JSON object with this exact structure (output ONLY valid JSON, no markdown code blocks):
 
 {{
   "top_insight": {{
