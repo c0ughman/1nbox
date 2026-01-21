@@ -824,19 +824,19 @@ def analyze(request):
                     deep_research_images, deep_research_sources = extract_images_and_sources_from_deep_research(deep_research_results)
                     print(f"Extracted {len(deep_research_images)} images and {len(deep_research_sources)} sources from Deep Research")
                 except TimeoutError as te:
-                    # Deep Research timed out - show error in development
-                    error_msg = f"Deep Research timed out: {str(te)}"
+                    # Deep Research timed out - continue with other sources instead of failing
+                    error_msg = f"Deep Research timed out after 15 minutes: {str(te)}"
                     print(error_msg)
-                    analysis.status = 'failed'
-                    analysis.results = {'error': error_msg}
-                    analysis.save()
-                    return JsonResponse({
-                        'id': analysis.id,
-                        'status': 'failed',
-                        'error': error_msg
-                    }, status=500)
+                    deep_research_results = error_msg
+                    # Continue with analysis using other data sources
                 except Exception as dr_error:
-                    # Deep Research failed - show error in development
+                    # Deep Research failed - continue with other sources instead of failing
+                    import traceback
+                    traceback.print_exc()
+                    error_msg = f"Deep Research encountered an error: {str(dr_error)}"
+                    print(error_msg)
+                    deep_research_results = error_msg
+                    # Continue with analysis using other data sources
                     error_msg = f"Deep Research failed: {str(dr_error)}"
                     print(error_msg)
                     analysis.status = 'failed'

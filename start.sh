@@ -93,14 +93,15 @@ fi
 
 # Start Gunicorn with error handling
 # Note: --preload removed as it can cause issues with Django apps
+# Timeout increased to 20 minutes (1200s) to handle Deep Research which can take 5-15 minutes
 echo "Starting Gunicorn server..." >&2
-echo "Gunicorn command: gunicorn _1nbox_ai.wsgi --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120" >&2
+echo "Gunicorn command: gunicorn _1nbox_ai.wsgi --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 1200" >&2
 
 # Use exec to replace shell process, but ensure stderr goes to stdout for Railway
 exec gunicorn _1nbox_ai.wsgi \
     --bind 0.0.0.0:${PORT:-8000} \
     --workers 2 \
-    --timeout 120 \
+    --timeout 1200 \
     --access-logfile - \
     --error-logfile - \
     --log-level debug \
