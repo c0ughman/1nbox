@@ -1,5 +1,7 @@
 import json
 import os
+import time
+import re
 from datetime import datetime
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -8,6 +10,8 @@ from django.utils import timezone
 from firebase_admin import auth
 from functools import wraps
 from google import generativeai as genai
+from google import genai as genai_client
+from urllib.parse import urlparse
 
 from .models import User, Organization, GenieAnalysis, Topic
 
@@ -40,6 +44,9 @@ def get_news_context(organization, topic_ids=None):
     Args:
         organization: Organization object
         topic_ids: Optional list of topic IDs to filter by
+    
+    Returns:
+        tuple: (context_string, sources_list)
     """
     if topic_ids:
         topics = organization.topics.filter(id__in=topic_ids)
@@ -47,6 +54,7 @@ def get_news_context(organization, topic_ids=None):
         topics = organization.topics.all()
     
     context = ""
+    sources = []
 
     for topic in topics:
         latest_summary = topic.summaries.first()
@@ -66,8 +74,263 @@ def get_news_context(organization, topic_ids=None):
         if latest_summary.cluster_summaries:
             for cs in latest_summary.cluster_summaries[:3]:
                 context += f"{cs[:500]}...\n\n"
+        
+        # Collect sources from topic
+        if topic.sources:
+            for source_url in topic.sources:
+                try:
+                    parsed = urlparse(source_url)
+                    domain = parsed.netloc.replace('www.', '')
+                    if domain and domain not in [s.get('domain', '') for s in sources]:
+                        sources.append({
+                            'url': source_url,
+                            'domain': domain,
+                            'name': domain.split('.')[0].title() if '.' in domain else domain,
+                            'type': 'topic'
+                        })
+                except:
+                    pass
 
-    return context
+    return context, sources
+
+
+def extract_images_and_sources_from_deep_research(deep_research_results):
+    """Extract images and sources from Deep Research results.
+    
+    Args:
+        deep_research_results: String containing Deep Research output
+    
+    Returns:
+        tuple: (images_list, sources_list)
+    """
+    images = []
+    sources = []
+    
+    if not deep_research_results:
+        return images, sources
+    
+    # Extract URLs (both images and regular URLs)
+    url_pattern = r'https?://[^\s\)]+'
+    urls = re.findall(url_pattern, deep_research_results)
+    
+    # Image extensions
+    image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp']
+    
+    for url in urls:
+        # Clean URL (remove trailing punctuation)
+        url = url.rstrip('.,;:!?)')
+        
+        # Check if it's an image
+        is_image = any(url.lower().endswith(ext) for ext in image_extensions) or 'image' in url.lower()
+        
+        if is_image:
+            # Extract domain for image source
+            try:
+                parsed = urlparse(url)
+                domain = parsed.netloc.replace('www.', '')
+                if url not in [img.get('url', '') for img in images]:
+                    images.append({
+                        'url': url,
+                        'source': domain,
+                        'alt': f'Chart from {domain}'
+                    })
+            except:
+                pass
+        else:
+            # Regular source URL
+            try:
+                parsed = urlparse(url)
+                domain = parsed.netloc.replace('www.', '')
+                if domain and url not in [s.get('url', '') for s in sources]:
+                    sources.append({
+                        'url': url,
+                        'domain': domain,
+                        'name': domain.split('.')[0].title() if '.' in domain else domain,
+                        'type': 'deep_research'
+                    })
+            except:
+                pass
+    
+    # Also look for citation patterns in the text
+    citation_patterns = [
+        r'\[(\d+)\]\((https?://[^\)]+)\)',  # Markdown links [1](url)
+        r'Source:\s*(https?://[^\s]+)',  # Source: url
+        r'Cited:\s*(https?://[^\s]+)',  # Cited: url
+        r'Reference:\s*(https?://[^\s]+)',  # Reference: url
+    ]
+    
+    for pattern in citation_patterns:
+        matches = re.findall(pattern, deep_research_results, re.IGNORECASE)
+        for match in matches:
+            url = match if isinstance(match, str) else match[1] if isinstance(match, tuple) else match
+            try:
+                parsed = urlparse(url)
+                domain = parsed.netloc.replace('www.', '')
+                if domain and url not in [s.get('url', '') for s in sources]:
+                    sources.append({
+                        'url': url,
+                        'domain': domain,
+                        'name': domain.split('.')[0].title() if '.' in domain else domain,
+                        'type': 'deep_research'
+                    })
+            except:
+                pass
+    
+    return images, sources
+
+
+def start_deep_research(query, organization):
+    """Start Deep Research in background and return interaction ID.
+    
+    Args:
+        query: User's query
+        organization: Organization object for context
+    
+    Returns:
+        interaction_id: String ID to track the research task
+    """
+    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_KEY")
+    if not gemini_key:
+        raise ValueError("Gemini API key not found. Set GEMINI_API_KEY or GEMINI_KEY.")
+    
+    client = genai_client.Client(api_key=gemini_key)
+    
+    # Build comprehensive research prompt focused on decision-making
+    research_prompt = f"""You are conducting comprehensive deep research to support a critical business decision.
+
+DECISION CONTEXT:
+{query}
+
+ORGANIZATION BACKGROUND:
+- Organization: {organization.name}
+- Industry: {organization.industry or 'Not specified'}
+- Key Products/Services: {', '.join(organization.key_products or []) or 'Not specified'}
+- Main Competitors: {', '.join(organization.competitors or []) or 'Not specified'}
+- Target Markets: {', '.join(organization.target_markets or []) or 'Not specified'}
+- Strategic Priorities: {', '.join(organization.strategic_priorities or []) or 'Not specified'}
+
+RESEARCH OBJECTIVES:
+Your goal is to gather ALL information necessary for making the best possible decision. This research will be used to create a comprehensive decision support report.
+
+Please investigate and provide:
+
+1. **Current Market Dynamics & Trends**
+   - Latest developments in the relevant market/industry
+   - Key trends that could impact this decision
+   - Market size, growth rates, and forecasts
+
+2. **Historical Context & Precedents**
+   - Similar decisions/situations from the past
+   - What worked and what didn't
+   - Lessons learned from comparable scenarios
+
+3. **Risk Analysis**
+   - Potential risks and their likelihood
+   - Risk mitigation strategies
+   - Early warning signs to monitor
+
+4. **Opportunity Assessment**
+   - Potential benefits and upside scenarios
+   - Competitive advantages that could be leveraged
+   - Timing considerations and windows of opportunity
+
+5. **Expert Perspectives & Analysis**
+   - Industry expert opinions
+   - Analyst reports and forecasts
+   - Academic research if relevant
+
+6. **Quantitative Data & Metrics**
+   - Relevant statistics and data points
+   - Financial implications and projections
+   - Benchmarks and comparisons
+
+7. **Stakeholder Considerations**
+   - Impact on different stakeholder groups
+   - Customer sentiment and needs
+   - Competitive responses to anticipate
+
+IMPORTANT INSTRUCTIONS:
+- Focus on ACTIONABLE insights that will directly inform decision-making
+- Prioritize recent, relevant information (last 6-12 months most important)
+- Include specific data points, numbers, and citations wherever possible
+- Look for both supporting and contradicting evidence
+- Consider multiple scenarios and perspectives
+- This is for strategic business decision support - be thorough and objective
+
+Format your research with clear sections, bullet points, and citations. Include source URLs for all major findings."""
+    
+    try:
+        # Start Deep Research with the agent
+        interaction = client.interactions.create(
+            input=research_prompt,
+            agent='deep-research-pro-preview-12-2025',
+            background=True
+        )
+        
+        print(f"Deep Research started: {interaction.id}")
+        return interaction.id
+        
+    except Exception as e:
+        print(f"Failed to start Deep Research: {str(e)}")
+        raise
+
+
+def get_deep_research_results(interaction_id, timeout_minutes=15):
+    """Poll for Deep Research completion and return results.
+    
+    Args:
+        interaction_id: The interaction ID from start_deep_research
+        timeout_minutes: Maximum time to wait (default 15 minutes)
+    
+    Returns:
+        research_results: String containing the research findings
+    """
+    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_KEY")
+    if not gemini_key:
+        raise ValueError("Gemini API key not found.")
+    
+    client = genai_client.Client(api_key=gemini_key)
+    
+    start_time = time.time()
+    timeout_seconds = timeout_minutes * 60
+    poll_interval = 10  # Poll every 10 seconds
+    
+    print(f"Polling for Deep Research results: {interaction_id}")
+    
+    while True:
+        try:
+            interaction = client.interactions.get(interaction_id)
+            
+            if interaction.status == "completed":
+                print(f"Deep Research completed: {interaction_id}")
+                # Get the final output text
+                if interaction.outputs and len(interaction.outputs) > 0:
+                    return interaction.outputs[-1].text
+                else:
+                    return "Deep Research completed but no output was generated."
+            
+            elif interaction.status == "failed":
+                error_msg = f"Deep Research failed: {getattr(interaction, 'error', 'Unknown error')}"
+                print(error_msg)
+                raise Exception(error_msg)
+            
+            # Check timeout
+            elapsed = time.time() - start_time
+            if elapsed > timeout_seconds:
+                timeout_msg = f"Deep Research exceeded {timeout_minutes} minute timeout (still processing)"
+                print(timeout_msg)
+                raise TimeoutError(timeout_msg)
+            
+            # Log progress
+            remaining = timeout_seconds - elapsed
+            print(f"Deep Research still processing... {remaining:.0f}s remaining")
+            
+            # Wait before next poll
+            time.sleep(poll_interval)
+            
+        except (TimeoutError, Exception) as e:
+            # Re-raise the exception to be handled by caller
+            raise
 
 
 def generate_questionnaire(query):
@@ -158,7 +421,7 @@ RULES:
     return questionnaire
 
 
-def generate_analysis(organization, query, questionnaire_answers, news_context):
+def generate_analysis(organization, query, questionnaire_answers, news_context, deep_research_results="", images=None, sources=None):
     # Support both GEMINI_API_KEY and GEMINI_KEY for backwards compatibility
     gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_KEY")
     if not gemini_key:
@@ -187,6 +450,21 @@ ORGANIZATION CONTEXT:
     for qa in questionnaire_answers:
         qa_context += f"Q: {qa.get('question', '')}\nA: {qa.get('answer', '')}\n\n"
 
+    # Add deep research section if available
+    deep_research_section = ""
+    if deep_research_results:
+        # Limit deep research to 25,000 characters to avoid token limits
+        truncated_research = deep_research_results[:25000]
+        if len(deep_research_results) > 25000:
+            truncated_research += "\n\n[Deep Research results truncated for length...]"
+        
+        deep_research_section = f"""
+
+DEEP RESEARCH FINDINGS:
+{truncated_research}
+
+"""
+
     prompt = f"""You are Briefed Genie, a strategic decision support system. Your role is to provide everything the user needs to know before making an important decision. This is decision-making support, not just analysis.
 
 {org_context}
@@ -194,8 +472,9 @@ ORGANIZATION CONTEXT:
 
 RECENT NEWS CONTEXT:
 {news_context[:15000]}
+{deep_research_section}
 
-Based on the organization context, user preferences/trade-offs, and recent news provided above, generate a comprehensive decision support report. This should be "everything you need to know before making this decision" - complete, actionable, and tailored to help the user make the best possible choice.
+Based on ALL the information provided above (organization context, user preferences, recent news{', and comprehensive deep research findings' if deep_research_results else ''}), generate a comprehensive decision support report. This should be "everything you need to know before making this decision" - complete, actionable, and tailored to help the user make the best possible choice.
 
 Your response MUST be a valid JSON object with this exact structure (output ONLY valid JSON, no markdown code blocks):
 
@@ -217,6 +496,21 @@ Your response MUST be a valid JSON object with this exact structure (output ONLY
     "attribution": "Source or expert name and title"
   }},
   "sources_analyzed": 8,
+  "images": [
+    {{
+      "url": "https://example.com/chart.png",
+      "source": "Example Source",
+      "alt": "Chart description"
+    }}
+  ],
+  "sources": [
+    {{
+      "url": "https://example.com/article",
+      "domain": "example.com",
+      "name": "Example",
+      "type": "deep_research"
+    }}
+  ],
   "full_analysis": {{
     "executive_summary": "2-3 paragraph summary of findings",
     "current_dynamics": "Analysis of current market/situation dynamics",
@@ -303,6 +597,14 @@ IMPORTANT:
             "confidence_score": 0.5,
             "data_freshness": datetime.now().strftime('%Y-%m-%d')
         }
+    
+    # Add images and sources to the response (override if model didn't include them)
+    if images:
+        analysis_data['images'] = images
+    if sources:
+        analysis_data['sources'] = sources
+        # Update sources_analyzed count
+        analysis_data['sources_analyzed'] = len(sources)
 
     return analysis_data
 
@@ -390,24 +692,53 @@ def organization_profile(request):
 @firebase_auth_required
 @require_http_methods(["POST"])
 def questionnaire(request):
-    """Generate a questionnaire based on user's query."""
+    """Generate a questionnaire based on user's query and optionally start Deep Research."""
     try:
         firebase_user = request.firebase_user
         email = firebase_user['email']
-        user = User.objects.get(email=email)
+        user = User.objects.select_related('organization').get(email=email)
+        organization = user.organization
 
         data = json.loads(request.body)
         query = data.get('query')
+        research_type = data.get('research_type', 'quick')  # 'quick', 'comprehensive', or 'deep'
 
         if not query:
             return JsonResponse({'error': 'Query is required'}, status=400)
 
+        # Validate research_type
+        if research_type not in ['quick', 'comprehensive', 'deep']:
+            return JsonResponse({'error': 'Invalid research_type'}, status=400)
+
         try:
+            # Generate questionnaire
             questionnaire_data = generate_questionnaire(query)
-            return JsonResponse({
+            
+            # Start Deep Research if research_type is 'deep'
+            deep_research_id = None
+            if research_type == 'deep':
+                try:
+                    deep_research_id = start_deep_research(query, organization)
+                    print(f"Deep Research initiated: {deep_research_id}")
+                except Exception as dr_error:
+                    # Log the error but don't fail the entire request
+                    print(f"Failed to start Deep Research: {str(dr_error)}")
+                    # In development, we want to see this error
+                    return JsonResponse({
+                        'error': f'Failed to start Deep Research: {str(dr_error)}'
+                    }, status=500)
+            
+            response_data = {
                 'success': True,
-                'questionnaire': questionnaire_data
-            })
+                'questionnaire': questionnaire_data,
+                'research_type': research_type
+            }
+            
+            if deep_research_id:
+                response_data['deep_research_id'] = deep_research_id
+            
+            return JsonResponse(response_data)
+            
         except Exception as e:
             print(f"Questionnaire generation failed: {str(e)}")
             return JsonResponse({
@@ -427,7 +758,7 @@ def questionnaire(request):
 @firebase_auth_required
 @require_http_methods(["POST"])
 def analyze(request):
-    """Generate final analysis with questionnaire answers and selected topics."""
+    """Generate final analysis with questionnaire answers, selected topics, and optional Deep Research."""
     try:
         firebase_user = request.firebase_user
         email = firebase_user['email']
@@ -438,6 +769,8 @@ def analyze(request):
         query = data.get('query')
         questionnaire_answers = data.get('questionnaire_answers', [])
         topic_ids = data.get('topic_ids', [])
+        research_type = data.get('research_type', 'quick')
+        deep_research_id = data.get('deep_research_id')
 
         if not query:
             return JsonResponse({'error': 'Query is required'}, status=400)
@@ -446,15 +779,75 @@ def analyze(request):
             user=user,
             organization=organization,
             query=query,
-            status='processing'
+            status='processing',
+            research_type=research_type,
+            deep_research_id=deep_research_id
         )
 
         try:
-            # Get news context from selected topics
-            news_context = get_news_context(organization, topic_ids if topic_ids else None)
+            # Get news context from selected topics (returns context and sources)
+            news_context, topic_sources = get_news_context(organization, topic_ids if topic_ids else None)
             
-            # Generate analysis with questionnaire answers
-            results = generate_analysis(organization, query, questionnaire_answers, news_context)
+            # Wait for Deep Research to complete if this is a deep research request
+            deep_research_results = ""
+            deep_research_images = []
+            deep_research_sources = []
+            if research_type == 'deep' and deep_research_id:
+                try:
+                    print(f"Waiting for Deep Research to complete: {deep_research_id}")
+                    deep_research_results = get_deep_research_results(deep_research_id, timeout_minutes=15)
+                    analysis.deep_research_results = deep_research_results
+                    analysis.save()
+                    print(f"Deep Research completed successfully. Length: {len(deep_research_results)} chars")
+                    
+                    # Extract images and sources from Deep Research
+                    deep_research_images, deep_research_sources = extract_images_and_sources_from_deep_research(deep_research_results)
+                    print(f"Extracted {len(deep_research_images)} images and {len(deep_research_sources)} sources from Deep Research")
+                except TimeoutError as te:
+                    # Deep Research timed out - show error in development
+                    error_msg = f"Deep Research timed out: {str(te)}"
+                    print(error_msg)
+                    analysis.status = 'failed'
+                    analysis.results = {'error': error_msg}
+                    analysis.save()
+                    return JsonResponse({
+                        'id': analysis.id,
+                        'status': 'failed',
+                        'error': error_msg
+                    }, status=500)
+                except Exception as dr_error:
+                    # Deep Research failed - show error in development
+                    error_msg = f"Deep Research failed: {str(dr_error)}"
+                    print(error_msg)
+                    analysis.status = 'failed'
+                    analysis.results = {'error': error_msg}
+                    analysis.save()
+                    return JsonResponse({
+                        'id': analysis.id,
+                        'status': 'failed',
+                        'error': error_msg
+                    }, status=500)
+            
+            # Combine all sources (topics + deep research)
+            all_sources = topic_sources + deep_research_sources
+            # Remove duplicates based on URL
+            seen_urls = set()
+            unique_sources = []
+            for source in all_sources:
+                if source['url'] not in seen_urls:
+                    seen_urls.add(source['url'])
+                    unique_sources.append(source)
+            
+            # Generate final analysis with all context including deep research
+            results = generate_analysis(
+                organization, 
+                query, 
+                questionnaire_answers, 
+                news_context,
+                deep_research_results,  # Pass deep research results
+                deep_research_images,   # Pass images
+                unique_sources          # Pass all sources
+            )
 
             analysis.results = results
             analysis.status = 'completed'
@@ -466,6 +859,8 @@ def analyze(request):
                 'status': 'completed',
                 'query': analysis.query,
                 'results': results,
+                'research_type': analysis.research_type,
+                'deep_research_included': bool(deep_research_results),
                 'created_at': analysis.created_at,
                 'completed_at': analysis.completed_at,
             })
@@ -478,7 +873,7 @@ def analyze(request):
             return JsonResponse({
                 'id': analysis.id,
                 'status': 'failed',
-                'error': 'Analysis generation failed'
+                'error': f'Analysis generation failed: {str(e)}'
             }, status=500)
 
     except User.DoesNotExist:
