@@ -10,8 +10,16 @@ from django.utils import timezone
 from firebase_admin import auth
 from functools import wraps
 from google import generativeai as genai
-from google import genai as genai_client
 from urllib.parse import urlparse
+
+# Import genai_client only when needed (for Deep Research Interactions API)
+# This avoids import errors if the package isn't available
+try:
+    from google import genai as genai_client
+except ImportError:
+    # If google.genai is not available, set to None
+    # Deep Research functions will handle this gracefully
+    genai_client = None
 
 from .models import User, Organization, GenieAnalysis, Topic
 
@@ -189,6 +197,12 @@ def start_deep_research(query, organization):
     Returns:
         interaction_id: String ID to track the research task
     """
+    if genai_client is None:
+        raise ImportError(
+            "Deep Research requires the 'google-genai' package. "
+            "Install it with: pip install google-genai"
+        )
+    
     gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_KEY")
     if not gemini_key:
         raise ValueError("Gemini API key not found. Set GEMINI_API_KEY or GEMINI_KEY.")
@@ -285,6 +299,12 @@ def get_deep_research_results(interaction_id, timeout_minutes=15):
     Returns:
         research_results: String containing the research findings
     """
+    if genai_client is None:
+        raise ImportError(
+            "Deep Research requires the 'google-genai' package. "
+            "Install it with: pip install google-genai"
+        )
+    
     gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_KEY")
     if not gemini_key:
         raise ValueError("Gemini API key not found.")
