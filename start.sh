@@ -34,13 +34,17 @@ if [ $STATIC_EXIT -ne 0 ]; then
     echo "WARNING: Static files collection failed (exit $STATIC_EXIT), continuing..." >&2
 fi
 
-# Run migrations
+# Run migrations (CRITICAL - must succeed before starting server)
 echo "Running database migrations..." >&2
 python manage.py migrate --noinput 2>&1
 MIGRATE_EXIT=$?
 if [ $MIGRATE_EXIT -ne 0 ]; then
-    echo "WARNING: Migrations failed (exit $MIGRATE_EXIT), continuing..." >&2
+    echo "❌ FATAL ERROR: Migrations failed with exit code $MIGRATE_EXIT!" >&2
+    echo "The server cannot start without successful migrations." >&2
+    echo "Please check your database connection and migration files." >&2
+    exit 1
 fi
+echo "✓ Migrations completed successfully" >&2
 
 # Check if this is a cron job (Railway sets CRON_COMMAND env var for cron jobs)
 if [ -n "$CRON_COMMAND" ]; then
