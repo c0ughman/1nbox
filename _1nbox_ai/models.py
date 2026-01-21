@@ -192,6 +192,12 @@ class GenieAnalysis(models.Model):
         ('completed', 'Completed'),
         ('failed', 'Failed'),
     ]
+    
+    RESEARCH_TYPE_CHOICES = [
+        ('quick', 'Quick'),
+        ('comprehensive', 'Comprehensive'),
+        ('deep', 'Deep Research'),
+    ]
 
     user = models.ForeignKey(
         User,
@@ -209,6 +215,13 @@ class GenieAnalysis(models.Model):
         choices=STATUS_CHOICES,
         default='pending'
     )
+    research_type = models.CharField(
+        max_length=20,
+        choices=RESEARCH_TYPE_CHOICES,
+        default='quick'
+    )
+    deep_research_id = models.CharField(max_length=255, blank=True, null=True)
+    deep_research_results = models.TextField(blank=True, null=True)
     results = models.JSONField(default=dict, blank=True, null=True)
     sources = models.JSONField(default=list, blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
