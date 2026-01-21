@@ -1,358 +1,334 @@
-# 🚀 Deployment Checklist - Railway
+# 🚀 Deep Research Deployment Checklist
 
-## ✅ Pre-Deployment (Do This First)
+## ✅ Pre-Deployment Checklist
 
-- [ ] Read `RAILWAY_DEPLOYMENT_GUIDE.md` (comprehensive guide)
-- [ ] Have Railway account ready
-- [ ] Have git access to your repository
+### 1. API Keys & Environment Variables
+
+**✅ NO ADDITIONAL API KEYS NEEDED!**
+
+You already have everything you need:
+- ✅ **Same Gemini API Key**: Use your existing `GEMINI_API_KEY` or `GEMINI_KEY`
+- ✅ **No new services**: Uses existing Google AI Studio API
+- ✅ **No additional setup**: Just ensure API key has Interactions API access
+
+**Environment Variable:**
+```bash
+export GEMINI_API_KEY="your-existing-gemini-api-key"
+# OR
+export GEMINI_KEY="your-existing-gemini-api-key"
+```
+
+**Note**: The same API key that works for regular Gemini calls should work for Deep Research. If you get errors, ensure:
+- API key is from Google AI Studio (not Vertex AI)
+- Interactions API is enabled for your project
+- Billing is enabled (Deep Research costs $2-5 per request)
 
 ---
 
-## 📦 Step 1: Push Code to Railway (5 min)
+### 2. Python Packages
+
+**✅ NO ADDITIONAL PACKAGES NEEDED!**
+
+The code uses `google-generativeai` which is **already in your requirements.txt**.
+
+**Verify installation:**
+```bash
+pip show google-generativeai
+```
+
+**If you get import errors:**
+```bash
+pip install --upgrade google-generativeai
+```
+
+The `google.genai` module (for Interactions API) is part of the `google-generativeai` package.
+
+---
+
+### 3. Database Migration
+
+**✅ REQUIRED: Run migration before testing**
+
+```bash
+cd /Users/coughman/Desktop/Briefed/briefed/1nbox
+python manage.py migrate _1nbox_ai
+```
+
+**Expected output:**
+```
+Running migrations:
+  Applying _1nbox_ai.0007_add_deep_research_fields... OK
+```
+
+---
+
+## 📦 Files Changed Summary
+
+### Backend Files
+- ✅ `1nbox/_1nbox_ai/models.py` - Added 3 new fields
+- ✅ `1nbox/_1nbox_ai/genie_views.py` - Added Deep Research logic
+- ✅ `1nbox/_1nbox_ai/migrations/0007_add_deep_research_fields.py` - NEW migration
+
+### Frontend Files
+- ✅ `1nbox-frontend/js/genie.js` - Added research type tracking
+
+### Documentation Files (NEW)
+- ✅ `DEEP_RESEARCH_IMPLEMENTATION.md` - Full technical guide
+- ✅ `DEEP_RESEARCH_SUMMARY.md` - Quick reference
+- ✅ `DEEP_RESEARCH_TESTING_GUIDE.md` - Detailed testing instructions
+- ✅ `QUICK_TEST_INSTRUCTIONS.md` - Fast testing guide
+- ✅ `GITHUB_COMMIT_GUIDE.md` - Commit instructions
+- ✅ `DEPLOYMENT_CHECKLIST.md` - This file
+
+---
+
+## 🧪 Testing Instructions
+
+### Quick Test (2 minutes)
+
+1. **Set API key** (if not already set):
+   ```bash
+   export GEMINI_API_KEY="your-key"
+   ```
+
+2. **Run migration**:
+   ```bash
+   python manage.py migrate _1nbox_ai
+   ```
+
+3. **Start server**:
+   ```bash
+   python manage.py runserver
+   ```
+
+4. **Test Quick Mode**:
+   - Open Genie
+   - Keep "Comprehensive" selected
+   - Enter query → Generate → Complete questionnaire
+   - ✅ Should work as before
+
+5. **Test Deep Research**:
+   - Select "Deep Research" from dropdown
+   - Enter: `Should we invest in AI in the next 6 months?`
+   - Generate → Complete questionnaire → Wait 5-10 minutes
+   - ✅ Should include comprehensive research
+
+**See `QUICK_TEST_INSTRUCTIONS.md` for detailed steps.**
+
+---
+
+## 📤 Committing to GitHub
+
+### Option 1: Simple Commit (Recommended)
 
 ```bash
 cd /Users/coughman/Desktop/Briefed/briefed/1nbox
 
-# Check status
-git status
-
-# Add files
+# Add all Deep Research files
 git add 1nbox/_1nbox_ai/models.py
-git add 1nbox/_1nbox_ai/news.py
-git add 1nbox/_1nbox_ai/management/commands/runclusternews.py
-git add 1nbox/_1nbox_ai/migrations/0006_add_current_clusters_to_topic.py
+git add 1nbox/_1nbox_ai/genie_views.py
+git add 1nbox/_1nbox_ai/migrations/0007_add_deep_research_fields.py
+git add 1nbox-frontend/js/genie.js
+git add DEEP_RESEARCH_*.md
+git add QUICK_TEST_INSTRUCTIONS.md
+git add GITHUB_COMMIT_GUIDE.md
+git add DEPLOYMENT_CHECKLIST.md
 
 # Commit
-git commit -m "Add cluster news system with conditional summarization"
+git commit -m "feat: Add Gemini Deep Research integration to Genie
 
-# Push (Railway auto-deploys)
+- Add Deep Research option (Quick/Comprehensive/Deep Research)
+- Start Deep Research in background when user clicks Generate
+- Wait for Deep Research completion before final analysis
+- Include Deep Research findings in comprehensive reports
+- Add database fields and migration
+- Update frontend to support research type selection
+- Add comprehensive documentation"
+
+# Push
 git push origin main
 ```
 
-**Checklist:**
-- [ ] Code committed
-- [ ] Code pushed to main branch
-- [ ] Railway deployment started (check dashboard)
-- [ ] Deployment completed successfully
+### Option 2: If Using Submodules
 
----
-
-## 🗄️ Step 2: Run Migration (2 min)
-
-In Railway dashboard or CLI:
+If `1nbox` and `1nbox-frontend` are submodules:
 
 ```bash
-python manage.py migrate
+# Commit in submodules first
+cd 1nbox
+git add _1nbox_ai/models.py _1nbox_ai/genie_views.py _1nbox_ai/migrations/0007_add_deep_research_fields.py
+git commit -m "feat: Add Deep Research backend integration"
+git push
+
+cd ../1nbox-frontend
+git add js/genie.js
+git commit -m "feat: Add Deep Research frontend integration"
+git push
+
+# Then commit submodule updates
+cd ..
+git add 1nbox 1nbox-frontend
+git add DEEP_RESEARCH_*.md QUICK_TEST_INSTRUCTIONS.md GITHUB_COMMIT_GUIDE.md DEPLOYMENT_CHECKLIST.md
+git commit -m "feat: Add Deep Research feature with documentation"
+git push
 ```
 
-**Expected Output:**
-```
-Running migrations:
-  Applying _1nbox_ai.0006_add_current_clusters_to_topic... OK
-```
-
-**Checklist:**
-- [ ] Migration ran successfully
-- [ ] No errors in output
+**See `GITHUB_COMMIT_GUIDE.md` for detailed instructions.**
 
 ---
 
-## 🧪 Step 3: Test It Works (5 min)
+## 🔍 What to Verify After Deployment
 
-Run test command:
+### 1. Backend Verification
 
-```bash
-python manage.py runclusternews
-```
-
-**Check for these in logs:**
-- ✅ "Retrieved X articles from..."
-- ✅ "Generated X clusters"
-- ✅ "Successfully saved new summary"
-
-**Checklist:**
-- [ ] Command runs without errors
-- [ ] Articles are being fetched
-- [ ] Clusters are being generated
-- [ ] Summaries are being saved
-- [ ] Can see new Summary records in database
-
----
-
-## ⏰ Step 4: Create First Cron - Main Processor (5 min)
-
-**In Railway Dashboard:**
-
-1. Click "+ New" → "Cron Job"
-
-**Configuration:**
-```
-Service Name: cluster-news-processor
-Cron Schedule: */15 * * * *
-Command: python manage.py runclusternews
-```
-
-2. Link Database Service
-3. Copy ALL environment variables from web service:
-   - DATABASE_URL (auto-added when linking)
-   - OPENAI_KEY
-   - GEMINI_API_KEY or GEMINI_KEY
-   - DJANGO_SECRET_KEY
-   - All Firebase variables
-   - All other variables
-
-**Checklist:**
-- [ ] Cron service created
-- [ ] Schedule set to `*/15 * * * *`
-- [ ] Command is `python manage.py runclusternews`
-- [ ] Database linked
-- [ ] All environment variables added
-- [ ] Service deployed successfully
-
----
-
-## 🧹 Step 5: Create Second Cron - Cleanup (5 min)
-
-**In Railway Dashboard:**
-
-1. Click "+ New" → "Cron Job"
-
-**Configuration:**
-```
-Service Name: cleanup-old-summaries
-Cron Schedule: 0 2 * * *
-Command: python manage.py runclusternews --cleanup
-```
-
-2. Link Database Service
-3. Copy ALL environment variables (same as step 4)
-
-**Checklist:**
-- [ ] Cron service created
-- [ ] Schedule set to `0 2 * * *`
-- [ ] Command is `python manage.py runclusternews --cleanup`
-- [ ] Database linked
-- [ ] All environment variables added
-- [ ] Service deployed successfully
-
----
-
-## 👀 Step 6: Verify First Cron Run (15 min)
-
-**Wait for next 15-minute mark** (e.g., if it's 2:07 PM, wait until 2:15 PM)
-
-**Then check:**
-
-1. **View Logs:**
-   - Go to `cluster-news-processor` in Railway
-   - Click "Logs" tab
-   - Should see processing logs
-
-2. **Check Database:**
-```bash
-python manage.py shell
-
->>> from _1nbox_ai.models import Summary
->>> from datetime import datetime, timedelta
->>> recent = Summary.objects.filter(created_at__gte=datetime.now()-timedelta(hours=1))
->>> print(f"Summaries in last hour: {recent.count()}")
-```
-
-**Checklist:**
-- [ ] Cron ran at scheduled time
-- [ ] Logs show successful processing
-- [ ] New summaries created (or logs show "didn't change enough")
-- [ ] No errors in logs
-
----
-
-## 📊 Step 7: Monitor for 24 Hours
-
-### After 1 Hour:
-- [ ] At least 1 cron run completed
-- [ ] Summaries visible in database
-- [ ] Frontend showing new summaries
-
-### After 4 Hours:
-- [ ] Multiple cron runs completed (at least 16 runs)
-- [ ] Some runs created summaries (>40% change)
-- [ ] Some runs skipped summaries (<40% change)
-- [ ] No consistent errors
-
-### After 24 Hours:
-- [ ] ~96 cron runs total (4 per hour × 24 hours)
-- [ ] 6-10 summaries created per topic
-- [ ] Cleanup cron ran once (at 2 AM)
-- [ ] Costs within expected range
-
----
-
-## 🎯 Success Indicators
-
-After 24 hours, you should see:
-
-### In Logs:
-```
-✅ "Retrieved X articles from..."
-✅ "Generated X clusters"  
-✅ "Successfully saved new summary" (when changes >40%)
-✋ "didn't change enough (<40%)" (when no changes)
-📊 "Cluster difference: X.XX%"
-```
-
-### In Database:
-- 6-10 Summary records per topic over 24 hours
-- All recent summaries have `current_clusters` in Topic model
-- Old summaries (if >30 days) getting deleted
-
-### In Frontend:
-- Latest summaries showing
-- Summaries updating throughout the day
-- No errors or stale data
-
-### Costs (for 30 topics):
-- OpenAI usage: $12-18/day
-- Gemini usage: $1.20-1.80/day
-- Total: ~$13-20/day (~$400-600/month)
-
----
-
-## ⚠️ Common Issues & Fixes
-
-### Issue: Cron not running
-**Check:**
-- [ ] Cron service is "Active" in Railway
-- [ ] Cron schedule is correct (`*/15 * * * *`)
-- [ ] Environment variables are set
-- [ ] Database is linked
-
-**Fix:** Redeploy the cron service
-
-### Issue: No summaries being created
 **Check logs for:**
-- "Retrieved 0 articles" → RSS sources might be down
-- "No articles found" → Check topic has sources configured
-- "didn't change enough" → This is normal! It means <40% change
+```
+Deep Research started: interactions/abc123xyz
+Polling for Deep Research results...
+Deep Research completed successfully. Length: 12345 chars
+```
 
-**Fix:** Run `python manage.py runnews` to force a summary
+**Test endpoints:**
+- `POST /genie/questionnaire/` with `research_type: "deep"`
+- Should return `deep_research_id` in response
+- `POST /genie/analyze/` should wait for Deep Research
 
-### Issue: Too many summaries
-**If getting 4 summaries per hour (96/day):**
-- 40% threshold might be too sensitive
-- RSS sources are very active
+### 2. Frontend Verification
 
-**Fix:** Increase threshold in code (change 0.40 to 0.50)
+**Check browser console:**
+- Should see: `Deep Research started: interactions/...`
+- Loading message: "Conducting deep research..."
 
-### Issue: Database errors
-**Check:**
-- [ ] DATABASE_URL is set
-- [ ] Database is linked to cron service
-- [ ] Migration ran successfully
+**UI checks:**
+- Dropdown has "Deep Research" option
+- Selecting it triggers Deep Research
+- Loading screen shows correct message
 
-**Fix:** Re-run migration, check database connection
+### 3. Database Verification
 
----
-
-## 📝 Environment Variables Required
-
-Make sure these are in BOTH cron services:
-
-### Critical (Must Have):
-- `DATABASE_URL` ← Auto-added when linking database
-- `OPENAI_KEY` ← For cluster summaries
-- `GEMINI_API_KEY` or `GEMINI_KEY` ← For final summaries
-- `DJANGO_SECRET_KEY` ← Django required
-
-### Firebase (Required):
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_PRIVATE_KEY_ID`
-- `FIREBASE_PRIVATE_KEY`
-- `FIREBASE_CLIENT_EMAIL`
-- `FIREBASE_CLIENT_ID`
-- `FIREBASE_CLIENT_CERT_URL`
-
-### Optional:
-- `SENDGRID_API_KEY` (if using email)
-- Any custom variables your app uses
-
----
-
-## 🔧 Quick Commands Reference
-
-```bash
-# Test manually
-python manage.py runclusternews
-
-# Test with cleanup
-python manage.py runclusternews --cleanup
-
-# Force full regeneration
-python manage.py runnews
-
-# Check recent summaries
+```python
 python manage.py shell
->>> from _1nbox_ai.models import Summary
->>> from datetime import datetime, timedelta
->>> Summary.objects.filter(created_at__gte=datetime.now()-timedelta(hours=1)).count()
-
-# View logs in Railway
-# Dashboard → Service → Logs tab
-
-# Check cron schedule
-# Dashboard → Cron Service → Settings
+>>> from _1nbox_ai.models import GenieAnalysis
+>>> a = GenieAnalysis.objects.filter(research_type='deep').first()
+>>> print(a.research_type)  # 'deep'
+>>> print(a.deep_research_id)  # 'interactions/...'
+>>> print(len(a.deep_research_results))  # > 0
 ```
 
 ---
 
-## 📚 Documentation Files
+## ⚠️ Important Notes
 
-If you need more details:
+### Cost Considerations
 
-1. **`RAILWAY_DEPLOYMENT_GUIDE.md`** ← Full deployment guide
-2. **`CLUSTER_NEWS_SYSTEM_README.md`** ← Technical documentation
-3. **`IMPLEMENTATION_SUMMARY.md`** ← What changed
-4. **`QUICK_START.md`** ← 3-step quick guide
-5. **`DEPLOYMENT_CHECKLIST.md`** ← This file
+- **Quick/Comprehensive**: ~$0.10-0.50 per request (no change)
+- **Deep Research**: ~$2-5 per request (new cost)
+
+**Recommendation**: Consider adding usage limits per organization.
+
+### Performance
+
+- **Quick/Comprehensive**: ~10 seconds total
+- **Deep Research**: ~5-15 minutes total
+  - Most queries: 5-10 minutes
+  - Complex queries: 10-15 minutes
+  - Maximum: 60 minutes (Gemini limit)
+
+### Error Handling
+
+**Development Mode**: Errors are shown to users for debugging
+**Production Mode**: Consider graceful fallback if Deep Research fails
+
+Current behavior:
+- If Deep Research fails → Error message returned
+- If Deep Research times out → Error after 15 minutes
+- If Deep Research not selected → Normal flow (no Deep Research)
+
+---
+
+## 🎯 Success Criteria
+
+Your deployment is successful if:
+
+- ✅ Migration runs without errors
+- ✅ Quick/Comprehensive modes work as before
+- ✅ Deep Research option appears in dropdown
+- ✅ Deep Research starts when selected
+- ✅ Loading waits for Deep Research completion
+- ✅ Final analysis includes Deep Research findings
+- ✅ Database stores research data correctly
+- ✅ No errors in backend logs
+- ✅ No errors in browser console
+
+---
+
+## 📚 Documentation Reference
+
+After deployment, refer to:
+
+1. **`QUICK_TEST_INSTRUCTIONS.md`** - Fast testing guide
+2. **`DEEP_RESEARCH_TESTING_GUIDE.md`** - Comprehensive testing
+3. **`DEEP_RESEARCH_IMPLEMENTATION.md`** - Technical details
+4. **`DEEP_RESEARCH_SUMMARY.md`** - Quick reference
+
+---
+
+## 🆘 Troubleshooting
+
+### Issue: "Failed to start Deep Research"
+
+**Check:**
+1. API key is set: `echo $GEMINI_API_KEY`
+2. API key is valid (test with simple Gemini call)
+3. API key has Interactions API access
+
+**Solution:**
+- Get API key from [Google AI Studio](https://aistudio.google.com/)
+- Ensure Interactions API is enabled
+- Check billing is enabled
+
+### Issue: "ModuleNotFoundError: No module named 'google.genai'"
+
+**Solution:**
+```bash
+pip install --upgrade google-generativeai
+```
+
+### Issue: Deep Research times out
+
+**Normal**: Complex queries can take 10-15 minutes
+
+**Solution:**
+- Increase timeout in `get_deep_research_results()` function
+- Or retry with simpler query
 
 ---
 
 ## ✅ Final Checklist
 
-Before calling it done:
+Before marking as complete:
 
-- [ ] Code pushed to Railway
+- [ ] API key is set and working
 - [ ] Migration ran successfully
-- [ ] Test command works
-- [ ] First cron service created (every 15 min)
-- [ ] Second cron service created (daily cleanup)
-- [ ] Both cron services have all environment variables
-- [ ] Both cron services linked to database
-- [ ] First cron run completed successfully
-- [ ] Summaries visible in database
-- [ ] Frontend showing updated summaries
-- [ ] No errors in logs
-- [ ] Monitoring for 24 hours planned
+- [ ] Quick mode tested (works as before)
+- [ ] Deep Research tested (completes successfully)
+- [ ] Backend logs show no errors
+- [ ] Frontend console shows no errors
+- [ ] Database fields populated correctly
+- [ ] Documentation reviewed
+- [ ] Code committed to GitHub
+- [ ] Team notified of new feature
 
 ---
 
-## 🎉 You're Done!
+## 🎉 Ready to Deploy!
 
-Once all checkboxes are complete, your system is:
-- ✅ Fetching news every 15 minutes
-- ✅ Clustering automatically
-- ✅ Creating summaries when content changes >40%
-- ✅ Cleaning up old data after 30 days
-- ✅ Providing continuous updates to users
+Everything is ready. Just:
+1. Run migration
+2. Test locally
+3. Commit to GitHub
+4. Deploy!
 
-**Next:** Monitor for 24-48 hours, then you can relax! 🚀
+**Questions?** Check the documentation files or review the code comments.
 
----
-
-## 🆘 Need Help?
-
-1. Check logs: Railway Dashboard → Service → Logs
-2. Test manually: `python manage.py runclusternews`
-3. Check documentation: `RAILWAY_DEPLOYMENT_GUIDE.md`
-4. Review this checklist again
-5. Verify all environment variables are set
-
+Good luck! 🚀
